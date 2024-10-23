@@ -11,10 +11,11 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    cairo.url = "github:cairo-nix/cairo-nix";
   };
 
   # The results of our flake.
-  outputs = { self, nixpkgs, flake-utils, crane, fenix }:
+  outputs = { self, nixpkgs, flake-utils, crane, fenix, cairo }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         # We grab our expected rust version from the Cargo.toml.
