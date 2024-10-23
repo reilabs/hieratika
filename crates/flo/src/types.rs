@@ -78,6 +78,9 @@ pub enum PoisonType {
     /// should not ever be accessed.
     Unreachable,
 
+    /// Indicates a value that is never read from.
+    Unused,
+
     /// This **special case** is the value of the Null interned entry, which
     /// sits at 0 and tries to prevent logic bugs.
     NullInternedValue,

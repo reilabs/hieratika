@@ -269,6 +269,62 @@ impl DataLayout {
         specs.sort();
         specs
     }
+
+    /// Gets the integer layout corresponding to integers of the provided
+    /// `size`, or returns [`None`] if no such layout is available.
+    #[must_use]
+    pub fn int_spec_of(&self, size: usize) -> Option<&IntegerLayout> {
+        self.integer_layouts.iter().find(|int_spec| int_spec.size == size)
+    }
+
+    /// Gets the integer layout corresponding to integers of the provided
+    /// `size`.
+    ///
+    /// # Panics
+    ///
+    /// If no layout exists in the data layout for integers of the provided
+    /// `size`.
+    #[must_use]
+    pub fn expect_int_spec_of(&self, size: usize) -> &IntegerLayout {
+        self.int_spec_of(size)
+            .unwrap_or_else(|| panic!("No layout found for integer of size {size}"))
+    }
+
+    /// Gets the floating-point layout corresponding to floating-point numbers
+    /// of the provided `size`, or returns [`None`] if no such layout is
+    /// available.
+    #[must_use]
+    pub fn float_spec_of(&self, size: usize) -> Option<&FloatLayout> {
+        self.float_layouts.iter().find(|float_spec| float_spec.size == size)
+    }
+
+    /// Gets the floating-point layout corresponding to floating-point numbers
+    /// of the provided `size`.
+    ///
+    /// # Panics
+    ///
+    /// If no layout exists in the data layout for floating-point of the
+    /// provided `size`.
+    #[must_use]
+    pub fn expect_float_spec_of(&self, size: usize) -> &FloatLayout {
+        self.float_spec_of(size)
+            .unwrap_or_else(|| panic!("No layout found for float of size {size}"))
+    }
+
+    /// Gets the pointer layout specification for the default address space.
+    ///
+    /// # Panics
+    ///
+    /// If the data layout somehow does not contain a pointer layout for the
+    /// default address space zero. This is required to exist, so panic here
+    /// indicates a programmer error.
+    #[must_use]
+    pub fn default_pointer_layout(&self) -> &PointerLayout {
+        self.pointer_layouts
+            .iter()
+            .find(|ptr_layout| ptr_layout.address_space == 0)
+            .expect("No pointer layout existed for the default address space")
+    }
 }
 
 impl Default for DataLayout {

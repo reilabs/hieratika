@@ -54,8 +54,9 @@
 pub mod mappings;
 
 use bimap::{BiHashMap, BiMap};
+use hieratika_errors::compile::{Error, Result};
 
-use crate::polyfill::mappings::LLVM_UADD_WITH_OVERFLOW_I64;
+use crate::polyfill::mappings::{LLVM_ALLOCA, LLVM_FENCE, LLVM_STORE, LLVM_UADD_WITH_OVERFLOW_I64};
 
 /// A bidirectional mapping from the builtin names for LLVM to the internal
 /// names for the corresponding polyfills.
@@ -83,15 +84,62 @@ impl PolyfillMap {
 
     /// Queries for the polyfill name that corresponds to the provided
     /// `llvm_name`, returning it if it exists or returning [`None`] otherwise.
-    pub fn polyfill(&self, llvm_name: impl Into<String>) -> Option<&String> {
-        self.mapping.get_by_left(&llvm_name.into())
+    #[must_use]
+    pub fn polyfill(&self, llvm_name: &str) -> Option<&String> {
+        self.mapping.get_by_left(llvm_name)
+    }
+
+    /// Queries for the polyfill name that corresponds to the provided
+    /// `llvm_name`, returning it if it exists or returning an error otherwise.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MissingPolyfill`] if the requested polyfill does not exist.
+    pub fn polyfill_or_err(&self, llvm_name: &str) -> Result<&String> {
+        self.polyfill(llvm_name).ok_or(Error::missing_polyfill(llvm_name))
+    }
+
+    /// Queries for the polyfill name that corresponds to the provided
+    /// `llvm_name`, returning it if it exists.
+    ///
+    /// # Panics
+    ///
+    /// If no polyfill exists for the provided `llvm_name`.
+    #[must_use]
+    pub fn expect_polyfill(&self, llvm_name: &str) -> &String {
+        self.polyfill(llvm_name)
+            .unwrap_or_else(|| panic!("{llvm_name} polyfill was not present"))
     }
 
     /// Queries for the LLVM opcode (as modified by [`Self::of_opcode`]) that
     /// corresponds to the provided `polyfill_name`, returning it if it exists
     /// or returning [`None`] otherwise.
-    pub fn llvm(&self, polyfill_name: impl Into<String>) -> Option<&String> {
-        self.mapping.get_by_right(&polyfill_name.into())
+    #[must_use]
+    pub fn llvm(&self, polyfill_name: &str) -> Option<&String> {
+        self.mapping.get_by_right(polyfill_name)
+    }
+
+    /// Queries for the LLVM opcode (as modified by [`Self::of_opcode`]) that
+    /// corresponds to the provided `polyfill_name`, returning it if it exists
+    /// or returning an error otherwise.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MissingPolyfill`] if the requested polyfill does not exist.
+    pub fn llvm_or_err(&self, polyfill_name: &str) -> Result<&String> {
+        self.llvm(polyfill_name).ok_or(Error::missing_polyfill(polyfill_name))
+    }
+
+    /// Queries for the LLVM opcode (as modified by [`Self::of_opcode`]) that
+    /// corresponds to the provided `polyfill_name`, returning it if it exists.
+    ///
+    /// # Panics
+    ///
+    /// If no llvm name exists for the provided `polyfill_name`.
+    #[must_use]
+    pub fn expect_llvm(&self, polyfill_name: &str) -> &String {
+        self.llvm(polyfill_name)
+            .unwrap_or_else(|| panic!("{polyfill_name} llvm definition was not present"))
     }
 
     /// Provides more information to assist in resolving the correct polyfill
@@ -127,7 +175,12 @@ impl Default for PolyfillMap {
     /// Contains the default mapping from opcodes and builtins to the
     /// corresponding polyfill names.
     fn default() -> Self {
-        let defaults = [LLVM_UADD_WITH_OVERFLOW_I64];
+        let defaults = [
+            LLVM_ALLOCA,
+            LLVM_FENCE,
+            LLVM_STORE,
+            LLVM_UADD_WITH_OVERFLOW_I64,
+        ];
 
         Self::new(
             defaults

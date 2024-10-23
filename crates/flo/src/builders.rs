@@ -185,8 +185,7 @@ impl<'a> BlockBuilder<'a> {
     pub(crate) fn build(mut self, into: Option<BlockId>) -> BlockId {
         // Before we insert the block, we'll set its poison to indicate if it's now
         // ready to use.
-        let is_incomplete =
-            self.block.statements.is_empty() || BlockExit::is_poisoned(&self.block.exit);
+        let is_incomplete = BlockExit::is_poisoned(&self.block.exit);
         self.block.poison = if is_incomplete {
             PoisonType::Incomplete
         } else {
