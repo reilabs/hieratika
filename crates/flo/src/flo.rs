@@ -16,7 +16,9 @@ use bimap::BiMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    builders::BlockBuilder,
     intern::InternTable,
+    poison::Poisonable,
     types::{
         ArrayType,
         ArrayTypeId,
@@ -30,12 +32,16 @@ use crate::{
         LocationId,
         MatchArm,
         MatchArmId,
+        PoisonType,
+        Signature,
         Statement,
         StatementId,
         StructType,
         StructTypeId,
+        Type,
         Variable,
         VariableId,
+        VariableLinkage,
     },
 };
 
@@ -151,6 +157,10 @@ pub struct FlatLoweredObject {
     /// ensure control flow eventually returns with no result.
     pub finalizers: Vec<BlockId>,
 
+    /// Internal varaible whose value is always true.
+    /// Should be set by the CRT0 initializer.   
+    pub fixed_true: VariableId,
+
     // Internal flags.
     /// If set, this allows loading or emitting files that contain poison values
     /// in referenced places. Can be used to allow objects to be serialized
@@ -162,30 +172,41 @@ impl FlatLoweredObject {
     /// Creates a new, empty `FlatLoweredObject`.
     #[must_use]
     pub fn new(module_name: &str) -> Self {
+        let mut variables: InternTable<VariableId, Variable> = InternTable::new();
+
+        // Create a new variable that we can always assume is true.
+        let fixed_true = variables.insert(&Variable {
+            typ: crate::types::Type::Bool,
+            linkage: VariableLinkage::Local,
+            poison: crate::types::PoisonType::None,
+            ..Default::default()
+        });
+
         Self {
             // Header.
             module_name: module_name.to_owned(),
-            version:     None,
-            time:        None,
+            version: None,
+            time: None,
             entry_point: None,
 
             // Symbol tables.
             symbols: SymbolTables::new(),
 
             // Intern tables.
-            blocks:      InternTable::new(),
-            statements:  InternTable::new(),
-            match_arms:  InternTable::new(),
-            variables:   InternTable::new(),
+            blocks: InternTable::new(),
+            statements: InternTable::new(),
+            match_arms: InternTable::new(),
+            variables,
             diagnostics: InternTable::new(),
-            locations:   InternTable::new(),
-            types:       TypeTables::new(),
+            locations: InternTable::new(),
+            types: TypeTables::new(),
 
             // ini and fini
             initializers: Vec::new(),
-            finalizers:   Vec::new(),
+            finalizers: Vec::new(),
 
             // Internal flags.
+            fixed_true,
             allow_incomplete: false,
         }
     }
@@ -318,6 +339,173 @@ impl FlatLoweredObject {
 
         let writer = File::create(filename)?;
         serde_lexpr::to_writer(writer, &self)
+    }
+}
+
+/// Helper functions for adding [Block]s, the core elements of FLO code.
+impl FlatLoweredObject {
+    /// Inserts or creates a block by allowing a method access to a
+    /// `BlockBuilder`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - if a `BlockId` is provided, it will be filled; otherwise a new
+    ///   block will be created
+    /// * `f` - A function to be called with the `BlockBuilder` as its argument;
+    ///   used to populate the relevant block.
+    fn insert_or_create_block(
+        &mut self,
+        id: Option<BlockId>,
+        signature: Option<&Signature>,
+        f: impl FnOnce(&mut BlockBuilder),
+    ) -> BlockId {
+        let mut builder = BlockBuilder::new(self);
+
+        // Let our user populate the block...
+        f(&mut builder);
+
+        if let Some(sig) = signature {
+            builder.set_signature(sig);
+        }
+
+        builder.build(id)
+    }
+
+    /// Panics iff the given block is poisoned.
+    pub(crate) fn assert_block_not_poisoned(&self, id: BlockId) {
+        // Enforce that the block we got back wasn't poisoned.
+        let built_block = self.blocks.get(id);
+        assert!(
+            !Block::is_poisoned(&built_block),
+            "Block builder didn't generate a complete block! If this was intentional, you want \
+             add_incomplete_block!"
+        );
+    }
+
+    /// Fills an existing block by providing access to it via a `BlockBuilder`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - the id of the Block to be filled
+    /// * `f` - a function to be called with the `BlockBuilder` as its argument;
+    ///   used to populate the relevant block.
+    ///
+    /// # Panics
+    ///
+    /// Panics iff the resultant block is poisoned.
+    pub fn fill_block(&mut self, id: BlockId, f: impl FnOnce(&mut BlockBuilder)) {
+        self.insert_or_create_block(Some(id), None, f);
+        self.assert_block_not_poisoned(id);
+    }
+
+    /// Fills an existing block by providing access to it via a `BlockBuilder`.
+    ///
+    /// This variant allows the relevant block to be partially specified, in
+    /// which case the returned block will be poisoned with
+    /// c`crate::PoisonType::Incomplete`
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - the id of the Block to be filled
+    /// * `f` - a function to be called with the `BlockBuilder` as its argument;
+    ///   used to populate the relevant block.
+    ///
+    /// # Panics
+    ///
+    /// Panics iff the resultant block is poisoned.
+    pub fn fill_incomplete_block(&mut self, id: BlockId, f: impl FnOnce(&mut BlockBuilder)) {
+        self.insert_or_create_block(Some(id), None, f);
+    }
+
+    /// Helper function that creates a new non-function-entry-point block.
+    ///
+    /// This variant allows the relevant block to be partially specified, in
+    /// which case the returned block will be poisoned with
+    /// c`crate::PoisonType::Incomplete`
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - a function to be called with the `BlockBuilder` as its argument;
+    ///   used to populate the relevant block.
+    pub fn add_incomplete_block(&mut self, f: impl FnOnce(&mut BlockBuilder)) -> BlockId {
+        self.insert_or_create_block(None, None, f)
+    }
+
+    /// Helper function that creates a new non-function-entry-point block.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - a function to be called with the `BlockBuilder` as its argument;
+    ///   used to populate the relevant block.
+    ///
+    /// # Panics
+    ///
+    /// Panics iff the resultant block is poisoned.
+    pub fn add_block(&mut self, f: impl FnOnce(&mut BlockBuilder)) -> BlockId {
+        let id = self.insert_or_create_block(None, None, f);
+        self.assert_block_not_poisoned(id);
+
+        id
+    }
+
+    /// Helper function that creates a new function-entry-point block.
+    ///
+    /// This variant allows the relevant block to be partially specified, in
+    /// which case the returned block will be poisoned with
+    /// c`crate::PoisonType::Incomplete`
+    pub fn add_incomplete_function(
+        &mut self,
+        signature: &Signature,
+        f: impl FnOnce(&mut BlockBuilder),
+    ) -> BlockId {
+        self.insert_or_create_block(None, Some(signature), f)
+    }
+
+    /// Helper function that creates a new function-entry-point block.
+    ///
+    /// # Panics
+    ///
+    /// Panics iff the resultant block is poisoned.
+    pub fn add_function(
+        &mut self,
+        signature: &Signature,
+        f: impl FnOnce(&mut BlockBuilder),
+    ) -> BlockId {
+        let id = self.insert_or_create_block(None, Some(signature), f);
+        self.assert_block_not_poisoned(id);
+
+        id
+    }
+}
+
+/// Simple helper functions that add elements to the FLO.
+impl FlatLoweredObject {
+    /// Helper that adds a trivial variable of type `Type` and returns its ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `typ` - the [Type] of the variable to be created
+    /// * `diagnostics` - any diagnostic messages to be included; may be empty
+    /// * `location` - an optional source location to be associated with the
+    ///   variable
+    pub fn add_variable_with_diagnostics(
+        &mut self,
+        typ: Type,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        self.variables.insert(&Variable {
+            typ,
+            linkage: VariableLinkage::Local,
+            poison: PoisonType::None,
+            diagnostics,
+            location,
+        })
+    }
+
+    /// Helper that adds a trivial variable of type `Type` and returns its ID.
+    pub fn add_variable(&mut self, typ: Type) -> VariableId {
+        self.add_variable_with_diagnostics(typ, vec![], None)
     }
 }
 

@@ -3,6 +3,7 @@
 use crate::types::{
     ArrayType,
     Block,
+    BlockExit,
     Diagnostic,
     Location,
     MatchArm,
@@ -40,7 +41,7 @@ macro_rules! make_struct_poisonable {
     };
 }
 
-macro_rules! make_enum_poisonable {
+macro_rules! make_enum_explicitly_poisonable {
     ($val:ty) => {
         impl Poisonable for $val {
             fn get_poison_value(typ: PoisonType) -> Self {
@@ -49,6 +50,20 @@ macro_rules! make_enum_poisonable {
 
             fn is_poisoned(value: &Self) -> bool {
                 matches!(value, Self::Poisoned(_))
+            }
+        }
+    };
+}
+
+macro_rules! make_enum_default_poisonable {
+    ($val:ty) => {
+        impl Poisonable for $val {
+            fn get_poison_value(typ: PoisonType) -> Self {
+                Self::Poisoned(typ)
+            }
+
+            fn is_poisoned(value: &Self) -> bool {
+                matches!(value, Self::Unspecified) || matches!(value, Self::Poisoned(_))
             }
         }
     };
@@ -63,4 +78,5 @@ make_struct_poisonable!(Location);
 make_struct_poisonable!(ArrayType);
 make_struct_poisonable!(StructType);
 
-make_enum_poisonable!(Statement);
+make_enum_explicitly_poisonable!(Statement);
+make_enum_default_poisonable!(BlockExit);

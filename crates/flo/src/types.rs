@@ -54,9 +54,6 @@ pub struct Signature {
     /// The values returned by the eventual `return`-type [`BlockExit`].
     pub returns: Vec<VariableId>,
 
-    /// Should be set to true if any part of the function path can panic.
-    pub can_panic: bool,
-
     /// The source location associated with this function, if available.
     pub location: Option<LocationId>,
 }
@@ -84,6 +81,10 @@ pub enum PoisonType {
     /// This **special case** is the value of the Null interned entry, which
     /// sits at 0 and tries to prevent logic bugs.
     NullInternedValue,
+
+    /// Specifies that an object is partially built, but lacking core
+    /// information.
+    Incomplete,
 }
 
 impl PoisonType {
@@ -125,6 +126,9 @@ pub enum BlockExit {
     /// compile-time error.
     #[default]
     Unspecified,
+
+    /// For internal use -- indicates that this Statement is poisoned.
+    Poisoned(PoisonType),
 }
 
 /// Describes a single step in program execution.
@@ -183,7 +187,7 @@ pub struct CallStatement {
     pub block: BlockRef,
 
     /// The inputs to the call.
-    pub input: Vec<VariableId>,
+    pub inputs: Vec<VariableId>,
 
     /// The values received from the call as return values.
     pub outputs: Vec<VariableId>,
@@ -208,7 +212,7 @@ pub struct ConstructStatement {
     ///
     /// For an Enum type, this should be a single variable that contains
     /// a concrete representation of the enum's type.
-    pub initializier: Vec<VariableId>,
+    pub initializer: Vec<VariableId>,
 
     /// Any diagnostics associated with this statement.
     pub diagnostics: Vec<DiagnosticId>,
@@ -359,7 +363,7 @@ pub enum VariableLinkage {
 /// Specifies the simple or composite type of the given SSA variable.
 ///
 /// This is effectively our filtered view of LLVM's type system.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub enum Type {
     // Simple types.
     Void,
@@ -384,7 +388,7 @@ pub enum Type {
 
     // Pointer-ish types.
     Pointer,
-    Snapshot,
+    Snapshot(Box<Type>),
 
     /// Composite types.
     Array(ArrayTypeId),
@@ -524,7 +528,7 @@ pub struct MatchArm {
     pub condition: VariableId,
 
     /// The target for the 'jump' if the match condition is met.
-    pub target_block: BlockRef,
+    pub target_block: BlockId,
 
     /// Indicates whether this arm is a _poison value_.
     ///

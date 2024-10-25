@@ -6,6 +6,7 @@
 #![allow(clippy::module_name_repetitions)] // Allows for better API naming
 #![allow(clippy::multiple_crate_versions)] // Enforced by our dependencies
 
+pub mod builders;
 pub mod flo;
 pub mod intern;
 pub mod poison;
