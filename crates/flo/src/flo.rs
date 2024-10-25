@@ -219,10 +219,10 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to deserialize a partial
+    /// - [`serde_lexpr::Error`] if it is not possible to deserialize a partial
     ///   `FlatLoweredObject` from the provided `encoded` string.
-    pub fn from_str_partial(encoded: &str) -> serde_sexpr::Result<Self> {
-        serde_sexpr::from_str(encoded)
+    pub fn from_str_partial(encoded: &str) -> serde_lexpr::Result<Self> {
+        serde_lexpr::from_str(encoded)
     }
 
     /// Reads a .flo file from the provided reader, and generates an in-memory
@@ -234,10 +234,10 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to deserialize a partial
+    /// - [`serde_lexpr::Error`] if it is not possible to deserialize a partial
     ///   `FlatLoweredObject` from the provided `reader`.
-    pub fn read_partial(reader: impl Read) -> serde_sexpr::Result<Self> {
-        serde_sexpr::from_reader(reader)
+    pub fn read_partial(reader: impl Read) -> serde_lexpr::Result<Self> {
+        serde_lexpr::from_reader(reader)
     }
 
     /// Reads a .flo file from the filesystem, and generates our in-memory
@@ -249,11 +249,11 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to deserialize a partial
+    /// - [`serde_lexpr::Error`] if it is not possible to deserialize a partial
     ///   `FlatLoweredObject` from the file at the provided `filename`.
-    pub fn read_partial_from_file(filename: &str) -> serde_sexpr::Result<Self> {
+    pub fn read_partial_from_file(filename: &str) -> serde_lexpr::Result<Self> {
         let reader = File::open(filename)?;
-        serde_sexpr::from_reader(reader)
+        serde_lexpr::from_reader(reader)
     }
 
     /// Reads a .flo file from the provided `reader`, and generates an in-memory
@@ -261,9 +261,9 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to deserialize a
+    /// - [`serde_lexpr::Error`] if it is not possible to deserialize a
     ///   `FlatLoweredObject` from the provided `reader`.
-    pub fn read(reader: impl Read) -> serde_sexpr::Result<Self> {
+    pub fn read(reader: impl Read) -> serde_lexpr::Result<Self> {
         let flo = Self::read_partial(reader)?;
         flo.panic_on_unexpected_poison();
 
@@ -275,9 +275,9 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to deserialize a
+    /// - [`serde_lexpr::Error`] if it is not possible to deserialize a
     ///   `FlatLoweredObject` from the file at the provided `filename.`
-    pub fn read_from_file(filename: &str) -> serde_sexpr::Result<Self> {
+    pub fn read_from_file(filename: &str) -> serde_lexpr::Result<Self> {
         let flo = Self::read_partial_from_file(filename)?;
         flo.panic_on_unexpected_poison();
 
@@ -289,44 +289,44 @@ impl FlatLoweredObject {
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to serialize `self` to a
+    /// - [`serde_lexpr::Error`] if it is not possible to serialize `self` to a
     ///   string.
-    pub fn to_str(&self) -> serde_sexpr::Result<String> {
+    pub fn to_str(&self) -> serde_lexpr::Result<String> {
         self.panic_on_unexpected_poison();
-        serde_sexpr::to_string(&self)
+        serde_lexpr::to_string(&self)
     }
 
     /// Writes the `FlatLoweredObject` to the provided `writer`.
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to write `self` to the
+    /// - [`serde_lexpr::Error`] if it is not possible to write `self` to the
     ///   provided `writer`.
-    pub fn write(&self, writer: impl Write) -> serde_sexpr::Result<()> {
+    pub fn write(&self, writer: impl Write) -> serde_lexpr::Result<()> {
         self.panic_on_unexpected_poison();
-        serde_sexpr::to_writer(writer, &self)
+        serde_lexpr::to_writer(writer, &self)
     }
 
     /// Writes the `FlatLoweredObject` to the file at the provided `filename`.
     ///
     /// # Errors
     ///
-    /// - [`serde_sexpr::Error`] if it is not possible to write `self` to a
+    /// - [`serde_lexpr::Error`] if it is not possible to write `self` to a
     ///   file.
-    pub fn write_to_file(&self, filename: &str) -> serde_sexpr::Result<()> {
+    pub fn write_to_file(&self, filename: &str) -> serde_lexpr::Result<()> {
         self.panic_on_unexpected_poison();
 
         let writer = File::create(filename)?;
-        serde_sexpr::to_writer(writer, &self)
+        serde_lexpr::to_writer(writer, &self)
     }
 }
 
 impl FromStr for FlatLoweredObject {
-    type Err = serde_sexpr::Error;
+    type Err = serde_lexpr::Error;
 
     /// Creates a new `FlatLoweredObject` representation from a string
     /// representation; for example, from a string read from a .flo file.
-    fn from_str(encoded: &str) -> serde_sexpr::Result<Self> {
+    fn from_str(encoded: &str) -> serde_lexpr::Result<Self> {
         let flo = Self::from_str_partial(encoded)?;
         flo.panic_on_unexpected_poison();
 
