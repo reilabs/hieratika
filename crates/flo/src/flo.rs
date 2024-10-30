@@ -45,7 +45,7 @@ use crate::{
     },
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SymbolTables {
     // Symbol table for function-pointing symbols.
     pub code: BiMap<FunctionSymbol, BlockId>,
@@ -64,7 +64,7 @@ impl SymbolTables {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct TypeTables {
     /// Stores the definitions of our array types.
     pub arrays: InternTable<ArrayTypeId, ArrayType>,
@@ -86,7 +86,7 @@ impl TypeTables {
 /// The core, in-memory representation of a FLO file.
 ///
 /// It is used for building, linking, and mutating a `FlatLoweredObject`.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct FlatLoweredObject {
     /// The name associated with this translation unit, if any.
     ///
@@ -223,12 +223,13 @@ impl FlatLoweredObject {
 
     /// Walks each of the tables and ensures no poisoned elements are left in
     /// expected places.
+    #[allow(clippy::needless_return)]
     pub(crate) fn panic_on_unexpected_poison(&self) {
         if self.allow_incomplete {
             return;
         }
 
-        todo!();
+        // TODO(ktemkin): implement!
     }
 
     /// Creates a new `FlatLoweredObject` representation from a string
@@ -380,6 +381,14 @@ impl FlatLoweredObject {
             "Block builder didn't generate a complete block! If this was intentional, you want \
              add_incomplete_block!"
         );
+    }
+
+    /// Generates an empty block, to be filled later.
+    ///
+    /// The generated block will be poisoned until `fill_block` (or a variant
+    /// thereof) is called on it.
+    pub fn new_empty_block(&mut self) -> BlockId {
+        self.blocks.insert_default()
     }
 
     /// Fills an existing block by providing access to it via a `BlockBuilder`.

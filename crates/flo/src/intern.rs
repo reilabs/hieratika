@@ -19,7 +19,7 @@ const POISON_ENTRY: usize = 0xdecea5ed;
 ///
 /// It is used to store these objects as part of the `FlatLoweredObject` file,
 /// and to make them able to be referenced as needed.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct InternTable<IdType, ValueType>
 where
     IdType: Eq + Hash + From<usize> + Into<usize> + Copy,
@@ -130,6 +130,22 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<IdType, ValueType> InternTable<IdType, ValueType>
+where
+    IdType: Eq + Hash + From<usize> + Into<usize> + Copy,
+    ValueType: Poisonable + Clone + Default,
+{
+    /// Inserts a new element into the table with the default value for the
+    /// table-element's type. Excellent for creating placeholders to be
+    /// filled later.
+    ///
+    /// Note that for most of the FLO types, this will return an uninitialized/
+    /// poisoned object, which you may wat to unpoison on initialization.
+    pub fn insert_default(&mut self) -> IdType {
+        self.insert(&ValueType::default())
     }
 }
 
