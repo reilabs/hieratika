@@ -1,3 +1,6 @@
 # Generated Lockfiles
 Cargo.lock
 package-lock.json
+
+# Git submodule
+cairo

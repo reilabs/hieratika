@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Lix
         shell: "bash"
         run: |
@@ -78,6 +80,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Lix
         shell: bash
         run: |
@@ -112,6 +116,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Lix
         shell: bash
         run: |
@@ -145,6 +151,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Lix
         shell: bash
         run: |

@@ -100,6 +100,7 @@ exceptions = [
   # Each entry is the crate and version constraint, and its specific allow
   # list
   { allow = ["Unicode-DFS-2016"], crate = "unicode-ident" },
+  { allow = ["CC0-1.0"], crate = "tiny-keccak" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

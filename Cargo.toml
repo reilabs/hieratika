@@ -2,6 +2,8 @@
 # workspace.
 [workspace]
 resolver = "2"
+# Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
+exclude = ["cairo"]
 members = [
   "crates/cli",
   "crates/compiler",
