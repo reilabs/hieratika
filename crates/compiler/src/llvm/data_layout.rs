@@ -6,7 +6,7 @@ use chumsky::{
     prelude::{choice, just},
     Parser,
 };
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::llvm_compile::{Error, Result};
 
 use crate::constant::{
     BYTE_SIZE,

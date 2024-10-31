@@ -1,12 +1,12 @@
 [package]
-name = "hieratika-errors"
+name = "hieratika-flat-lowered"
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "The error types used by the Hieratika project."
+description = "Generate the FLO object from Cairo files."
 keywords.workspace = true
 categories.workspace = true
 
@@ -14,9 +14,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ariadne.workspace = true
 cairo-lang-compiler = { path = "../../cairo/crates/cairo-lang-compiler" }
-cairo-lang-diagnostics = { path = "../../cairo/crates/cairo-lang-diagnostics" }
+cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
+cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
 cairo-lang-lowering = { path = "../../cairo/crates/cairo-lang-lowering" }
-inkwell.workspace = true
-thiserror.workspace = true
+cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-errors.workspace = true

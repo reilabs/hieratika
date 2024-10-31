@@ -2,16 +2,17 @@
 # workspace.
 [workspace]
 resolver = "2"
-# Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
-exclude = ["cairo"]
 members = [
   "crates/cli",
   "crates/compiler",
   "crates/driver",
   "crates/error",
+  "crates/flat-lowered",
   "crates/flo",
   "crates/rust-test-input",
 ]
+# Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
+exclude = ["cairo"]
 
 # Here we set keys that are relevant across all packages, allowing them to be inherited.
 [workspace.package]
@@ -40,6 +41,7 @@ hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
+hieratika-flat-lowered = { path = "crates/flat-lowered" }
 hieratika-flo = { path = "crates/flo" }
 thiserror = "1.0.63"
 tracing = "0.1.40"

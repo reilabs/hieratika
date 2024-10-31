@@ -50,7 +50,7 @@ pub mod llvm;
 pub mod pass;
 pub mod polyfill;
 
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::llvm_compile::{Error, Result};
 use hieratika_flo::FlatLoweredObject;
 
 use crate::{
@@ -143,8 +143,8 @@ impl Compiler {
     ///
     /// # Errors
     ///
-    /// - [`hieratika_errors::compile::Error`] if the compilation process fails
-    ///   for any reason.
+    /// - [`hieratika_errors::llvm_compile::Error`] if the compilation process
+    ///   fails for any reason.
     pub fn run(mut self) -> Result<CompilationResult> {
         let PassManagerReturnData {
             context: _context,
