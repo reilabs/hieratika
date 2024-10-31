@@ -6,14 +6,14 @@ use std::default::Default;
 
 use serde::{Deserialize, Serialize};
 
-use crate::intern::InternIdentifier;
+use crate::{intern::InternIdentifier, serdes};
 
 /// A Block is a linear, single-entry code path composed of a series
 /// of [`Statement`]s and terminating in a [`BlockExit`].
 ///
 /// All of a program's real work—everything but control flow—is accomplished in
 /// the sequence of statements that make up a block's body.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Block {
     /// Metadata present iff this Block is an entry point to a function.
     ///
@@ -46,7 +46,7 @@ pub type BlockId = InternIdentifier;
 ///
 /// Signatures are stored within the relevant [Block], and thus are currently
 /// not interned.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Signature {
     /// The parameters expected to be passed to this function during a call.
     pub params: Vec<VariableId>,
@@ -54,16 +54,13 @@ pub struct Signature {
     /// The values returned by the eventual `return`-type [`BlockExit`].
     pub returns: Vec<VariableId>,
 
-    /// Should be set to true if any part of the function path can panic.
-    pub can_panic: bool,
-
     /// The source location associated with this function, if available.
     pub location: Option<LocationId>,
 }
 
 /// Indicates whether a containing object is a _poison value_, and thus should
 /// not be included in reasonable use.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum PoisonType {
     /// Indicates the object is not a poison value.
     #[default]
@@ -84,6 +81,10 @@ pub enum PoisonType {
     /// This **special case** is the value of the Null interned entry, which
     /// sits at 0 and tries to prevent logic bugs.
     NullInternedValue,
+
+    /// Specifies that an object is partially built, but lacking core
+    /// information.
+    Incomplete,
 }
 
 impl PoisonType {
@@ -96,7 +97,7 @@ impl PoisonType {
 
 /// Determines the action to be taken once the execution of a [`Block`] is
 /// complete.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockExit {
     /// Indicates that control flow should return to the caller.
     ///
@@ -125,12 +126,15 @@ pub enum BlockExit {
     /// compile-time error.
     #[default]
     Unspecified,
+
+    /// For internal use -- indicates that this Statement is poisoned.
+    Poisoned(PoisonType),
 }
 
 /// Describes a single step in program execution.
 ///
 /// See the _statement types_ for more information.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum Statement {
     /// Assigns a constant value to an SSA variable.
     AssignConst(AssignConstStatement),
@@ -160,12 +164,12 @@ pub enum Statement {
 pub type StatementId = InternIdentifier;
 
 /// Assigns a constant value to a given SSA variable.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct AssignConstStatement {
     /// The Variable to be assigned to.
     pub variable: VariableId,
 
-    /// The [`ConstantValue`] to be assigned.
+    /// The `ConstantValue` to be assigned.
     pub value: ConstantValue,
 
     /// Any diagnostics associated with this statement.
@@ -177,13 +181,13 @@ pub struct AssignConstStatement {
 }
 
 /// Calls a target function.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct CallStatement {
     /// A reference to the [Block] to be called.
     pub block: BlockRef,
 
     /// The inputs to the call.
-    pub input: Vec<VariableId>,
+    pub inputs: Vec<VariableId>,
 
     /// The values received from the call as return values.
     pub outputs: Vec<VariableId>,
@@ -199,7 +203,7 @@ pub struct CallStatement {
 ///
 /// The type of the constructed object is determined by the type of [`Variable`]
 /// it is to be bound to ("target").
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct ConstructStatement {
     /// The variable the constructed object is to be bound to.
     pub target: VariableId,
@@ -208,7 +212,7 @@ pub struct ConstructStatement {
     ///
     /// For an Enum type, this should be a single variable that contains
     /// a concrete representation of the enum's type.
-    pub initializier: Vec<VariableId>,
+    pub initializer: Vec<VariableId>,
 
     /// Any diagnostics associated with this statement.
     pub diagnostics: Vec<DiagnosticId>,
@@ -218,7 +222,7 @@ pub struct ConstructStatement {
 }
 
 /// Breaks a composite type into variables equivalent to each of its members.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct DestructureStatement {
     /// The single variable to be deconstructed into its constituent parts.
     ///
@@ -239,7 +243,7 @@ pub struct DestructureStatement {
 /// Takes a Snapshot of a given variable's value at the current time.
 ///
 /// Effectively a free copy operation in our memory model.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct SnapStatement {
     /// The single variable for a Snapshot to be taken of.
     pub target: VariableId,
@@ -256,7 +260,7 @@ pub struct SnapStatement {
 
 /// "Dereferences" a snapshot, binding a new variable to the value captured at
 /// snapshot time.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct DesnapStatement {
     /// The Snapshot variable to be converted back into a concrete value.
     pub snap: VariableId,
@@ -272,7 +276,7 @@ pub struct DesnapStatement {
     pub location: Option<LocationId>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockRef {
     /// Specifies a block in the local translation unit directly.
     Local(BlockId),
@@ -308,7 +312,7 @@ pub enum BlockRef {
 
 /// Represents an SSA variable—simple or composite, and provides basic metadata
 /// about that variable.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Variable {
     /// Identifies the [`Type`] of the variable.
     pub typ: Type,
@@ -334,7 +338,7 @@ pub type VariableId = InternIdentifier;
 
 /// Specifies the location of a given variable's storage—either the variable is
 /// local, or in another translation unit.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum VariableLinkage {
     /// Indicates the variable exists directly in this translation unit.
     Local,
@@ -359,14 +363,16 @@ pub enum VariableLinkage {
 /// Specifies the simple or composite type of the given SSA variable.
 ///
 /// This is effectively our filtered view of LLVM's type system.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Type {
     // Simple types.
     Void,
     Bool,
 
-    // Integer types.
+    // Integer-backed types.
     Enum,
+
+    // Integer types.
     Unsigned8,
     Unsigned16,
     Unsigned32,
@@ -378,13 +384,17 @@ pub enum Type {
     Signed64,
     Signed128,
 
-    // Floating points.
+    // Type for working with Cairo's built-in felt.
+    // This is the only type considered weak -- it can accept or be assigned to any integer type.
+    WeaklyTypedFelt,
+
+    // Floating point types.
     Float,
     Double,
 
     // Pointer-ish types.
     Pointer,
-    Snapshot,
+    Snapshot(Box<Type>),
 
     /// Composite types.
     Array(ArrayTypeId),
@@ -416,7 +426,7 @@ impl Type {
 /// array bound_ (i.e. to determine "two array types are the same"); or member
 /// types can be compared to identify e.g. if "two arrays are _of_ the same
 /// type".
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ArrayType {
     /// The single type of all members in the type.
     pub member_type: Type,
@@ -444,7 +454,7 @@ pub type ArrayTypeId = InternIdentifier;
 ///
 /// To support languages with strict typing, `CompositeTypeIds` can be treated
 /// as unique type identifiers, and compared.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct StructType {
     /// The types of each member of this composite type, in order.
     pub members: Vec<Type>,
@@ -467,7 +477,7 @@ pub type StructTypeId = InternIdentifier;
 
 /// Contains a simple string message that can be associated with a given object;
 /// as well as an optional associated [`Location`].
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Diagnostic {
     /// The core string for the message.
     pub message: String,
@@ -487,7 +497,7 @@ pub type DiagnosticId = InternIdentifier;
 
 /// Contains a simple "pointer" to a piece of source material, for diagnostic
 /// and debugging purposes.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Location {
     /// The source context being described—usually a file path.
     pub source: String,
@@ -515,7 +525,7 @@ pub type LocationId = InternIdentifier;
 ///
 /// Directs control flow to the provided Block if the relevant [`Variable`] is
 /// true.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct MatchArm {
     /// A variable of type Bool that determines whehter this arm will be taken.
     ///
@@ -524,7 +534,7 @@ pub struct MatchArm {
     pub condition: VariableId,
 
     /// The target for the 'jump' if the match condition is met.
-    pub target_block: BlockRef,
+    pub target_block: BlockId,
 
     /// Indicates whether this arm is a _poison value_.
     ///
@@ -543,14 +553,69 @@ pub struct MatchArm {
 pub type MatchArmId = InternIdentifier;
 
 /// A simple constant with a fixed type.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ConstantValue {
     /// The constant value; should fit within the constraints of
     /// the specified type.
+    #[serde(with = "serdes::u128")]
     pub value: u128,
 
     /// Identifies the [`Type`] of the constant.
     pub typ: Type,
+}
+
+/// Helper that creates a constant value of Felt, our "any" type.
+#[must_use]
+pub fn untyped_const(value: u128) -> ConstantValue {
+    ConstantValue {
+        value,
+        typ: Type::WeaklyTypedFelt,
+    }
+}
+
+/// Helper that creates a constant value.
+#[must_use]
+pub fn const_u8(value: u8) -> ConstantValue {
+    ConstantValue {
+        value: value as u128,
+        typ:   Type::Unsigned8,
+    }
+}
+
+/// Helper that creates a constant value.
+#[must_use]
+pub fn const_u16(value: u16) -> ConstantValue {
+    ConstantValue {
+        value: value as u128,
+        typ:   Type::Unsigned16,
+    }
+}
+
+/// Helper that creates a constant value.
+#[must_use]
+pub fn const_u32(value: u32) -> ConstantValue {
+    ConstantValue {
+        value: value as u128,
+        typ:   Type::Unsigned32,
+    }
+}
+
+/// Helper that creates a constant value.
+#[must_use]
+pub fn const_u64(value: u64) -> ConstantValue {
+    ConstantValue {
+        value: value as u128,
+        typ:   Type::Unsigned64,
+    }
+}
+
+/// Helper that creates a constant value of Felt, our "any" type.
+#[must_use]
+pub fn const_u128(value: u128) -> ConstantValue {
+    ConstantValue {
+        value,
+        typ: Type::Unsigned128,
+    }
 }
 
 /// A string "symbol" that can be used to find a function at link-time.

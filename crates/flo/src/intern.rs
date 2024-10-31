@@ -19,7 +19,7 @@ const POISON_ENTRY: usize = 0xdecea5ed;
 ///
 /// It is used to store these objects as part of the `FlatLoweredObject` file,
 /// and to make them able to be referenced as needed.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct InternTable<IdType, ValueType>
 where
     IdType: Eq + Hash + From<usize> + Into<usize> + Copy,
@@ -101,7 +101,9 @@ where
         let raw_id: usize = id.into();
         self.table
             .get(&raw_id)
-            .expect("internal consistency error: get with an unknown ID!")
+            .unwrap_or_else(|| {
+                panic!("internal consistency error: get with an unknown ID {raw_id}!")
+            })
             .clone()
     }
 
@@ -128,5 +130,139 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<IdType, ValueType> InternTable<IdType, ValueType>
+where
+    IdType: Eq + Hash + From<usize> + Into<usize> + Copy,
+    ValueType: Poisonable + Clone + Default,
+{
+    /// Inserts a new element into the table with the default value for the
+    /// table-element's type. Excellent for creating placeholders to be
+    /// filled later.
+    ///
+    /// Note that for most of the FLO types, this will return an uninitialized/
+    /// poisoned object, which you may wat to unpoison on initialization.
+    pub fn insert_default(&mut self) -> IdType {
+        self.insert(&ValueType::default())
+    }
+}
+
+// Tests.
+//
+
+#[cfg(test)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::needless_range_loop,
+    clippy::unreadable_literal
+)]
+mod tests {
+    use super::{InternIdentifier, InternTable};
+    use crate::poison::Poisonable;
+
+    // For testing, make a synthetic poisonable type out of Vec<u32>.
+    impl Poisonable for Vec<u32> {
+        fn get_poison_value(_typ: crate::types::PoisonType) -> Self {
+            vec![0xabad_cafe]
+        }
+
+        fn is_poisoned(value: &Self) -> bool {
+            (*value) == vec![0xabad_cafe]
+        }
+    }
+
+    /// Generates our sample unit under test, with some simple initialization.
+    fn _get_uut() -> InternTable<InternIdentifier, Vec<u32>> {
+        InternTable::new()
+    }
+
+    #[test]
+    fn added_elements_can_be_retreived() {
+        let mut uut = _get_uut();
+        let mut indices: Vec<InternIdentifier> = vec![];
+
+        // Populate a bunch of elements.
+        for i in 0..100 {
+            let index = uut.insert(&vec![i]);
+            indices.push(index);
+
+            assert_ne!(
+                index,
+                super::POISON_ENTRY,
+                "should never get index {index}, the poison entry!"
+            );
+            assert_ne!(index, 0, "should never get index {index}, the null entry!");
+        }
+
+        // Check back their values.
+        for i in 0..100 {
+            let index = indices[i];
+
+            assert_eq!(
+                vec![i as u32],
+                uut.get(index),
+                "stored {:?} in index {}, but got back {:?}",
+                vec![i],
+                index,
+                uut.get(index)
+            );
+        }
+
+        // Check that value semantics work.
+        let index = indices[0];
+
+        uut.get(index).push(0x600dcafe);
+        assert_eq!(vec![0], uut.get(index));
+    }
+
+    #[test]
+    fn swap_replaces_elements() {
+        let mut uut = _get_uut();
+
+        // Add two sample values.
+        let index_a = uut.insert(&vec![0xcccc_cccc]);
+        let index_b = uut.insert(&vec![0xbbbb_bbbb]);
+
+        // Tweak the first value...
+        let prior = uut.swap(index_a, &vec![0xaaaa_aaaa]);
+        assert_eq!(
+            prior,
+            vec![0xcccc_cccc],
+            "swap should return the prior value"
+        );
+
+        // The value changed should have changed; the other vlaue should not have.
+        assert_eq!(
+            uut.get(index_a),
+            vec![0xaaaa_aaaa],
+            "swap() should update values!"
+        );
+        assert_eq!(
+            uut.get(index_b),
+            vec![0xbbbb_bbbb],
+            "swap() should update values!"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "internal consistency error: get with an unknown ID 1234!")]
+    fn getting_a_nonexistent_index_should_panic() {
+        _get_uut().get(1234);
+    }
+
+    #[test]
+    fn special_values_should_exist_and_be_poisoned() {
+        let uut = _get_uut();
+
+        assert_eq!(
+            uut.get(0),
+            Vec::<u32>::get_poison_value(crate::types::PoisonType::NullInternedValue)
+        );
+        assert_eq!(
+            uut.get(super::POISON_ENTRY),
+            Vec::<u32>::get_poison_value(crate::types::PoisonType::Undefined)
+        );
     }
 }
