@@ -20,8 +20,6 @@ use crate::{
     intern::InternTable,
     poison::Poisonable,
     types::{
-        ArrayType,
-        ArrayTypeId,
         Block,
         BlockId,
         DataSymbol,
@@ -36,8 +34,6 @@ use crate::{
         Signature,
         Statement,
         StatementId,
-        StructType,
-        StructTypeId,
         Type,
         Variable,
         VariableId,
@@ -60,25 +56,6 @@ impl SymbolTables {
         Self {
             code: BiMap::new(),
             data: BiMap::new(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct TypeTables {
-    /// Stores the definitions of our array types.
-    pub arrays: InternTable<ArrayTypeId, ArrayType>,
-
-    /// Stores the definitions of our struct types.
-    pub structs: InternTable<StructTypeId, StructType>,
-}
-
-impl TypeTables {
-    /// Creates a new set of empty symbol tables.
-    pub(crate) fn new() -> Self {
-        Self {
-            arrays:  InternTable::new(),
-            structs: InternTable::new(),
         }
     }
 }
@@ -133,9 +110,6 @@ pub struct FlatLoweredObject {
     /// not contain a human-friendly name in their diagnostic data.
     pub variables: InternTable<VariableId, Variable>,
 
-    /// Stores the definitions of any types.
-    pub types: TypeTables,
-
     /// Stores any diagnostic messages associated with any of the types that may
     /// exist in the object file.
     pub diagnostics: InternTable<DiagnosticId, Diagnostic>,
@@ -158,7 +132,7 @@ pub struct FlatLoweredObject {
     pub finalizers: Vec<BlockId>,
 
     /// Internal varaible whose value is always true.
-    /// Should be set by the CRT0 initializer.   
+    /// Should be set by the CRT0 initializer.
     pub fixed_true: VariableId,
 
     // Internal flags.
@@ -199,7 +173,6 @@ impl FlatLoweredObject {
             variables,
             diagnostics: InternTable::new(),
             locations: InternTable::new(),
-            types: TypeTables::new(),
 
             // ini and fini
             initializers: Vec::new(),
@@ -354,22 +327,22 @@ impl FlatLoweredObject {
     ///   block will be created
     /// * `f` - A function to be called with the `BlockBuilder` as its argument;
     ///   used to populate the relevant block.
-    fn insert_or_create_block(
+    fn insert_or_create_block<E>(
         &mut self,
         id: Option<BlockId>,
         signature: Option<&Signature>,
-        f: impl FnOnce(&mut BlockBuilder),
-    ) -> BlockId {
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<BlockId, E> {
         let mut builder = BlockBuilder::new(self);
 
         // Let our user populate the block...
-        f(&mut builder);
+        f(&mut builder)?;
 
         if let Some(sig) = signature {
             builder.set_signature(sig);
         }
 
-        builder.build(id)
+        Ok(builder.build(id))
     }
 
     /// Panics iff the given block is poisoned.
@@ -399,12 +372,22 @@ impl FlatLoweredObject {
     /// * `f` - a function to be called with the `BlockBuilder` as its argument;
     ///   used to populate the relevant block.
     ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    ///
     /// # Panics
     ///
     /// Panics iff the resultant block is poisoned.
-    pub fn fill_block(&mut self, id: BlockId, f: impl FnOnce(&mut BlockBuilder)) {
-        self.insert_or_create_block(Some(id), None, f);
+    pub fn fill_block<E>(
+        &mut self,
+        id: BlockId,
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.insert_or_create_block(Some(id), None, f)?;
         self.assert_block_not_poisoned(id);
+
+        Ok(())
     }
 
     /// Fills an existing block by providing access to it via a `BlockBuilder`.
@@ -419,11 +402,20 @@ impl FlatLoweredObject {
     /// * `f` - a function to be called with the `BlockBuilder` as its argument;
     ///   used to populate the relevant block.
     ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    ///
     /// # Panics
     ///
     /// Panics iff the resultant block is poisoned.
-    pub fn fill_incomplete_block(&mut self, id: BlockId, f: impl FnOnce(&mut BlockBuilder)) {
-        self.insert_or_create_block(Some(id), None, f);
+    pub fn fill_incomplete_block<E>(
+        &mut self,
+        id: BlockId,
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.insert_or_create_block(Some(id), None, f)?;
+        Ok(())
     }
 
     /// Helper function that creates a new non-function-entry-point block.
@@ -436,7 +428,14 @@ impl FlatLoweredObject {
     ///
     /// * `f` - a function to be called with the `BlockBuilder` as its argument;
     ///   used to populate the relevant block.
-    pub fn add_incomplete_block(&mut self, f: impl FnOnce(&mut BlockBuilder)) -> BlockId {
+    ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    pub fn add_incomplete_block<E>(
+        &mut self,
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<BlockId, E> {
         self.insert_or_create_block(None, None, f)
     }
 
@@ -447,14 +446,21 @@ impl FlatLoweredObject {
     /// * `f` - a function to be called with the `BlockBuilder` as its argument;
     ///   used to populate the relevant block.
     ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    ///
     /// # Panics
     ///
     /// Panics iff the resultant block is poisoned.
-    pub fn add_block(&mut self, f: impl FnOnce(&mut BlockBuilder)) -> BlockId {
-        let id = self.insert_or_create_block(None, None, f);
+    pub fn add_block<E>(
+        &mut self,
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<BlockId, E> {
+        let id = self.insert_or_create_block(None, None, f)?;
         self.assert_block_not_poisoned(id);
 
-        id
+        Ok(id)
     }
 
     /// Helper function that creates a new function-entry-point block.
@@ -462,28 +468,36 @@ impl FlatLoweredObject {
     /// This variant allows the relevant block to be partially specified, in
     /// which case the returned block will be poisoned with
     /// c`crate::PoisonType::Incomplete`
-    pub fn add_incomplete_function(
+    ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    pub fn add_incomplete_function<E>(
         &mut self,
         signature: &Signature,
-        f: impl FnOnce(&mut BlockBuilder),
-    ) -> BlockId {
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<BlockId, E> {
         self.insert_or_create_block(None, Some(signature), f)
     }
 
     /// Helper function that creates a new function-entry-point block.
     ///
+    /// # Errors
+    ///
+    /// - `E` if the provided builder function results in an error.
+    ///
     /// # Panics
     ///
     /// Panics iff the resultant block is poisoned.
-    pub fn add_function(
+    pub fn add_function<E>(
         &mut self,
         signature: &Signature,
-        f: impl FnOnce(&mut BlockBuilder),
-    ) -> BlockId {
-        let id = self.insert_or_create_block(None, Some(signature), f);
+        f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
+    ) -> Result<BlockId, E> {
+        let id = self.insert_or_create_block(None, Some(signature), f)?;
         self.assert_block_not_poisoned(id);
 
-        id
+        Ok(id)
     }
 }
 

@@ -9,18 +9,18 @@ use hieratika_flo::{
 };
 
 #[test]
-fn flos_are_the_same_after_round_trip() {
+fn flos_are_the_same_after_round_trip() -> anyhow::Result<()> {
     let mut flo = FlatLoweredObject::new("test");
 
     // Simple factorial test program.
     //
     // This is equivalent to fact(x) -> eq_u32_u32(x, 0) ? 1 : mul_u32_u32(x,
     // fact(sub_u32_u32(x, 1))), with multiplication, subtraction and equality
-    // checking performed by fictitous compiler functions.
+    // checking performed by fictitious compiler functions.
 
     // Create the function signature...
-    let fact_input = flo.add_variable(hieratika_flo::types::Type::Unsigned32);
-    let fact_output = flo.add_variable(hieratika_flo::types::Type::Unsigned32);
+    let fact_input = flo.add_variable(Type::Unsigned32);
+    let fact_output = flo.add_variable(Type::Unsigned32);
     let fact_signature = Signature {
         params:   vec![fact_input],
         returns:  vec![fact_output],
@@ -34,8 +34,8 @@ fn flos_are_the_same_after_round_trip() {
 
     // Create the function entry point that will implement the initial equality
     // comparison, and then branch to the other blocks.
-    flo.add_function(&fact_signature, |b| {
-        // Create a constant vaule of zero.
+    flo.add_function(&fact_signature, |b| -> anyhow::Result<()> {
+        // Create a constant value of zero.
         let zero = b.add_variable(Type::Unsigned32);
         b.simple_assign_const(zero, const_u32(0));
 
@@ -45,25 +45,29 @@ fn flos_are_the_same_after_round_trip() {
 
         // Finally, branch to either the is-zero or non-zero path.
         b.end_with_if(equals_zero, block_is_zero, block_is_nonzero, None);
-    });
+
+        Ok(())
+    })?;
 
     // In the zero path, we have a bock that just returns '1'.
-    flo.fill_block(block_is_zero, |b| {
+    flo.fill_block(block_is_zero, |b| -> anyhow::Result<()> {
         // Create the return value of '1'...
         let retval = b.add_variable(Type::Unsigned32);
         b.simple_assign_const(retval, const_u32(1));
 
         // ... and end the block by returning!
         b.end_with_return(vec![retval]);
-    });
+
+        Ok(())
+    })?;
 
     // In the non-zero path, we compute mul(i, sub(i, 1)), and return that.
-    flo.fill_block(block_is_nonzero, |b| {
+    flo.fill_block(block_is_nonzero, |b| -> anyhow::Result<()> {
         // Create the '1' we'll use in subtract...
         let const_one = b.add_variable(Type::Unsigned32);
         b.simple_assign_const(const_one, const_u32(1));
 
-        // ... and peform the subtraction to compute i - 1.
+        // ... and perform the subtraction to compute i - 1.
         let i_minus_one = b.add_variable(Type::Unsigned32);
         b.simple_call_builtin(
             "sub_u32_u32",
@@ -81,7 +85,9 @@ fn flos_are_the_same_after_round_trip() {
 
         // ... and return the result.
         b.end_with_return(vec![final_value]);
-    });
+
+        Ok(())
+    })?;
 
     // Finally, serialize the result, and validate that it matches the hand-made
     // file we expect from the calls.
@@ -90,7 +96,7 @@ fn flos_are_the_same_after_round_trip() {
         .expect("the sample function should generate valid sexprs");
 
     // TODO(ktemkin): once we have sorted sexpr rendering, we can either compare
-    // sexpr strings (brittle, and what this test originaly did), or we can
+    // sexpr strings (brittle, and what this test originally did), or we can
     // build a simple visitor that walks the trees and makes sure they're the same.
 
     // Deserialized
@@ -102,4 +108,6 @@ fn flos_are_the_same_after_round_trip() {
         restored_flo, flo,
         "flo should serialize and deserialize to be the same!"
     );
+
+    Ok(())
 }

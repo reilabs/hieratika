@@ -397,8 +397,8 @@ pub enum Type {
     Snapshot(Box<Type>),
 
     /// Composite types.
-    Array(ArrayTypeId),
-    Struct(StructTypeId),
+    Array(ArrayType),
+    Struct(StructType),
 
     /// **For Internal Use:** Indicates that this Variable's type is
     /// unspecified, e.g. as part of a poisoned [`Variable`].
@@ -429,7 +429,7 @@ impl Type {
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ArrayType {
     /// The single type of all members in the type.
-    pub member_type: Type,
+    pub member_type: Box<Type>,
 
     /// The length of the array, in elements.
     pub length: usize,

@@ -17,3 +17,6 @@ rust-version.workspace = true
 bimap.workspace = true
 serde = { version = "1.0.210", features = ["derive"] }
 serde-lexpr = "0.1.0"
+
+[dev-dependencies]
+anyhow.workspace = true
