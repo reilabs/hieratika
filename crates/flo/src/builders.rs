@@ -36,7 +36,7 @@ use crate::{
 #[derive(Debug)]
 pub struct BlockBuilder<'a> {
     /// The `FlatLoweredObject` context in which this block is being built.
-    context: &'a mut FlatLoweredObject,
+    pub context: &'a mut FlatLoweredObject,
 
     /// The block object actively being built.
     block: Block,
@@ -234,12 +234,13 @@ impl<'a> BlockBuilder<'a> {
     /// * `value` - The constant value to be assigned.
     pub fn assign_new_const(
         &mut self,
-        typ: Type,
         value: ConstantValue,
         diagnostics: Vec<DiagnosticId>,
         location: Option<LocationId>,
     ) -> StatementId {
-        let variable = self.context.add_variable_with_diagnostics(typ, vec![], location);
+        let variable =
+            self.context
+                .add_variable_with_diagnostics(value.typ.clone(), vec![], location);
         self.assign_const(variable, value, diagnostics, location);
 
         variable
@@ -265,8 +266,8 @@ impl<'a> BlockBuilder<'a> {
     ///
     /// * `typ` -  The type of the variable to be created.
     /// * `value` - The constant value to be assigned.
-    pub fn simple_assign_new_const(&mut self, typ: Type, value: ConstantValue) -> VariableId {
-        let variable = self.context.add_variable(typ);
+    pub fn simple_assign_new_const(&mut self, value: ConstantValue) -> VariableId {
+        let variable = self.context.add_variable(value.typ.clone());
         self.assign_const(variable, value, vec![], None);
 
         variable
