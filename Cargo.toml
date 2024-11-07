@@ -37,11 +37,11 @@ bimap = { version = "0.6.3", features = ["serde"] }
 clap = { version = "4.5.16", features = ["derive"] }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 itertools = "0.13.0"
+hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
-hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-flo = { path = "crates/flo" }
 thiserror = "1.0.63"
 tracing = "0.1.40"

@@ -8,6 +8,7 @@
 
 use std::process;
 
+use anyhow::Result;
 use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
@@ -34,10 +35,10 @@ fn main() {
 ///
 /// # Errors
 ///
-/// - [`Error`] if the command fails execution.
-fn run(args: Cli) -> anyhow::Result<()> {
+/// - [`anyhow::Error`] if the command fails execution.
+fn run(args: Cli) -> Result<()> {
     match args.command {
-        Command::Build(build_args) => run_build_command(build_args)?,
+        Command::Build(build_args) => run_build_command(&build_args)?,
     }
     Ok(())
 }
@@ -46,14 +47,14 @@ fn run(args: Cli) -> anyhow::Result<()> {
 ///
 /// # Errors
 ///
-/// - [`Error`] if the command fails execution.
-fn run_build_command(args: BuildArgs) -> anyhow::Result<()> {
+/// - [`anyhow::Error`] if the command fails execution.
+fn run_build_command(args: &BuildArgs) -> Result<()> {
     match args.compiler_type {
         CompilerType::Cairo => {
             let files = generate_flat_lowered(&args.path)?;
             // TODO (#73) Save the output to .flat files in the same folder structure.
             for f in files {
-                println!("{f:?}")
+                println!("{f:?}");
             }
         }
     }

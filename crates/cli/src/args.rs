@@ -36,6 +36,6 @@ pub struct BuildArgs {
 /// The compiler to use.
 #[derive(Clone, Debug, ValueEnum)]
 pub enum CompilerType {
-    /// It compiles Cairo files into FlatLowered.
+    /// It compiles Cairo files into `FlatLowered`.
     Cairo,
 }
