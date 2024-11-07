@@ -1,7 +1,7 @@
 //! Generates the `FlatLowered` object for Cairo functions needed by the linker.
 //! This is initially used by polyfill functions.
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, env, path::Path, sync::Arc};
 
 use cairo_lang_compiler::{
     db::{validate_corelib, RootDatabase},
@@ -25,6 +25,7 @@ use cairo_lang_semantic::{
 };
 use cairo_lang_utils::{Intern, Upcast};
 use hieratika_errors::cairo_compile::{Error, Result};
+use itertools::Itertools;
 
 /// Returns a dictionary mapping function names to their ids for all the
 /// functions in the given crate.
@@ -74,7 +75,11 @@ fn build_db() -> RootDatabase {
     let auto_withdraw_gas = false;
     let mut db = RootDatabase::default();
 
-    let corelib_path = Path::new("../../cairo/corelib/src");
+    // Using absolute path to ensure `corelib` is found from any working directory
+    // hieratika is executed.
+    let cargo_path = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let filename = [cargo_path.as_str(), "/../../cairo/corelib/src"].iter().join("");
+    let corelib_path = Path::new(&filename);
     init_dev_corelib(&mut db, corelib_path.to_path_buf());
 
     let add_withdraw_gas_flag_id = FlagId::new(db.upcast(), "add_withdraw_gas");
@@ -113,8 +118,10 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<Vec<Arc<FlatLowered>>> {
         let lowered_function = db
             .final_concrete_function_with_body_lowered(function_id)
             .map_err(Error::SalsaDbError)?;
+
         lowered_functions.push(lowered_function);
     }
+
     Ok(lowered_functions)
 }
 

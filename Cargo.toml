@@ -7,7 +7,7 @@ members = [
   "crates/compiler",
   "crates/driver",
   "crates/error",
-  "crates/flat-lowered",
+  "crates/cairoc",
   "crates/flo",
   "crates/rust-test-input",
 ]
@@ -34,14 +34,14 @@ rust-version = "1.81.0"
 anyhow = "1.0.89"
 ariadne = "0.4.1"
 bimap = { version = "0.6.3", features = ["serde"] }
-clap = "4.5.16"
+clap = { version = "4.5.16", features = ["derive"] }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 itertools = "0.13.0"
 hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
-hieratika-flat-lowered = { path = "crates/flat-lowered" }
+hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-flo = { path = "crates/flo" }
 thiserror = "1.0.63"
 tracing = "0.1.40"
