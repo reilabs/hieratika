@@ -9,7 +9,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 ///
 /// The cli supports different commands.
 #[derive(Clone, Debug, Parser)]
-pub struct Cli {
+pub struct Arguments {
     /// The wrapper of all the commands available.
     #[clap(subcommand)]
     pub command: Command,

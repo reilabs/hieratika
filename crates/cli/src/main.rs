@@ -14,13 +14,11 @@ use clap::Parser;
 use exitcode::{OK, SOFTWARE};
 use hieratika_cairoc::generate_flat_lowered;
 
-use crate::args::Cli;
+use crate::args::Arguments;
 mod args;
 
 fn main() {
-    // The main function shall only parse the arguments, call the run function to
-    // execute the program and report the result.
-    let args = Cli::parse();
+    let args = Arguments::parse();
 
     match run(args) {
         Ok(()) => process::exit(OK),
@@ -31,12 +29,13 @@ fn main() {
     }
 }
 
-/// The run function reads the input arguments and reports the result of executing the specified command.
+/// The run function reads the input arguments and reports the result of
+/// executing the specified command.
 ///
 /// # Errors
 ///
 /// - [`anyhow::Error`] if the command fails execution.
-fn run(args: Cli) -> Result<()> {
+fn run(args: Arguments) -> Result<()> {
     match args.command {
         Command::Build(build_args) => run_build_command(&build_args)?,
     }
