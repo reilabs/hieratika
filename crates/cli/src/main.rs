@@ -31,7 +31,7 @@ fn main() {
     }
 }
 
-/// The run function reads the input arguments and reports the result for main.
+/// The run function reads the input arguments and reports the result of executing the specified command.
 ///
 /// # Errors
 ///
@@ -43,7 +43,7 @@ fn run(args: Cli) -> Result<()> {
     Ok(())
 }
 
-/// This function processes the build command.
+/// This function implements the build command.
 ///
 /// # Errors
 ///
