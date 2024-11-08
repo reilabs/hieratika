@@ -24,7 +24,7 @@ use cairo_lang_semantic::{
     ConcreteImplLongId,
 };
 use cairo_lang_utils::{Intern, Upcast};
-use hieratika_errors::cairo_compile::{Error, Result};
+use hieratika_errors::compile::cairo::{Error, Result};
 use itertools::Itertools;
 
 /// Returns a dictionary mapping function names to their ids for all the

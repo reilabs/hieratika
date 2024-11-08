@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use hieratika_errors::llvm_compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{
     module::{Linkage, Module},
     values::{FunctionValue, GlobalValue},

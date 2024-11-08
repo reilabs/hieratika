@@ -10,8 +10,7 @@
 //! specific errors in library code. To that end, we make sure that our errors
 //! are kept strongly typed within the library as much as is possible.
 
-pub mod cairo_compile;
-pub mod llvm_compile;
+pub mod compile;
 
 use thiserror::Error;
 
@@ -27,8 +26,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    LLVMCompile(#[from] llvm_compile::Error),
+    LLVMCompile(#[from] compile::llvm::Error),
 
     #[error(transparent)]
-    CairoCompile(#[from] cairo_compile::Error),
+    CairoCompile(#[from] compile::cairo::Error),
 }
