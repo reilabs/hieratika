@@ -19,7 +19,6 @@ ariadne.workspace = true
 clap.workspace = true
 exitcode = "1.1.2"
 hieratika-cairoc.workspace = true
-hieratika-compiler.workspace = true
 itertools.workspace = true
 tracing.workspace = true
 

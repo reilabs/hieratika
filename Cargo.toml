@@ -35,6 +35,9 @@ rust-version = "1.81.0"
 anyhow = "1.0.89"
 ariadne = "0.4.1"
 bimap = { version = "0.6.3", features = ["serde"] }
+cairo-lang-compiler = { path = "cairo/crates/cairo-lang-compiler" }
+cairo-lang-diagnostics = { path = "cairo/crates/cairo-lang-diagnostics" }
+cairo-lang-lowering = { path = "cairo/crates/cairo-lang-lowering" }
 clap = { version = "4.5.16", features = ["derive"] }
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 itertools = "0.13.0"

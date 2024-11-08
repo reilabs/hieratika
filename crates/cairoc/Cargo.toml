@@ -14,10 +14,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-cairo-lang-compiler = { path = "../../cairo/crates/cairo-lang-compiler" }
+cairo-lang-compiler.workspace = true
 cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
 cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
-cairo-lang-lowering = { path = "../../cairo/crates/cairo-lang-lowering" }
+cairo-lang-lowering.workspace = true
 cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 hieratika-errors.workspace = true
