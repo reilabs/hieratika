@@ -6,7 +6,7 @@ repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "The CLI to allow users to interact with the Hieratika compilation process."
+description = "Hieratika CLI allows users to interact with the Hieratika compilation process."
 keywords.workspace = true
 categories.workspace = true
 
