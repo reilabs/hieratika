@@ -38,6 +38,7 @@ fn main() {
 fn run(args: Arguments) -> Result<()> {
     match args.command {
         Command::Build(build_args) => run_build_command(&build_args)?,
+        Command::Clean => todo!(),
     }
     Ok(())
 }

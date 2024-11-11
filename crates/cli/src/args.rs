@@ -22,6 +22,8 @@ pub struct Arguments {
 pub enum Command {
     /// Compile code to the `FlatLowered` Object format.
     Build(BuildArgs),
+    /// Delete all the generated FlatLowered files from the target folder.
+    Clean,
 }
 
 /// The arguments required for the build command.

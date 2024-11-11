@@ -15,6 +15,7 @@ use cairo_lang_filesystem::{
 };
 use cairo_lang_lowering::{db::LoweringGroup, ids::ConcreteFunctionWithBodyId, FlatLowered};
 use cairo_lang_semantic::{
+    db::SemanticGroup,
     items::functions::{
         ConcreteFunctionWithBody,
         GenericFunctionWithBodyId,
@@ -93,6 +94,46 @@ fn build_db() -> RootDatabase {
     db
 }
 
+/// This function creates and prints the error message when `function_id` fails
+/// to compile.
+fn print_compiler_error(db: &RootDatabase, function_id: ConcreteFunctionWithBodyId) {
+    let function_id = function_id.function_with_body_id(db);
+    let semantic_function_id = function_id.base_semantic_function(db);
+    let declaration_diagnostics = db.function_declaration_diagnostics(semantic_function_id);
+    if declaration_diagnostics.check_error_free().is_err() {
+        let declaration_diagnostics = declaration_diagnostics.format(db.upcast());
+        eprintln!("{declaration_diagnostics}");
+    }
+    let body_diagnostics = db.function_body_diagnostics(semantic_function_id);
+    if body_diagnostics.check_error_free().is_err() {
+        let body_diagnostics = body_diagnostics.format(db.upcast());
+        eprintln!("{body_diagnostics}");
+    }
+}
+
+/// This function returns the `FlatLowered` object if there are no errors
+/// compiling the Cairo `function_id`. Otherwise, it returns `None`.
+fn get_flat_lowered_function(
+    db: &RootDatabase,
+    function_id: GenericFunctionWithBodyId,
+) -> Option<Arc<FlatLowered>> {
+    let function_id = ConcreteFunctionWithBodyId::from_semantic(
+        db,
+        ConcreteFunctionWithBody {
+            generic_function: function_id,
+            generic_args:     vec![],
+        }
+        .intern(db),
+    );
+    match db.final_concrete_function_with_body_lowered(function_id) {
+        Ok(f) => Some(f),
+        Err(_) => {
+            print_compiler_error(db, function_id);
+            None
+        }
+    }
+}
+
 /// This function returns the `FlatLowered` object of a Cairo program. The
 /// filename can be either a project or a single file.
 ///
@@ -102,26 +143,22 @@ fn build_db() -> RootDatabase {
 ///   during the compilation process.
 /// - [`Error::ProjectNotCreated`] if the filename isn't a valid Cairo file or
 ///   project.
+/// - [`Error::DiagnosticsError`] if any Cairo file fails to compile.
 pub fn generate_flat_lowered(filename: &Path) -> Result<Vec<Arc<FlatLowered>>> {
     let mut db = build_db();
     let crate_ids = setup_project(&mut db, filename)?;
     let mut lowered_functions = Vec::new();
+    let mut errors_found = false;
     for (_, function_id) in get_all_funcs(&db, &crate_ids)? {
-        let function_id = ConcreteFunctionWithBodyId::from_semantic(
-            &db,
-            ConcreteFunctionWithBody {
-                generic_function: function_id,
-                generic_args:     vec![],
-            }
-            .intern(&db),
-        );
-        let lowered_function = db
-            .final_concrete_function_with_body_lowered(function_id)
-            .map_err(Error::SalsaDbError)?;
-
+        let Some(lowered_function) = get_flat_lowered_function(&db, function_id) else {
+            errors_found = true;
+            continue;
+        };
         lowered_functions.push(lowered_function);
     }
-
+    if errors_found {
+        return Err(Error::DiagnosticsError);
+    }
     Ok(lowered_functions)
 }
 
