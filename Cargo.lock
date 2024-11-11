@@ -809,6 +809,7 @@ dependencies = [
  "clap",
  "exitcode",
  "hieratika-cairoc",
+ "hieratika-compiler",
  "itertools 0.13.0",
  "tracing",
 ]

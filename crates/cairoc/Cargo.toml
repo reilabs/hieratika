@@ -6,7 +6,7 @@ repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "Generate the FLO object from Cairo files."
+description = "Generates FLO objects from Cairo projects."
 keywords.workspace = true
 categories.workspace = true
 

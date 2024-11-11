@@ -1,5 +1,6 @@
-//! This is the CLI driver for the compilation of LLVM IR to Cairo. For more
-//! detail, please see the documentation for the [`hieratika_cairoc`] crate.
+//! This is the CLI driver for the compilation of Rust and Cairo files to
+//! `FlatLowered`. For more detail, please see the documentation for the
+//! [`hieratika_cairoc`] crate and the [`hieratika_compiler`] crate.
 
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)] // Allows for better API naming
