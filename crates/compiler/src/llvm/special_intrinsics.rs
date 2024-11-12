@@ -11,7 +11,10 @@ use std::collections::HashMap;
 use inkwell::{module::Linkage, GlobalVisibility};
 
 use crate::{
-    llvm::{typesystem::LLVMType, TopLevelEntryKind},
+    llvm::{
+        typesystem::{LLVMFunction, LLVMType},
+        TopLevelEntryKind,
+    },
     pass::analysis::module_map::FunctionInfo,
 };
 
@@ -31,35 +34,37 @@ impl SpecialIntrinsics {
         intrinsics.insert(
             "llvm.dbg.declare".to_string(),
             FunctionInfo {
-                kind:       TopLevelEntryKind::Declaration,
-                intrinsic:  true,
-                typ:        LLVMType::make_function(
+                kind:        TopLevelEntryKind::Declaration,
+                intrinsic:   true,
+                typ:         LLVMFunction::new(
                     LLVMType::void,
                     &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata],
                 ),
-                linkage:    Linkage::External,
-                visibility: GlobalVisibility::Default,
+                param_names: vec![None, None, None],
+                linkage:     Linkage::External,
+                visibility:  GlobalVisibility::Default,
             },
         );
         intrinsics.insert(
             "llvm.dbg.value".to_string(),
             FunctionInfo {
-                kind:       TopLevelEntryKind::Declaration,
-                intrinsic:  true,
-                typ:        LLVMType::make_function(
+                kind:        TopLevelEntryKind::Declaration,
+                intrinsic:   true,
+                typ:         LLVMFunction::new(
                     LLVMType::void,
                     &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata],
                 ),
-                linkage:    Linkage::External,
-                visibility: GlobalVisibility::Default,
+                param_names: vec![None, None, None],
+                linkage:     Linkage::External,
+                visibility:  GlobalVisibility::Default,
             },
         );
         intrinsics.insert(
             "llvm.dbg.assign".to_string(),
             FunctionInfo {
-                kind:       TopLevelEntryKind::Declaration,
-                intrinsic:  true,
-                typ:        LLVMType::make_function(
+                kind:        TopLevelEntryKind::Declaration,
+                intrinsic:   true,
+                typ:         LLVMFunction::new(
                     LLVMType::void,
                     &[
                         LLVMType::Metadata,
@@ -69,8 +74,9 @@ impl SpecialIntrinsics {
                         LLVMType::Metadata,
                     ],
                 ),
-                linkage:    Linkage::External,
-                visibility: GlobalVisibility::Default,
+                param_names: vec![None, None, None, None, None],
+                linkage:     Linkage::External,
+                visibility:  GlobalVisibility::Default,
             },
         );
 

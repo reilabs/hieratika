@@ -11,6 +11,34 @@
 //! 2. To enable use of libraries written in such languages as part of the Cairo
 //!    ecosystem (e.g. from a contract written in Cairo itself).
 //!
+//! Using the compiler API is very simple, as illustrated by the following
+//! example:
+//!
+//! ```rust
+//! use std::path::Path;
+//!
+//! use hieratika_compiler::{context::SourceContext, CompilerBuilder};
+//! use hieratika_flo::FlatLoweredObject;
+//!
+//! fn main() -> anyhow::Result<()> {
+//!     // We start by prepping the source, and the source context to hold it.
+//!     let llvm_ir_path = "input/add.ll";
+//!     let source_path = Path::new(llvm_ir_path);
+//!     let ctx = SourceContext::create(source_path)?;
+//!
+//!     // We then need to build the compiler itself. This can take additional
+//!     // options to specify a pass configuration or a polyfill configuration
+//!     // as needed.
+//!     let compiler = CompilerBuilder::new(ctx).build();
+//!
+//!     // With that done, we can execute the compiler, which will process the
+//!     // provided LLVM IR into an FLO object.
+//!     let result: FlatLoweredObject = compiler.run()?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
 //! # Process Overview
 //!
 //! While more information can be found in the module-level documentation of
@@ -18,15 +46,41 @@
 //! be stated as follows:
 //!
 //! 1. We ingest LLVM IR in textual format.
-//! 2. We translate that LLVM IR to a combination of Cairo's internal IR, and
-//!    invocation of polyfills for operations that our target CPU does not
-//!    support.
-//! 3. We optimize those polyfills to achieve better performance.
+//! 2. We translate that LLVM IR to a combination of our [`hieratika_flo`]
+//!    object format, and the invocation of polyfills for operations that our
+//!    target CPU does not support.
+//! 3. We emit a FLO module that contains the code corresponding to the ingested
+//!    LLVM IR.
+//! 4. Externally to this compiler, this module—along with others that include
+//!    our polyfill implementations—are then linked together and undergo
+//!    whole-program consistency checks, optimization, and lowering to produce a
+//!    final binary.
 //!
 //! It should be noted that point 2 above is doing a lot of heavy lifting. As
 //! part of this translation we have to account for mismatches between calling
 //! conventions, stack and memory semantics, and perform translations of these
 //! things where they cannot directly be implemented using a polyfill.
+//!
+//! # Targeting `FlatLowered` instead of `Sierra`
+//!
+//! It might seem strange to target `FlatLowered` instead of something like
+//! [Sierra](https://docs.starknet.io/architecture-and-concepts/smart-contracts/cairo-and-sierra/#why_do_we_need_sierra)
+//! which is _intended_ as a target for compilation.
+//!
+//! While we definitely want the benefits of Sierra—particularly model checking
+//! for the underlying machine, and the gas monitoring—we do not want to perform
+//! all the necessary bookkeeping to make Sierra work on our own at the current
+//! time. By targeting `FlatLowered` instead, we gain the benefits of the
+//! _already existing_ [`sierragen`](https://github.com/starkware-libs/cairo/blob/main/crates/cairo-lang-sierra-generator/src/lib.rs)
+//! functionality, which ingests `FlatLowered` and handles the required Sierra
+//! bookkeeping for us, while also being able to iterate and design faster.
+//!
+//! While this does give us less control---as we rely on the existing
+//! translation---the benefits of not having to manually perform this additional
+//! work far outweighs that downside.
+//!
+//! We fully expect to modify the process in the future to target `Sierra`
+//! directly, giving us more control as we need it.
 //!
 //! # Language Support
 //!
@@ -39,6 +93,13 @@
 //! require _some_ specialized work to allow those languages to properly call
 //! intrinsics that can interact with the chain and the larger Starknet
 //! ecosystem.
+//!
+//! # Tests
+//!
+//! While this crate includes unit tests for individual portions of its
+//! functionality, the majority of the tests for the compiler can be found in
+//! the `tests` integration test directory. These serve as useful examples for
+//! the external API for the compiler, and can be referenced in that context.
 
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)] // Allows for better API naming
@@ -47,15 +108,17 @@
 pub mod constant;
 pub mod context;
 pub mod llvm;
+pub mod obj_gen;
 pub mod pass;
 pub mod polyfill;
 
-use hieratika_errors::compile::llvm::{Error, Result};
+use hieratika_errors::compile::llvm::Result;
 use hieratika_flo::FlatLoweredObject;
 
 use crate::{
     context::SourceContext,
-    pass::{data::DynPassDataMap, PassManager, PassManagerReturnData},
+    obj_gen::ObjectGenerator,
+    pass::{analysis::module_map::BuildModuleMap, PassManager, PassManagerReturnData},
     polyfill::PolyfillMap,
 };
 
@@ -89,27 +152,6 @@ use crate::{
 /// the original LLVM IR—through use of translation and polyfills as needed—and
 /// to retain as much context information as possible so to ensure the
 /// possibility of a good user experience in the future.
-///
-/// # Targeting `FlatLowered` instead of `Sierra`
-///
-/// It might seem strange to target `FlatLowered` instead of something like
-/// [Sierra](https://docs.starknet.io/architecture-and-concepts/smart-contracts/cairo-and-sierra/#why_do_we_need_sierra)
-/// which is _intended_ as a target for compilation.
-///
-/// While we definitely want the benefits of Sierra—particularly model checking
-/// for the underlying machine, and the gas monitoring—we do not want to perform
-/// all the necessary bookkeeping to make Sierra work on our own at the current
-/// time. By targeting `FlatLowered` instead, we gain the benefits of the
-/// _already existing_ [`sierragen`](https://github.com/starkware-libs/cairo/blob/main/crates/cairo-lang-sierra-generator/src/lib.rs)
-/// functionality, which ingests `FlatLowered` and handles the required Sierra
-/// bookkeeping for us, while also being able to iterate and design faster.
-///
-/// While this does give us less control—as we rely on the existing
-/// translation—the benefits of not having to manually perform this additional
-/// work far outweighs that downside.
-///
-/// We fully expect to modify the process in the future to target `Sierra`
-/// directly, giving us more control as we need it.
 pub struct Compiler {
     /// The source context, containing references to the LLVM module to be
     /// compiled.
@@ -123,6 +165,7 @@ pub struct Compiler {
     pub polyfill_map: PolyfillMap,
 }
 
+/// The basic operations required of the compiler.
 impl Compiler {
     /// Constructs a new compiler instance, wrapping the provided `context`
     /// describing the LLVM module to compile, the `passes` to run, and the
@@ -145,40 +188,24 @@ impl Compiler {
     ///
     /// - [`hieratika_errors::compile::llvm::Error`] if the compilation process
     ///   fails for any reason.
-    pub fn run(mut self) -> Result<CompilationResult> {
-        let PassManagerReturnData {
-            context: _context,
-            data: _data,
-        } = self.passes.run(self.context)?;
+    ///
+    /// # Panics
+    ///
+    /// - If the module mapping pass has not been run.
+    pub fn run(mut self) -> Result<FlatLoweredObject> {
+        // First we have to run all the passes and collect their data.
+        let PassManagerReturnData { context, data } = self.passes.run(self.context)?;
 
-        Err(Error::CompilationFailure(
-            "Compilation is not yet implemented".to_string(),
-        ))
-    }
-}
+        // After that, we can grab the module name out of the pass data.
+        let mod_name = data
+            .get::<BuildModuleMap>()
+            .expect("Module mapping pass has not been run, but it is required for code generation.")
+            .module_name
+            .clone();
 
-/// The result of compiling an LLVM IR module.
-#[derive(Debug)]
-pub struct CompilationResult {
-    /// The final state of the pass data after the compiler passes have been
-    /// executed.
-    pub pass_results: DynPassDataMap,
-
-    /// The `FLO` module that results from compilation.
-    pub result_module: FlatLoweredObject,
-}
-
-impl CompilationResult {
-    /// Constructs a new compilation result wrapping the final `FLO` module
-    /// and also containing the final output of any compiler passes.
-    #[must_use]
-    pub fn new(pass_results: DynPassDataMap) -> Self {
-        // TODO (#24) Actually compile to FLO.
-        let result_module = FlatLoweredObject::new("");
-        Self {
-            pass_results,
-            result_module,
-        }
+        // Then we can put our builder together and start the code generation process.
+        let builder = ObjectGenerator::new(&mod_name, data, context, self.polyfill_map)?;
+        builder.run()
     }
 }
 
@@ -256,23 +283,5 @@ impl CompilerBuilder {
             self.passes.unwrap_or_default(),
             self.polyfill_map.unwrap_or_default(),
         )
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::path::Path;
-
-    use crate::{context::SourceContext, CompilerBuilder};
-
-    #[test]
-    fn compiler_runs_successfully() -> anyhow::Result<()> {
-        let test_input = r"input/add.ll";
-        let ctx = SourceContext::create(Path::new(test_input))?;
-
-        let compiler = CompilerBuilder::new(ctx).build();
-        assert!(compiler.run().is_err());
-
-        Ok(())
     }
 }

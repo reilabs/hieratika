@@ -18,7 +18,7 @@ use inkwell::types::{
 };
 use itertools::Itertools;
 
-use crate::constant::BYTE_SIZE;
+use crate::{constant::BYTE_SIZE, llvm::data_layout::DataLayout};
 
 /// A representation of the LLVM [types](https://llvm.org/docs/LangRef.html#type-system)
 /// for use within the compiler.
@@ -88,13 +88,7 @@ pub enum LLVMType {
     /// An [array](https://llvm.org/docs/LangRef.html#array-type) is a
     /// sequential arrangement of a number of elements of the given type
     /// linearly in memory.
-    Array {
-        /// The number of elements in the array type.
-        count: usize,
-
-        /// The type of elements in the array type.
-        typ: Box<LLVMType>,
-    },
+    Array(LLVMArray),
 
     /// A [structure](https://llvm.org/docs/LangRef.html#structure-type)
     /// represents a number of elements together in memory.
@@ -102,32 +96,11 @@ pub enum LLVMType {
     /// Note that struct elements do not have names, and can only be accessed by
     /// index. This makes LLVM struct types far more akin to what we call a
     /// Tuple in most languages.
-    Structure {
-        /// If the structure is packed, it has one-byte alignment with no
-        /// padding between elements.
-        ///
-        /// If it is not packed, then the padding and alignment of struct
-        /// elements is given by the module's data-layout string.
-        packed: bool,
-
-        /// The element types in the structure type.
-        ///
-        /// The order is semantically meaninful here.
-        elements: Vec<LLVMType>,
-    },
+    Structure(LLVMStruct),
 
     /// A [function](https://llvm.org/docs/LangRef.html#function-type) is akin
     /// to a function signature.
-    Function {
-        /// The type returned from the function.
-        return_type: Box<LLVMType>,
-
-        /// The types of the parameters to the function.
-        ///
-        /// Note that these are never named, and are purely matched
-        /// positionally.
-        parameter_types: Vec<LLVMType>,
-    },
+    Function(LLVMFunction),
 
     /// Embedded [metadata](https://llvm.org/docs/LangRef.html#metadata-type)
     /// used as a value has this type.
@@ -141,30 +114,21 @@ impl LLVMType {
     /// elements of type `elem_type`.
     #[must_use]
     pub fn make_array(elem_count: usize, elem_type: LLVMType) -> Self {
-        Self::Array {
-            count: elem_count,
-            typ:   Box::new(elem_type),
-        }
+        Self::Array(LLVMArray::new(elem_count, elem_type))
     }
 
     /// Creates a struct type from the provided `elem_types` and whether it is
     /// `packed`.
     #[must_use]
     pub fn make_struct(packed: bool, elem_types: &[LLVMType]) -> Self {
-        Self::Structure {
-            packed,
-            elements: Vec::from(elem_types),
-        }
+        Self::Structure(LLVMStruct::new(packed, elem_types))
     }
 
     /// Creates a function type from the provided `return_type` and
     /// `param_types`.
     #[must_use]
     pub fn make_function(return_type: LLVMType, param_types: &[LLVMType]) -> Self {
-        Self::Function {
-            return_type:     Box::new(return_type),
-            parameter_types: Vec::from(param_types),
-        }
+        Self::Function(LLVMFunction::new(return_type, param_types))
     }
 }
 
@@ -222,6 +186,75 @@ impl LLVMType {
     pub fn is_float(&self) -> bool {
         matches!(self, Self::half | Self::float | Self::double)
     }
+
+    /// Returns `self` as a function type if it exists, and otherwise returns
+    /// [`None`].
+    #[must_use]
+    pub fn as_function(&self) -> Option<&LLVMFunction> {
+        match self {
+            Self::Function(func) => Some(func),
+            _ => None,
+        }
+    }
+
+    /// Returns `self` as a function type if possible.
+    ///
+    /// # Panics
+    ///
+    /// If `self` is not a function type.
+    #[must_use]
+    pub fn expect_function(&self) -> &LLVMFunction {
+        self.as_function().expect("`self` value was not Self::Function")
+    }
+
+    /// Gets the size of `self` in bits under the provided data layout.
+    #[must_use]
+    pub fn size_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        #[allow(clippy::match_same_arms)] // The similarity is incidental
+        match self {
+            LLVMType::bool => layout.expect_int_spec_of(1).size,
+            LLVMType::i8 => layout.expect_int_spec_of(8).size,
+            LLVMType::i16 => layout.expect_int_spec_of(16).size,
+            LLVMType::i32 => layout.expect_int_spec_of(32).size,
+            LLVMType::i64 => layout.expect_int_spec_of(64).size,
+            LLVMType::i128 => layout.expect_int_spec_of(128).size,
+            LLVMType::half => layout.expect_float_spec_of(16).size,
+            LLVMType::float => layout.expect_float_spec_of(32).size,
+            LLVMType::double => layout.expect_float_spec_of(64).size,
+            LLVMType::ptr => layout.default_pointer_layout().size,
+            LLVMType::void => 0,
+            LLVMType::Array(array_ty) => array_ty.size_of(layout),
+            LLVMType::Structure(struct_ty) => struct_ty.size_of(layout),
+            LLVMType::Function(func_ty) => func_ty.size_of(layout),
+            LLVMType::Metadata => 0,
+        }
+    }
+
+    /// Gets the ABI alignment of `self` in bits under the provided data
+    /// layout.
+    #[must_use]
+    pub fn align_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        #[allow(clippy::match_same_arms)] // The similarity is incidental
+        match self {
+            LLVMType::bool => layout.expect_int_spec_of(1).abi_alignment,
+            LLVMType::i8 => layout.expect_int_spec_of(8).abi_alignment,
+            LLVMType::i16 => layout.expect_int_spec_of(16).abi_alignment,
+            LLVMType::i32 => layout.expect_int_spec_of(32).abi_alignment,
+            LLVMType::i64 => layout.expect_int_spec_of(64).abi_alignment,
+            LLVMType::i128 => layout.expect_int_spec_of(128).abi_alignment,
+            LLVMType::half => layout.expect_float_spec_of(16).abi_alignment,
+            LLVMType::float => layout.expect_float_spec_of(32).abi_alignment,
+            LLVMType::double => layout.expect_float_spec_of(64).abi_alignment,
+            LLVMType::ptr => layout.default_pointer_layout().abi_alignment,
+            LLVMType::void => 0,
+            LLVMType::Array(array_ty) => array_ty.align_of(layout),
+            LLVMType::Structure(struct_ty) => struct_ty.align_of(layout),
+            LLVMType::Function(func_ty) => func_ty.align_of(layout),
+            LLVMType::Metadata => 0,
+        }
+    }
 }
 
 /// This attempts to match the LLVM representations for these types where it is
@@ -244,11 +277,11 @@ impl Display for LLVMType {
             LLVMType::ptr => "ptr".to_string(),
             LLVMType::void => "void".to_string(),
             LLVMType::Metadata => "metadata".to_string(),
-            LLVMType::Array { count, typ: ty } => {
-                let ty_str = ty.to_string();
+            LLVMType::Array(LLVMArray { count, typ }) => {
+                let ty_str = typ.to_string();
                 format!("[{ty_str}; {count}]")
             }
-            LLVMType::Structure { packed, elements } => {
+            LLVMType::Structure(LLVMStruct { packed, elements }) => {
                 let elem_strs = elements.iter().map(std::string::ToString::to_string).join(", ");
                 if *packed {
                     format!("<{{ {elem_strs} }}>")
@@ -256,10 +289,10 @@ impl Display for LLVMType {
                     format!("{{ {elem_strs} }}")
                 }
             }
-            LLVMType::Function {
+            LLVMType::Function(LLVMFunction {
                 return_type,
                 parameter_types,
-            } => {
+            }) => {
                 let params_string = parameter_types
                     .iter()
                     .map(std::string::ToString::to_string)
@@ -338,9 +371,7 @@ impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMType {
     type Error = llvm::Error;
 
     fn try_from(value: &ArrayType<'ctx>) -> Result<Self, Self::Error> {
-        let length = value.len() as usize;
-        let elem_type = Self::try_from(value.get_element_type())?;
-        Ok(Self::make_array(length, elem_type))
+        Ok(Self::Array(LLVMArray::try_from(value)?))
     }
 }
 
@@ -446,13 +477,7 @@ impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMType {
     type Error = llvm::Error;
 
     fn try_from(value: &StructType<'ctx>) -> Result<Self, Self::Error> {
-        let field_types: Vec<Self> = value
-            .get_field_types()
-            .iter()
-            .map(Self::try_from)
-            .collect::<Result<Vec<Self>, Error>>()?;
-        let packed = value.is_packed();
-        Ok(Self::make_struct(packed, &field_types))
+        Ok(Self::Structure(LLVMStruct::try_from(value)?))
     }
 }
 
@@ -498,14 +523,7 @@ impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMType {
     type Error = llvm::Error;
 
     fn try_from(value: &FunctionType<'ctx>) -> Result<Self, Self::Error> {
-        let return_type = value.get_return_type().map_or(Ok(LLVMType::void), Self::try_from)?;
-        let param_types = value
-            .get_param_types()
-            .iter()
-            .map(Self::try_from)
-            .collect::<Result<Vec<Self>, Error>>()?;
-
-        Ok(Self::make_function(return_type, &param_types))
+        Ok(Self::Function(LLVMFunction::try_from(value)?))
     }
 }
 
@@ -530,5 +548,275 @@ impl<'ctx> TryFrom<&VoidType<'ctx>> for LLVMType {
 
     fn try_from(_: &VoidType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::void)
+    }
+}
+
+/// An [array](https://llvm.org/docs/LangRef.html#array-type) is a sequential
+/// arrangement of a number of elements of the given type linearly in memory.
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct LLVMArray {
+    /// The number of elements in the array type.
+    pub count: usize,
+
+    /// The type of elements in the array type.
+    pub typ: Box<LLVMType>,
+}
+
+impl LLVMArray {
+    /// Creates a new LLVM array type from the provided `count` and `typ`.
+    #[must_use]
+    pub fn new(count: usize, typ: LLVMType) -> Self {
+        let typ = Box::new(typ);
+        Self { count, typ }
+    }
+
+    /// Gets the size of `self` in bits under the provided data layout.
+    #[must_use]
+    pub fn size_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        let size_of_elem = self.typ.size_of(layout);
+        let align_of_elem = self.typ.align_of(layout);
+        let total_size_per_elem = if size_of_elem > align_of_elem {
+            align_of_elem * (1 + align_of_elem / size_of_elem)
+        } else {
+            align_of_elem
+        };
+
+        total_size_per_elem * self.count
+    }
+
+    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    #[must_use]
+    pub fn align_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        layout.aggregate_layout.abi_alignment
+    }
+}
+
+impl From<LLVMArray> for LLVMType {
+    fn from(value: LLVMArray) -> Self {
+        LLVMType::Array(value)
+    }
+}
+
+impl TryFrom<LLVMType> for LLVMArray {
+    type Error = llvm::Error;
+
+    fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
+        match value {
+            LLVMType::Array(array) => Ok(array),
+            _ => Err(Error::invalid_type_conversion(
+                "Cannot convert non-array LLVMType to LLVMArray",
+            )),
+        }
+    }
+}
+
+impl<'ctx> TryFrom<ArrayType<'ctx>> for LLVMArray {
+    type Error = llvm::Error;
+
+    fn try_from(value: ArrayType<'ctx>) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMArray {
+    type Error = llvm::Error;
+
+    fn try_from(value: &ArrayType<'ctx>) -> Result<Self, Self::Error> {
+        let length = value.len() as usize;
+        let elem_type = LLVMType::try_from(value.get_element_type())?;
+        Ok(Self::new(length, elem_type))
+    }
+}
+
+/// A [structure](https://llvm.org/docs/LangRef.html#structure-type)
+/// represents a number of elements together in memory.
+///
+/// Note that struct elements do not have names, and can only be accessed by
+/// index. This makes LLVM struct types far more akin to what we call a
+/// Tuple in most languages.
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct LLVMStruct {
+    /// If the structure is packed, it has one-byte alignment with no
+    /// padding between elements.
+    ///
+    /// If it is not packed, then the padding and alignment of struct
+    /// elements is given by the module's data-layout string.
+    pub packed: bool,
+
+    /// The element types in the structure type.
+    ///
+    /// The order is semantically meaningful here.
+    pub elements: Vec<LLVMType>,
+}
+
+impl LLVMStruct {
+    /// Creates a new LLVM struct from the provided `packed` specification and
+    /// `elements` types.
+    #[must_use]
+    pub fn new(packed: bool, elements: &[LLVMType]) -> Self {
+        let elements = elements.to_vec();
+
+        Self { packed, elements }
+    }
+
+    /// Gets the size of `self` in bits under the provided data layout.
+    #[must_use]
+    pub fn size_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        self.elements
+            .iter()
+            .map(|element| {
+                if self.packed {
+                    element.size_of(layout)
+                } else {
+                    let size_of_element = element.size_of(layout);
+                    let align_of_element = element.size_of(layout);
+                    if size_of_element > align_of_element {
+                        align_of_element * (1 + align_of_element / size_of_element)
+                    } else {
+                        align_of_element
+                    }
+                }
+            })
+            .sum()
+    }
+
+    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    #[must_use]
+    pub fn align_of(&self, layout: &DataLayout) -> usize {
+        // TODO (#29) Make this comply with the design for the memory model.
+        layout.aggregate_layout.abi_alignment
+    }
+}
+
+impl From<LLVMStruct> for LLVMType {
+    fn from(value: LLVMStruct) -> Self {
+        LLVMType::Structure(value)
+    }
+}
+
+impl TryFrom<LLVMType> for LLVMStruct {
+    type Error = llvm::Error;
+
+    fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
+        match value {
+            LLVMType::Structure(structure) => Ok(structure),
+            _ => Err(Error::invalid_type_conversion(
+                "Cannot convert non-struct LLVMType to LLVMStruct",
+            )),
+        }
+    }
+}
+
+impl<'ctx> TryFrom<StructType<'ctx>> for LLVMStruct {
+    type Error = llvm::Error;
+
+    fn try_from(value: StructType<'ctx>) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMStruct {
+    type Error = llvm::Error;
+
+    fn try_from(value: &StructType<'ctx>) -> Result<Self, Self::Error> {
+        let field_types = value
+            .get_field_types()
+            .iter()
+            .map(LLVMType::try_from)
+            .collect::<Result<Vec<LLVMType>, Error>>()?;
+        let packed = value.is_packed();
+
+        Ok(Self::new(packed, &field_types))
+    }
+}
+
+/// A [function](https://llvm.org/docs/LangRef.html#function-type) is akin
+/// to a function signature.
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct LLVMFunction {
+    /// The type returned from the function.
+    pub return_type: Box<LLVMType>,
+
+    /// The types of the parameters to the function.
+    ///
+    /// Note that these are never named, and are purely matched
+    /// positionally.
+    pub parameter_types: Vec<LLVMType>,
+}
+
+impl LLVMFunction {
+    /// Constructs a new LLVM function type from the provided `return_type` and
+    /// `parameter_types`.
+    #[must_use]
+    pub fn new(return_type: LLVMType, parameter_types: &[LLVMType]) -> Self {
+        let return_type = Box::new(return_type);
+        let parameter_types = parameter_types.to_vec();
+        Self {
+            return_type,
+            parameter_types,
+        }
+    }
+
+    /// Gets the size of `self` in bits under the provided data layout.
+    ///
+    /// This is given by the size of the function's return type.
+    #[must_use]
+    pub fn size_of(&self, layout: &DataLayout) -> usize {
+        self.return_type.size_of(layout)
+    }
+
+    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    ///
+    /// This is given by the ABI alignment of the function's return type.
+    #[must_use]
+    pub fn align_of(&self, layout: &DataLayout) -> usize {
+        self.return_type.align_of(layout)
+    }
+}
+
+impl From<LLVMFunction> for LLVMType {
+    fn from(value: LLVMFunction) -> Self {
+        Self::Function(value)
+    }
+}
+
+impl TryFrom<LLVMType> for LLVMFunction {
+    type Error = llvm::Error;
+
+    fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
+        match value {
+            LLVMType::Function(function) => Ok(function),
+            _ => Err(Error::invalid_type_conversion(
+                "Cannot convert non-function LLVMType to LLVMFunction",
+            )),
+        }
+    }
+}
+
+impl<'ctx> TryFrom<FunctionType<'ctx>> for LLVMFunction {
+    type Error = llvm::Error;
+
+    fn try_from(value: FunctionType<'ctx>) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMFunction {
+    type Error = llvm::Error;
+
+    fn try_from(value: &FunctionType<'ctx>) -> Result<Self, Self::Error> {
+        let return_type = value
+            .get_return_type()
+            .map_or(Ok(LLVMType::void), LLVMType::try_from)?;
+        let param_types = value
+            .get_param_types()
+            .iter()
+            .map(LLVMType::try_from)
+            .collect::<Result<Vec<LLVMType>, Error>>()?;
+
+        Ok(Self::new(return_type, &param_types))
     }
 }

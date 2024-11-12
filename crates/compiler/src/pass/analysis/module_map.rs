@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 
+use ethnum::U256;
 use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{
     module::{Linkage, Module},
@@ -20,7 +21,7 @@ use crate::{
     llvm::{
         data_layout::DataLayout,
         special_intrinsics::SpecialIntrinsics,
-        typesystem::LLVMType,
+        typesystem::{LLVMFunction, LLVMType},
         TopLevelEntryKind,
     },
     pass::{
@@ -91,6 +92,9 @@ impl BuildModuleMap {
     ///
     /// - [`Error`] if the module cannot be mapped successfully.
     pub fn map_module(&mut self, module: &Module) -> Result<ModuleMap> {
+        // First, we grab the module name.
+        let module_name = module.get_name().to_str()?;
+
         // We start by analyzing the data-layout of the module, which is important to
         // ensure that things match later on and that we are not being asked for things
         // that we do not or cannot support. This _may_ currently return errors due to
@@ -100,7 +104,7 @@ impl BuildModuleMap {
 
         // With our data layout obtained successfully, we can build our module map and
         // start adding top-level entries to it.
-        let mut mod_map = ModuleMap::new(data_layout);
+        let mut mod_map = ModuleMap::new(module_name, data_layout);
 
         // We then process the global definitions in scope and gather the relevant
         // information about them.
@@ -184,6 +188,16 @@ impl BuildModuleMap {
         let visibility = global.get_visibility();
         let is_initialized = global.get_initializer().is_some();
 
+        // LLVM IR's [LangRef](https://llvm.org/docs/LangRef.html#global-variables)
+        // states that definitions of global variables must have initializers. Only
+        // declarations of globals in other translation units may not be accompanied by
+        // an initializer.
+        if !is_initialized && kind == TopLevelEntryKind::Definition {
+            Err(Error::malformed_llvm(
+                "Definitions of constants in LLVM IR must have initializers",
+            ))?;
+        }
+
         let global_info = GlobalInfo {
             kind,
             typ,
@@ -191,7 +205,6 @@ impl BuildModuleMap {
             visibility,
             alignment,
             is_const,
-            is_initialized,
         };
 
         mod_map.globals.insert(name, global_info);
@@ -216,14 +229,24 @@ impl BuildModuleMap {
             } else {
                 TopLevelEntryKind::Definition
             };
-            let typ = LLVMType::try_from(func.get_type())?;
+            let typ = LLVMFunction::try_from(func.get_type())?;
             let linkage = func.get_linkage();
             let intrinsic = func.get_intrinsic_id() != 0;
             let visibility = func.as_global_value().get_visibility();
+            let param_names = func
+                .get_params()
+                .iter()
+                .map(|p| {
+                    let name = p.get_name().to_str()?.to_string();
+                    Ok(if name.is_empty() { None } else { Some(name) })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
             let f_info = FunctionInfo {
                 kind,
                 intrinsic,
                 typ,
+                param_names,
                 linkage,
                 visibility,
             };
@@ -272,11 +295,15 @@ impl ConcretePass for BuildModuleMap {
 ///
 /// It contains information on the module's:
 ///
+/// - Name, useful for identifying the module in question.
 /// - Data layout, as given by the embedded data layout string.
 /// - Functions, as given by the function definitions and declarations.
 /// - Globals, as given by the global definitions and declarations.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModuleMap {
+    /// The name for the module.
+    pub module_name: String,
+
     /// The data layout provided for this module.
     pub data_layout: DataLayout,
 
@@ -289,11 +316,30 @@ pub struct ModuleMap {
 
 impl ModuleMap {
     /// Creates a new instance of the output data for the module mapping pass.
+    ///
+    /// # Anonymous Modules
+    ///
+    /// If the module is anonymous—in other words that its name is an empty
+    /// string—it will have a name generated at random. Please note that the
+    /// underlying RNG **cannot be relied upon to be cryptographically secure**,
+    /// and should not be treated as such.
     #[must_use]
-    pub fn new(data_layout: DataLayout) -> Self {
+    pub fn new(name: &str, data_layout: DataLayout) -> Self {
+        let module_name = if name.is_empty() {
+            // This _is_ actually cryptographically secure, but the fact that it is (see the
+            // docs on `ThreadRng` for more details), is an implementation detail and need
+            // not be sustained through changes.
+            let rand_bytes: [u8; size_of::<U256>()] = rand::random();
+            let rand_num = U256::from_be_bytes(rand_bytes);
+            format!("{rand_num:#032x}")
+        } else {
+            name.to_string()
+        };
         let functions = HashMap::new();
         let globals = HashMap::new();
+
         Self {
+            module_name,
             data_layout,
             globals,
             functions,
@@ -303,8 +349,8 @@ impl ModuleMap {
     /// Creates a new trait object of the output data for the module mapping
     /// pass.
     #[must_use]
-    pub fn new_dyn(data_layout: DataLayout) -> Box<Self> {
-        Box::new(Self::new(data_layout))
+    pub fn new_dyn(name: &str, data_layout: DataLayout) -> Box<Self> {
+        Box::new(Self::new(name, data_layout))
     }
 }
 
@@ -328,12 +374,23 @@ pub struct FunctionInfo {
     pub intrinsic: bool,
 
     /// The LLVM type of our function.
-    pub typ: LLVMType,
+    pub typ: LLVMFunction,
+
+    /// The parameter names for the function, if they exist.
+    pub param_names: Vec<Option<String>>,
 
     /// The linkage for our function.
+    ///
+    /// For more information, see the
+    /// [LLVM Documentation](https://llvm.org/docs/LangRef.html#linkage-types)
+    /// on linkage.
     pub linkage: Linkage,
 
     /// The visibility of our function.
+    ///
+    /// For more information, see the
+    /// [LLVM Documentation](https://llvm.org/docs/LangRef.html#visibility-styles)
+    /// on visibility.
     pub visibility: GlobalVisibility,
 }
 
@@ -348,9 +405,17 @@ pub struct GlobalInfo {
     pub typ: LLVMType,
 
     /// The linkage for our global.
+    ///
+    /// For more information, see the
+    /// [LLVM Documentation](https://llvm.org/docs/LangRef.html#linkage-types)
+    /// on linkage.
     pub linkage: Linkage,
 
     /// The visibility of our global.
+    ///
+    /// For more information, see the
+    /// [LLVM Documentation](https://llvm.org/docs/LangRef.html#visibility-styles)
+    /// on visibility.
     pub visibility: GlobalVisibility,
 
     /// The alignment of the global value.
@@ -358,9 +423,6 @@ pub struct GlobalInfo {
 
     /// `true` if this global is constant, and `false` otherwise.
     pub is_const: bool,
-
-    /// `true` if this global is initialized, and `false` otherwise.
-    pub is_initialized: bool,
 }
 
 #[cfg(test)]
@@ -371,8 +433,17 @@ mod test {
 
     use crate::{
         context::SourceContext,
-        llvm::{data_layout::DataLayout, typesystem::LLVMType, TopLevelEntryKind},
-        pass::{analysis::module_map::BuildModuleMap, data::DynPassDataMap, ConcretePass, PassOps},
+        llvm::{
+            data_layout::DataLayout,
+            typesystem::{LLVMFunction, LLVMType},
+            TopLevelEntryKind,
+        },
+        pass::{
+            analysis::module_map::{BuildModuleMap, ModuleMap},
+            data::DynPassDataMap,
+            ConcretePass,
+            PassOps,
+        },
     };
 
     /// A utility function to make it easy to load the testing context in all
@@ -380,6 +451,14 @@ mod test {
     fn get_text_context() -> SourceContext {
         SourceContext::create(Path::new(r"input/add.ll"))
             .expect("Unable to construct testing source context")
+    }
+
+    #[test]
+    fn generates_random_names_for_anon_modules() {
+        let map_1 = ModuleMap::new("", DataLayout::new("").unwrap());
+        let map_2 = ModuleMap::new("", DataLayout::new("").unwrap());
+
+        assert_ne!(map_1.module_name, map_2.module_name);
     }
 
     #[test]
@@ -457,7 +536,6 @@ mod test {
         let global_1 = globals
             .get(&"alloc_4190527422e5cc48a15bd1cb4f38f425".to_string())
             .unwrap();
-        assert!(global_1.is_initialized);
         assert_eq!(global_1.visibility, GlobalVisibility::Default);
         assert_eq!(global_1.alignment, 1);
         assert!(global_1.is_const);
@@ -473,7 +551,6 @@ mod test {
         let global_2 = globals
             .get(&"alloc_5b4544c775a23c08ca70c48dd7be27fc".to_string())
             .unwrap();
-        assert!(global_2.is_initialized);
         assert_eq!(global_2.visibility, GlobalVisibility::Default);
         assert_eq!(global_2.alignment, 8);
         assert!(global_2.is_const);
@@ -518,52 +595,72 @@ mod test {
         assert_eq!(rust_test_input.visibility, GlobalVisibility::Default);
         assert_eq!(
             rust_test_input.typ,
-            LLVMType::make_function(LLVMType::i64, &[LLVMType::i64, LLVMType::i64])
+            LLVMFunction::new(LLVMType::i64, &[LLVMType::i64, LLVMType::i64])
+        );
+        assert_eq!(
+            rust_test_input.param_names,
+            vec![Some("left".into()), Some("right".into())]
         );
 
         // llvm.dbg.declare
-        let rust_test_input = functions.get(&"llvm.dbg.declare".to_string()).unwrap();
-        assert!(rust_test_input.intrinsic);
-        assert_eq!(rust_test_input.kind, TopLevelEntryKind::Declaration);
-        assert_eq!(rust_test_input.linkage, Linkage::External);
-        assert_eq!(rust_test_input.visibility, GlobalVisibility::Default);
+        let llvm_dbg_declare = functions.get(&"llvm.dbg.declare".to_string()).unwrap();
+        assert!(llvm_dbg_declare.intrinsic);
+        assert_eq!(llvm_dbg_declare.kind, TopLevelEntryKind::Declaration);
+        assert_eq!(llvm_dbg_declare.linkage, Linkage::External);
+        assert_eq!(llvm_dbg_declare.visibility, GlobalVisibility::Default);
         assert_eq!(
-            rust_test_input.typ,
-            LLVMType::make_function(
+            llvm_dbg_declare.typ,
+            LLVMFunction::new(
                 LLVMType::void,
                 &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata]
             )
         );
+        assert_eq!(llvm_dbg_declare.param_names, vec![None, None, None]);
 
         // llvm.uadd.with.overflow.i64
-        let rust_test_input = functions.get(&"llvm.uadd.with.overflow.i64".to_string()).unwrap();
-        assert!(rust_test_input.intrinsic);
-        assert_eq!(rust_test_input.kind, TopLevelEntryKind::Declaration);
-        assert_eq!(rust_test_input.linkage, Linkage::External);
-        assert_eq!(rust_test_input.visibility, GlobalVisibility::Default);
+        let llvm_uadd_with_overflow_i64 =
+            functions.get(&"llvm.uadd.with.overflow.i64".to_string()).unwrap();
+        assert!(llvm_uadd_with_overflow_i64.intrinsic);
         assert_eq!(
-            rust_test_input.typ,
-            LLVMType::make_function(
+            llvm_uadd_with_overflow_i64.kind,
+            TopLevelEntryKind::Declaration
+        );
+        assert_eq!(llvm_uadd_with_overflow_i64.linkage, Linkage::External);
+        assert_eq!(
+            llvm_uadd_with_overflow_i64.visibility,
+            GlobalVisibility::Default
+        );
+        assert_eq!(
+            llvm_uadd_with_overflow_i64.typ,
+            LLVMFunction::new(
                 LLVMType::make_struct(false, &[LLVMType::i64, LLVMType::bool]),
                 &[LLVMType::i64, LLVMType::i64]
             )
         );
+        assert_eq!(llvm_uadd_with_overflow_i64.param_names, vec![None, None]);
 
         // _ZN4core9panicking11panic_const24panic_const_add_overflow17he7771b1d81fa091aE
-        let rust_test_input = functions
+        let panic_const_add_overflow = functions
             .get(
                 &"_ZN4core9panicking11panic_const24panic_const_add_overflow17he7771b1d81fa091aE"
                     .to_string(),
             )
             .unwrap();
-        assert!(!rust_test_input.intrinsic);
-        assert_eq!(rust_test_input.kind, TopLevelEntryKind::Declaration);
-        assert_eq!(rust_test_input.linkage, Linkage::External);
-        assert_eq!(rust_test_input.visibility, GlobalVisibility::Default);
+        assert!(!panic_const_add_overflow.intrinsic);
         assert_eq!(
-            rust_test_input.typ,
-            LLVMType::make_function(LLVMType::void, &[LLVMType::ptr])
+            panic_const_add_overflow.kind,
+            TopLevelEntryKind::Declaration
         );
+        assert_eq!(panic_const_add_overflow.linkage, Linkage::External);
+        assert_eq!(
+            panic_const_add_overflow.visibility,
+            GlobalVisibility::Default
+        );
+        assert_eq!(
+            panic_const_add_overflow.typ,
+            LLVMFunction::new(LLVMType::void, &[LLVMType::ptr])
+        );
+        assert_eq!(panic_const_add_overflow.param_names, vec![None]);
 
         Ok(())
     }

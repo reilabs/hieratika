@@ -121,6 +121,15 @@ where
 
         previous.expect("internal consistency error: swap called on an unknown ID!")
     }
+
+    /// Gets an immutable iterator over the entries in the table.
+    ///
+    /// Please note that neither the zero entry nor the poison entry will be
+    /// an element seen in the iterator, and so it is not recommended to
+    /// construct a new `InternTable` by `collect`ing this iterator.
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &ValueType)> {
+        self.table.iter().filter(|(id, _)| **id != POISON_ENTRY && **id != 0)
+    }
 }
 
 impl<IdType, ValueType> Default for InternTable<IdType, ValueType>
