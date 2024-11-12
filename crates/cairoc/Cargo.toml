@@ -22,3 +22,6 @@ cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 hieratika-errors.workspace = true
 itertools.workspace = true
+
+[dev-dependencies]
+rayon = "1.10.0"
