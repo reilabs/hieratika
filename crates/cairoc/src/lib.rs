@@ -129,21 +129,28 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<Vec<Arc<FlatLowered>>> {
 mod test {
     use std::{fs::read_dir, path::Path};
 
+    use itertools::Itertools;
+    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
     use crate::generate_flat_lowered;
 
     #[test]
     fn flat_lowered_cairo_example_folder() {
         let examples_folder = Path::new("../../cairo/examples");
-        for file in read_dir(examples_folder).unwrap() {
-            let file = file.unwrap();
-            if Path::new(file.file_name().to_str().unwrap())
-                .extension()
-                .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
-            {
-                println!("Flat lowered {:?}", file.path());
-                generate_flat_lowered(&file.path()).unwrap();
-            }
-        }
+        read_dir(examples_folder)
+            .unwrap()
+            .collect_vec()
+            .par_iter()
+            .for_each(|file| {
+                let file = file.as_ref().unwrap();
+                if Path::new(file.file_name().to_str().unwrap())
+                    .extension()
+                    .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
+                {
+                    println!("Flat lowered {:?}", file.path());
+                    generate_flat_lowered(&file.path()).unwrap();
+                }
+            });
     }
 
     #[test]

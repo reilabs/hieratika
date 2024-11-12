@@ -810,6 +810,7 @@ dependencies = [
  "cairo-lang-utils",
  "hieratika-errors",
  "itertools 0.13.0",
+ "rayon",
 ]
 
 [[package]]
