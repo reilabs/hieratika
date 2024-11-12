@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use ethnum::U256;
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{
     module::{Linkage, Module},
     values::{FunctionValue, GlobalValue},

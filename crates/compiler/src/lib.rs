@@ -112,7 +112,7 @@ pub mod obj_gen;
 pub mod pass;
 pub mod polyfill;
 
-pub use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::Result;
 use hieratika_flo::FlatLoweredObject;
 
 use crate::{
@@ -186,8 +186,8 @@ impl Compiler {
     ///
     /// # Errors
     ///
-    /// - [`hieratika_errors::compile::Error`] if the compilation process fails
-    ///   for any reason.
+    /// - [`hieratika_errors::compile::llvm::Error`] if the compilation process
+    ///   fails for any reason.
     ///
     /// # Panics
     ///

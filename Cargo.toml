@@ -7,9 +7,13 @@ members = [
   "crates/compiler",
   "crates/driver",
   "crates/error",
+  "crates/cairoc",
   "crates/flo",
   "crates/rust-test-input",
 ]
+
+# Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
+exclude = ["cairo"]
 
 # Here we set keys that are relevant across all packages, allowing them to be inherited.
 [workspace.package]
@@ -31,10 +35,14 @@ rust-version = "1.81.0"
 anyhow = "1.0.89"
 ariadne = "0.4.1"
 bimap = { version = "0.6.3", features = ["serde"] }
-clap = "4.5.16"
+cairo-lang-compiler = { path = "cairo/crates/cairo-lang-compiler" }
+cairo-lang-diagnostics = { path = "cairo/crates/cairo-lang-diagnostics" }
+cairo-lang-lowering = { path = "cairo/crates/cairo-lang-lowering" }
+clap = { version = "4.5.16", features = ["derive", "cargo", "env"] }
 ethnum = "1.5.0"
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
 itertools = "0.13.0"
+hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }

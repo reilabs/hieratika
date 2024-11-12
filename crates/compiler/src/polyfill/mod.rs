@@ -54,7 +54,7 @@
 pub mod mappings;
 
 use bimap::{BiHashMap, BiMap};
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 
 use crate::polyfill::mappings::{LLVM_ALLOCA, LLVM_FENCE, LLVM_STORE, LLVM_UADD_WITH_OVERFLOW_I64};
 

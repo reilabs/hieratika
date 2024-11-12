@@ -3,7 +3,7 @@
 
 use std::fmt::{Display, Formatter};
 
-use hieratika_errors::{compile, compile::Error};
+use hieratika_errors::compile::{llvm, llvm::Error};
 use inkwell::types::{
     AnyTypeEnum,
     ArrayType,
@@ -307,7 +307,7 @@ impl Display for LLVMType {
 
 /// Conversion from Inkwell's generic type enum to our type language.
 impl<'ctx> TryFrom<AnyTypeEnum<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: AnyTypeEnum<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -316,7 +316,7 @@ impl<'ctx> TryFrom<AnyTypeEnum<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's generic type enum to our type language.
 impl<'ctx> TryFrom<&AnyTypeEnum<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &AnyTypeEnum<'ctx>) -> Result<Self, Self::Error> {
         match value {
@@ -334,7 +334,7 @@ impl<'ctx> TryFrom<&AnyTypeEnum<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's basic type enum to our type language.
 impl<'ctx> TryFrom<BasicTypeEnum<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: BasicTypeEnum<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -343,7 +343,7 @@ impl<'ctx> TryFrom<BasicTypeEnum<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's basic type enum to our type language.
 impl<'ctx> TryFrom<&BasicTypeEnum<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &BasicTypeEnum<'ctx>) -> Result<Self, Self::Error> {
         match value {
@@ -359,7 +359,7 @@ impl<'ctx> TryFrom<&BasicTypeEnum<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's array type to our type language.
 impl<'ctx> TryFrom<ArrayType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: ArrayType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -368,7 +368,7 @@ impl<'ctx> TryFrom<ArrayType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's array type to our type language.
 impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &ArrayType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::Array(LLVMArray::try_from(value)?))
@@ -377,7 +377,7 @@ impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's generic float type to our specific float types.
 impl<'ctx> TryFrom<FloatType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: FloatType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -386,7 +386,7 @@ impl<'ctx> TryFrom<FloatType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's generic float type to our specific float types.
 impl<'ctx> TryFrom<&FloatType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &FloatType<'ctx>) -> Result<Self, Self::Error> {
         #[allow(clippy::cast_possible_wrap)] // Our byte size should never be large enough
@@ -408,7 +408,7 @@ impl<'ctx> TryFrom<&FloatType<'ctx>> for LLVMType {
 /// Conversion from Inkwell's generic integer type to our specific integer
 /// types.
 impl<'ctx> TryFrom<IntType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: IntType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -418,7 +418,7 @@ impl<'ctx> TryFrom<IntType<'ctx>> for LLVMType {
 /// Conversion from Inkwell's generic integer type to our specific integer
 /// types.
 impl<'ctx> TryFrom<&IntType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &IntType<'ctx>) -> Result<Self, Self::Error> {
         let res = match value.get_bit_width() {
@@ -442,7 +442,7 @@ impl<'ctx> TryFrom<&IntType<'ctx>> for LLVMType {
 /// pointers. Otherwise, we would have to change every site performing
 /// conversion of pointer types.
 impl<'ctx> TryFrom<PointerType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: PointerType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -456,7 +456,7 @@ impl<'ctx> TryFrom<PointerType<'ctx>> for LLVMType {
 /// pointers. Otherwise, we would have to change every site performing
 /// conversion of pointer types.
 impl<'ctx> TryFrom<&PointerType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(_: &PointerType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::ptr)
@@ -465,7 +465,7 @@ impl<'ctx> TryFrom<&PointerType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's struct type to our type language.
 impl<'ctx> TryFrom<StructType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: StructType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -474,7 +474,7 @@ impl<'ctx> TryFrom<StructType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's struct type to our type language.
 impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &StructType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::Structure(LLVMStruct::try_from(value)?))
@@ -488,7 +488,7 @@ impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMType {
 /// seamlessly add support without having to change multiple conversion sites
 /// that would currently need to produce errors.
 impl<'ctx> TryFrom<VectorType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: VectorType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -502,7 +502,7 @@ impl<'ctx> TryFrom<VectorType<'ctx>> for LLVMType {
 /// seamlessly add support without having to change multiple conversion sites
 /// that would currently need to produce errors.
 impl<'ctx> TryFrom<&VectorType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &VectorType<'ctx>) -> Result<Self, Self::Error> {
         Err(Error::UnsupportedType(value.to_string()))?
@@ -511,7 +511,7 @@ impl<'ctx> TryFrom<&VectorType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's function type to our type language.
 impl<'ctx> TryFrom<FunctionType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: FunctionType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -520,7 +520,7 @@ impl<'ctx> TryFrom<FunctionType<'ctx>> for LLVMType {
 
 /// Conversion from Inkwell's function type to our type language.
 impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &FunctionType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::Function(LLVMFunction::try_from(value)?))
@@ -532,7 +532,7 @@ impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMType {
 /// We centralize this in a conversion to ensure that it is consistent at all
 /// use sites.
 impl<'ctx> TryFrom<VoidType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: VoidType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -544,7 +544,7 @@ impl<'ctx> TryFrom<VoidType<'ctx>> for LLVMType {
 /// We centralize this in a conversion to ensure that it is consistent at all
 /// use sites.
 impl<'ctx> TryFrom<&VoidType<'ctx>> for LLVMType {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(_: &VoidType<'ctx>) -> Result<Self, Self::Error> {
         Ok(Self::void)
@@ -600,7 +600,7 @@ impl From<LLVMArray> for LLVMType {
 }
 
 impl TryFrom<LLVMType> for LLVMArray {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
         match value {
@@ -613,7 +613,7 @@ impl TryFrom<LLVMType> for LLVMArray {
 }
 
 impl<'ctx> TryFrom<ArrayType<'ctx>> for LLVMArray {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: ArrayType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -621,7 +621,7 @@ impl<'ctx> TryFrom<ArrayType<'ctx>> for LLVMArray {
 }
 
 impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMArray {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &ArrayType<'ctx>) -> Result<Self, Self::Error> {
         let length = value.len() as usize;
@@ -698,7 +698,7 @@ impl From<LLVMStruct> for LLVMType {
 }
 
 impl TryFrom<LLVMType> for LLVMStruct {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
         match value {
@@ -711,7 +711,7 @@ impl TryFrom<LLVMType> for LLVMStruct {
 }
 
 impl<'ctx> TryFrom<StructType<'ctx>> for LLVMStruct {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: StructType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -719,7 +719,7 @@ impl<'ctx> TryFrom<StructType<'ctx>> for LLVMStruct {
 }
 
 impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMStruct {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &StructType<'ctx>) -> Result<Self, Self::Error> {
         let field_types = value
@@ -784,7 +784,7 @@ impl From<LLVMFunction> for LLVMType {
 }
 
 impl TryFrom<LLVMType> for LLVMFunction {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: LLVMType) -> Result<Self, Self::Error> {
         match value {
@@ -797,7 +797,7 @@ impl TryFrom<LLVMType> for LLVMFunction {
 }
 
 impl<'ctx> TryFrom<FunctionType<'ctx>> for LLVMFunction {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: FunctionType<'ctx>) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -805,7 +805,7 @@ impl<'ctx> TryFrom<FunctionType<'ctx>> for LLVMFunction {
 }
 
 impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMFunction {
-    type Error = compile::Error;
+    type Error = llvm::Error;
 
     fn try_from(value: &FunctionType<'ctx>) -> Result<Self, Self::Error> {
         let return_type = value

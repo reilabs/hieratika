@@ -15,5 +15,8 @@ rust-version.workspace = true
 
 [dependencies]
 ariadne.workspace = true
+cairo-lang-compiler.workspace = true
+cairo-lang-diagnostics.workspace = true
+cairo-lang-lowering.workspace = true
 inkwell.workspace = true
 thiserror.workspace = true

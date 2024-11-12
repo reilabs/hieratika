@@ -1,7 +1,7 @@
 //! This module contains miscellaneous utilities that are useful aids in
 //! generating a `FlatLoweredObject`.
 
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::core::{LLVMGetIndices, LLVMGetNumIndices},

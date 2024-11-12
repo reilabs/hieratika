@@ -26,5 +26,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Compile(#[from] compile::Error),
+    LLVMCompile(#[from] compile::llvm::Error),
+
+    #[error(transparent)]
+    CairoCompile(#[from] compile::cairo::Error),
 }

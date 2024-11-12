@@ -6,7 +6,7 @@ pub mod util;
 
 use std::cell::RefCell;
 
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
     builders::BlockBuilder,
     types::{
@@ -613,7 +613,9 @@ impl ObjectGenerator {
         };
 
         let process_struct_ty = |(ix, ty): (usize, &Type)| -> Result<VariableId> {
-            if ix == index.try_into().expect("Index exceeded bounds") {
+            // Using type annotation for `try_into` due to multiple implementations across
+            // different crates.
+            if ix == TryInto::<usize>::try_into(index).expect("Index exceeded bounds") {
                 // We only care about the one we are actually extracting so it gets registered
                 // with its name.
                 let out_var_name = instruction

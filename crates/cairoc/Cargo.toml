@@ -1,0 +1,24 @@
+[package]
+name = "hieratika-cairoc"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+authors.workspace = true
+description = "Generates FLO objects from Cairo projects."
+keywords.workspace = true
+categories.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+cairo-lang-compiler.workspace = true
+cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
+cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
+cairo-lang-lowering.workspace = true
+cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-errors.workspace = true
+itertools.workspace = true

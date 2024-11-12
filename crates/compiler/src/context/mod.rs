@@ -1,7 +1,7 @@
 //! Contains the source compilation context, which is a way of tracking the
 //! compilation units being processed by the compiler.
 
-use hieratika_errors::compile::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{context::Context as LLVMContext, module::Module};
 use ouroboros::self_referencing;
 
