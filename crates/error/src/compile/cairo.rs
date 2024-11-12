@@ -20,6 +20,6 @@ pub enum Error {
     #[error(transparent)]
     ProjectNotCreated(#[from] ProjectError),
 
-    #[error("")]
+    #[error("Failure during compilation of Cairo project.")]
     DiagnosticsError,
 }
