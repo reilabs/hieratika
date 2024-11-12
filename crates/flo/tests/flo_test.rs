@@ -50,7 +50,7 @@ fn flos_are_the_same_after_round_trip() -> anyhow::Result<()> {
     })?;
 
     // In the zero path, we have a bock that just returns '1'.
-    flo.fill_block(block_is_zero, |b| -> anyhow::Result<()> {
+    flo.fill_block(block_is_zero, None, |b| -> anyhow::Result<()> {
         // Create the return value of '1'...
         let retval = b.add_variable(Type::Unsigned32);
         b.simple_assign_const(retval, const_u32(1));
@@ -62,7 +62,7 @@ fn flos_are_the_same_after_round_trip() -> anyhow::Result<()> {
     })?;
 
     // In the non-zero path, we compute mul(i, sub(i, 1)), and return that.
-    flo.fill_block(block_is_nonzero, |b| -> anyhow::Result<()> {
+    flo.fill_block(block_is_nonzero, None, |b| -> anyhow::Result<()> {
         // Create the '1' we'll use in subtract...
         let const_one = b.add_variable(Type::Unsigned32);
         b.simple_assign_const(const_one, const_u32(1));

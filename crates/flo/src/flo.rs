@@ -382,9 +382,10 @@ impl FlatLoweredObject {
     pub fn fill_block<E>(
         &mut self,
         id: BlockId,
+        signature: Option<&Signature>,
         f: impl FnOnce(&mut BlockBuilder) -> Result<(), E>,
     ) -> Result<(), E> {
-        self.insert_or_create_block(Some(id), None, f)?;
+        self.insert_or_create_block(Some(id), signature, f)?;
         self.assert_block_not_poisoned(id);
 
         Ok(())
