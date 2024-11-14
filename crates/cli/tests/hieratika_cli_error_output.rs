@@ -31,6 +31,7 @@ fn test_hieratika_cli_error_output() {
 
     let assert_output = cmd.assert();
     let output = assert_output.get_output();
+    println!("output {:?}", output);
     assert!(
         String::from_utf8(output.stderr.clone())
             .unwrap()
