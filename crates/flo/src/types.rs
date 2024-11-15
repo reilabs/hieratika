@@ -20,6 +20,10 @@ pub struct Block {
     /// See the [`Signature`] type for more information.
     pub signature: Option<Signature>,
 
+    /// The SSA variable that is populated at runtime to indicate the source
+    /// block for use in a phi.
+    pub incoming_block_id: VariableId,
+
     /// Indicates whether this block is a _poison value_.
     ///
     /// This is typically [`None`], indicating that this value has not been
@@ -115,7 +119,7 @@ pub enum BlockExit {
 
     /// Indicates that execution should continue to the [`Block`] with the
     /// provided ID.
-    Goto(BlockId),
+    Goto { to: BlockId, from: BlockId },
 
     /// Indicates that we should iterate through a list of [`MatchArm`]s, and
     /// continue to the [`Block`] associated with the first matching predicate.
@@ -134,6 +138,66 @@ pub enum BlockExit {
     Poisoned(PoisonType),
 }
 
+/// A representation of atomic ordering constraints used for fence statements to
+/// prevent certain kinds of reordering during optimization.
+///
+/// The types mirror [those in LLVM](https://llvm.org/docs/LangRef.html#atomic-memory-ordering-constraints)
+/// and the documentation on each variant is a reproduction of that from the
+/// LLVM language reference.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub enum MemoryOrdering {
+    /// The set of values that can be read is governed by the happens-before
+    /// partial order. A value cannot be read unless some operation wrote it.
+    /// This is intended to provide a guarantee strong enough to model Java’s
+    /// non-volatile shared variables. This ordering cannot be specified for
+    /// read-modify-write operations; it is not strong enough to make them
+    /// atomic in any interesting way.
+    Unordered,
+
+    /// In addition to the guarantees of unordered, there is a single total
+    /// order for modifications by monotonic operations on each address. All
+    /// modification orders must be compatible with the happens-before order.
+    /// There is no guarantee that the modification orders can be combined to a
+    /// global total order for the whole program (and this often will not be
+    /// possible). The read in an atomic read-modify-write operation (cmpxchg
+    /// and atomicrmw) reads the value in the modification order immediately
+    /// before the value it writes. If one atomic read happens before another
+    /// atomic read of the same address, the later read must see the same value
+    /// or a later value in the address’s modification order. This disallows
+    /// reordering of monotonic (or stronger) operations on the same address. If
+    /// an address is written monotonic-ally by one thread, and other threads
+    /// monotonic-ally read that address repeatedly, the other threads must
+    /// eventually see the write. This corresponds to the C/C++
+    /// `memory_order_relaxed`.
+    Monotonic,
+
+    /// In addition to the guarantees of monotonic, a synchronizes-with edge may
+    /// be formed with a release operation. This is intended to model C/C++’s
+    /// `memory_order_acquire`.
+    Acquire,
+
+    /// In addition to the guarantees of monotonic, if this operation writes a
+    /// value which is subsequently read by an acquire operation, it
+    /// synchronizes-with that operation. Furthermore, this occurs even if the
+    /// value written by a release operation has been modified by a
+    /// read-modify-write operation before being read. (Such a set of operations
+    /// comprises a release sequence). This corresponds to the C/C++
+    /// `memory_order_release`.
+    Release,
+
+    /// Acts as both an acquire and release operation on its address. This
+    /// corresponds to the C/C++ `memory_order_acq_rel`.
+    AcquireRelease,
+
+    /// In addition to the guarantees of `acq_rel` (acquire for an operation
+    /// that only reads, release for an operation that only writes), there
+    /// is a global total order on all sequentially-consistent operations on
+    /// all addresses. Each sequentially-consistent read sees the last
+    /// preceding write to the same address in this global order. This
+    /// corresponds to the C/C++ `memory_order_seq_cst` and Java volatile.
+    SequentiallyConsistent,
+}
+
 /// Describes a single step in program execution.
 ///
 /// See the _statement types_ for more information.
@@ -150,6 +214,10 @@ pub enum Statement {
 
     /// Breaks a composite type into variables equivalent to its members.
     Destructure(DestructureStatement),
+
+    /// A fence instruction that prevents reordering of operations before and
+    /// after it.
+    Fence(MemoryOrdering),
 
     /// Takes a Snapshot of a given variable's value at the current time.
     Snap(SnapStatement),

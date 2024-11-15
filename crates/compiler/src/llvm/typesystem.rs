@@ -4,21 +4,25 @@
 use std::fmt::{Display, Formatter};
 
 use hieratika_errors::compile::{llvm, llvm::Error};
-use inkwell::types::{
-    AnyTypeEnum,
-    ArrayType,
-    BasicTypeEnum,
-    FloatType,
-    FunctionType,
-    IntType,
-    PointerType,
-    StructType,
-    VectorType,
-    VoidType,
+use inkwell::{
+    llvm_sys::{core::LLVMGetTypeKind, LLVMTypeKind},
+    types::{
+        AnyTypeEnum,
+        ArrayType,
+        AsTypeRef,
+        BasicTypeEnum,
+        FloatType,
+        FunctionType,
+        IntType,
+        PointerType,
+        StructType,
+        VectorType,
+        VoidType,
+    },
 };
 use itertools::Itertools;
 
-use crate::{constant::BYTE_SIZE, llvm::data_layout::DataLayout};
+use crate::llvm::data_layout::DataLayout;
 
 /// A representation of the LLVM [types](https://llvm.org/docs/LangRef.html#type-system)
 /// for use within the compiler.
@@ -389,16 +393,11 @@ impl<'ctx> TryFrom<&FloatType<'ctx>> for LLVMType {
     type Error = llvm::Error;
 
     fn try_from(value: &FloatType<'ctx>) -> Result<Self, Self::Error> {
-        #[allow(clippy::cast_possible_wrap)] // Our byte size should never be large enough
-        let float_size_bits = value
-            .size_of()
-            .get_sign_extended_constant()
-            .ok_or(Error::UnsupportedType(value.to_string()))?
-            * BYTE_SIZE as i64;
-        let ret_val = match float_size_bits {
-            16 => Self::f16,
-            32 => Self::f32,
-            64 => Self::f64,
+        let type_kind = unsafe { LLVMGetTypeKind(value.as_type_ref()) };
+        let ret_val = match type_kind {
+            LLVMTypeKind::LLVMHalfTypeKind => Self::f16,
+            LLVMTypeKind::LLVMFloatTypeKind => Self::f32,
+            LLVMTypeKind::LLVMDoubleTypeKind => Self::f64,
             _ => Err(Error::UnsupportedType(value.to_string()))?,
         };
         Ok(ret_val)

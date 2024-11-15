@@ -107,6 +107,12 @@ where
             .clone()
     }
 
+    /// Gets the identifier for the table's poisoned entry.
+    #[must_use]
+    pub fn get_poison(&self) -> IdType {
+        POISON_ENTRY.into()
+    }
+
     /// Places a value into the intern table at a given ID, which _must_
     /// have already been allocated by a previous call to `insert()`.
     ///

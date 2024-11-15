@@ -21,6 +21,7 @@ use crate::{
         LocationId,
         MatchArm,
         MatchArmId,
+        MemoryOrdering,
         PoisonType,
         Signature,
         SnapStatement,
@@ -48,10 +49,15 @@ impl<'a> BlockBuilder<'a> {
     /// Prefer not calling this directly; instead, use the
     /// `crate::FlatLoweredObject::add_block` function.
     pub(crate) fn new(context: &'a mut FlatLoweredObject) -> Self {
-        BlockBuilder {
-            context,
-            block: Block::default(),
-        }
+        let block = context.new_empty_block_value();
+
+        BlockBuilder { context, block }
+    }
+
+    /// Returns the variable representing the incoming edge of this block.
+    #[must_use]
+    pub fn incoming_block_variable(&self) -> VariableId {
+        self.block.incoming_block_id
     }
 
     /// Sets the signature of the relevant block.
@@ -71,6 +77,15 @@ impl<'a> BlockBuilder<'a> {
     /// Adds a single statement to the Block, returning its ID.
     pub fn add_statement(&mut self, statement: &Statement) -> StatementId {
         let id = self.context.statements.insert(statement);
+        self.add_statement_by_id(id);
+
+        id
+    }
+
+    /// Adds a fence statement to the block, returning its ID.
+    pub fn add_fence(&mut self, ordering: MemoryOrdering) -> StatementId {
+        let statement = Statement::Fence(ordering);
+        let id = self.context.statements.insert(&statement);
         self.add_statement_by_id(id);
 
         id
@@ -136,8 +151,9 @@ impl<'a> BlockBuilder<'a> {
     }
 
     /// Ends the block with a GOTO/jump.
-    pub fn end_with_goto(&mut self, goto_target: BlockId) {
-        self.set_exit(&BlockExit::Goto(goto_target));
+    pub fn end_with_goto(&mut self, to: BlockId) {
+        let from: BlockId = self.context.blocks.get_poison();
+        self.set_exit(&BlockExit::Goto { to, from });
     }
 
     /// Ends the block with a Match statment.
@@ -192,13 +208,19 @@ impl<'a> BlockBuilder<'a> {
             PoisonType::None
         };
 
-        // Now we're ready to insert it into our block table, converting it to an ID.
-        if let Some(id) = into {
-            self.context.blocks.swap(id, &self.block);
-            id
-        } else {
-            self.context.blocks.insert(&self.block)
-        }
+        let id = into.unwrap_or_else(|| self.context.new_empty_block());
+
+        // In the case that we end with a goto, we have to annotate it with the
+        // identifier of _this block_, as this is necessary data for resolving Phi
+        // instructions.
+        if let BlockExit::Goto { to, .. } = self.block.exit {
+            self.block.exit = BlockExit::Goto { to, from: id }
+        };
+
+        // We replace the block under that id with the block that has been newly built.
+        self.context.blocks.swap(id, &self.block);
+
+        id
     }
 }
 

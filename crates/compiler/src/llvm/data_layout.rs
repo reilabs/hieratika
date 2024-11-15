@@ -9,7 +9,7 @@ use chumsky::{
 use hieratika_errors::compile::llvm::{Error, Result};
 
 use crate::constant::{
-    BYTE_SIZE,
+    BYTE_SIZE_BITS,
     DEFAULT_FLOAT_128_LAYOUT,
     DEFAULT_FLOAT_16_LAYOUT,
     DEFAULT_FLOAT_32_LAYOUT,
@@ -504,7 +504,7 @@ impl IntegerLayout {
             .then(parsing::field(parsing::pos_int(10)).or_not())
             .try_map(|((size, abi_alignment), preferred_alignment), span| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
-                if size == BYTE_SIZE && abi_alignment != size {
+                if size == BYTE_SIZE_BITS && abi_alignment != size {
                     Err(Simple::custom(
                         span,
                         "i8 was not aligned to a byte boundary",
@@ -729,7 +729,7 @@ impl NonIntegralPointerAddressSpaces {
 pub mod parsing {
     use chumsky::{error::Simple, prelude::just, text::int, Parser};
 
-    use crate::{constant::BYTE_SIZE, llvm::data_layout::parsing};
+    use crate::{constant::BYTE_SIZE_BITS, llvm::data_layout::parsing};
 
     /// Simply to avoid typing out the whole parser type parameter specification
     /// every single time given it only varies in one parameter.
@@ -770,7 +770,7 @@ pub mod parsing {
     #[must_use]
     pub fn stack_alignment() -> impl DLParser<usize> {
         just("S").ignore_then(pos_int(10)).validate(|alignment, span, emit| {
-            if alignment % BYTE_SIZE != 0 {
+            if alignment % BYTE_SIZE_BITS != 0 {
                 emit(Simple::custom(
                     span,
                     format!("{alignment} must be aligned to a byte offset"),

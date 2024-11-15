@@ -361,7 +361,17 @@ impl FlatLoweredObject {
     /// The generated block will be poisoned until `fill_block` (or a variant
     /// thereof) is called on it.
     pub fn new_empty_block(&mut self) -> BlockId {
-        self.blocks.insert_default()
+        let new_block = self.new_empty_block_value();
+        self.blocks.insert(&new_block)
+    }
+
+    /// Creates a new empty block value, ensuring that its incoming block id is
+    /// filled.
+    pub(crate) fn new_empty_block_value(&mut self) -> Block {
+        Block {
+            incoming_block_id: self.add_variable(Type::Unsigned128),
+            ..Default::default()
+        }
     }
 
     /// Fills an existing block by providing access to it via a `BlockBuilder`.

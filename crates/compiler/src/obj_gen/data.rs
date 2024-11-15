@@ -201,7 +201,7 @@ pub struct FunctionContext {
 
     /// The basic blocks that occur in the function as a bidirectional mapping
     /// from names to block identifiers.
-    pub blocks: BiHashMap<String, BlockId>,
+    blocks: BiHashMap<String, BlockId>,
 
     /// The global variables accessible to the function as a bidirectional
     /// mapping from names to identifiers.
@@ -265,6 +265,33 @@ impl FunctionContext {
         &self.locals
     }
 
+    /// Gets a reference to the mapping between names and identifiers for blocks
+    /// in this function.
+    #[must_use]
+    pub fn blocks(&self) -> &BiHashMap<String, BlockId> {
+        &self.blocks
+    }
+
+    /// Looks up the block with the given `name` in the function context,
+    /// returning its identifier if it exists or [`None`] if it does not.
+    #[must_use]
+    pub fn lookup_block(&self, name: &str) -> Option<BlockId> {
+        self.blocks.get_by_left(name).copied()
+    }
+
+    /// Looks up the block with the given `name` in the function context,
+    /// returning its identifier if it exists.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if `name` does not refer to a block in this
+    ///   function.
+    pub fn try_lookup_block(&self, name: &str) -> Result<BlockId> {
+        self.lookup_block(name).ok_or(Error::MalformedLLVM(format!(
+            "The block {name} was referenced but is unknown in this function"
+        )))
+    }
+
     /// Looks up the variable with the given `name` in the function context,
     /// returning its identifier if it exists, or [`None`] if it does not.
     #[must_use]
@@ -276,6 +303,19 @@ impl FunctionContext {
             .get_by_left(name)
             .copied()
             .or(self.globals.get_by_left(name).copied())
+    }
+
+    /// Looks up the variable with the given `name` in the function context,
+    /// returning its identifier if it exists.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if `name` has not been defined at the time of
+    ///   lookup.
+    pub fn try_lookup_variable(&self, name: &str) -> Result<VariableId> {
+        self.lookup_variable(name).ok_or(Error::MalformedLLVM(format!(
+            "The SSA variable {name} was used before being defined"
+        )))
     }
 
     /// Gets a reference to the mapping between identifiers and types for local
@@ -290,6 +330,12 @@ impl FunctionContext {
     pub fn register_local(&mut self, id: VariableId, name: &str, typ: Type) {
         self.locals.insert(name.to_string(), id);
         self.var_types.insert(id, typ);
+    }
+
+    /// Register the block with the provided `id` and `name` into the function
+    /// context.
+    pub fn register_block(&mut self, id: BlockId, name: &str) {
+        self.blocks.insert(name.to_string(), id);
     }
 
     /// Gets a reference to a mapping between the names and identifiers of the
