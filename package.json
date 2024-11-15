@@ -12,5 +12,8 @@
   },
   "scripts": {
     "prepare": "husky"
+  },
+  "dev-dependencies": {
+    "npx": "^10.2.2"
   }
 }
