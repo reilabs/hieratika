@@ -162,11 +162,11 @@ impl ObjectContext {
             LLVMType::i32 => Type::Signed32,
             LLVMType::i64 => Type::Signed64,
             LLVMType::i128 => Type::Signed128,
-            LLVMType::half => Err(Error::invalid_type_conversion(
+            LLVMType::f16 => Err(Error::invalid_type_conversion(
                 "We do not currently support half-precision floats",
             ))?,
-            LLVMType::float => Type::Float,
-            LLVMType::double => Type::Double,
+            LLVMType::f32 => Type::Float,
+            LLVMType::f64 => Type::Double,
             LLVMType::ptr => Type::Pointer,
             LLVMType::void => Type::Void,
             LLVMType::Array(array) => array_to_flo(array)?,

@@ -18,3 +18,5 @@ pub const LLVM_UADD_WITH_OVERFLOW_I64: PolyPair<'static> = (
     "llvm.uadd.with.overflow.i64",
     "__llvm_uadd_with_overflow_i64_i64",
 );
+
+pub const LLVM_ADD_I64: PolyPair<'static> = ("add.i64", "__llvm_add_i64_i64");

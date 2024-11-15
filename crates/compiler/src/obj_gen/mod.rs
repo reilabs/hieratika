@@ -45,6 +45,7 @@ use crate::{
             get_indices,
             is_non_terminator_instruction,
             is_terminator_instruction,
+            make_opcode_output,
             name_from_bv,
             name_type_pairs_from_value_operands,
             should_define_func,
@@ -490,18 +491,18 @@ impl ObjectGenerator {
 
         // Then we need to correctly process the opcode into the correct piece of
         // functionality, most of which end up being polyfills here.
+        #[allow(clippy::match_same_arms)] // The commonality here is incidental.
         match &opcode {
-            Add => unimplemented!("Add"),
-            AddrSpaceCast => unimplemented!("AddrSpaceCast"),
+            Add => self.generate_binary_op(instruction, bb, func_ctx),
             Alloca => self.generate_alloca(instruction, bb, func_ctx),
-            And => unimplemented!("And"),
+            And => self.generate_binary_op(instruction, bb, func_ctx),
             AShr => unimplemented!("AShr"),
             AtomicCmpXchg => unimplemented!("AtomicCmpXchg"),
             AtomicRMW => unimplemented!("AtomicRMW"),
             BitCast => unimplemented!("BitCast"),
             Call => self.generate_call(instruction, bb, func_ctx),
-            CatchPad => unimplemented!("CatchPad"),
-            CleanupPad => unimplemented!("CleanupPad"),
+            CatchPad => unimplemented!("CatchPad"), // Complex
+            CleanupPad => unimplemented!("CleanupPad"), // Complex
             ExtractValue => self.generate_extract_value(instruction, bb, func_ctx),
             FNeg => unimplemented!("FNeg"),
             FAdd => unimplemented!("FAdd"),
@@ -516,7 +517,9 @@ impl ObjectGenerator {
             Freeze => unimplemented!("Freeze"),
             FRem => unimplemented!("FRem"),
             FSub => unimplemented!("FSub"),
-            GetElementPtr => unimplemented!("GetElementPtr"),
+            GetElementPtr => unimplemented!("GetElementPtr"), // TODO need to destructure
+            // multiple indices into
+            // subsequent code.
             ICmp => unimplemented!("ICmp"),
             InsertValue => unimplemented!("InsertValue"),
             IntToPtr => unimplemented!("IntToPtr"),
@@ -525,30 +528,115 @@ impl ObjectGenerator {
             LShr => unimplemented!("LShr"),
             Mul => unimplemented!("Mul"),
             Or => unimplemented!("Or"),
-            Phi => unimplemented!("Phi"),
+            Phi => unimplemented!("Phi"), // Complex
             PtrToInt => unimplemented!("PtrToInt"),
             SDiv => unimplemented!("SDiv"),
-            Select => unimplemented!("Select"),
+            Select => unimplemented!("Select"), // Complex
             SExt => unimplemented!("SExt"),
             Shl => unimplemented!("Shl"),
             SIToFP => unimplemented!("SIToFP"),
             SRem => unimplemented!("SRem"),
             Store => self.generate_store(instruction, bb, func_ctx),
-            Sub => unimplemented!("Sub"),
+            Sub => self.generate_binary_op(instruction, bb, func_ctx),
             Trunc => unimplemented!("Trunc"),
             UDiv => unimplemented!("UDiv"),
             UIToFP => unimplemented!("UIToFP"),
             URem => unimplemented!("URem"),
-            VAArg => unimplemented!("VAArg"),
             Xor => unimplemented!("Xor"),
             ZExt => unimplemented!("ZExt"),
-            ExtractElement | InsertElement | ShuffleVector => {
+            AddrSpaceCast | ExtractElement | InsertElement | ShuffleVector | VAArg => {
                 Err(Error::UnsupportedOpcode(opcode))?
             }
             _ => unreachable!(
                 "The opcode has already been checked to ensure it is not a terminator instruction"
             ),
         }
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM binary operation
+    /// instruction.
+    ///
+    /// # Accepted Opcodes
+    ///
+    /// The following opcodes are allowable as calls to this function:
+    ///
+    /// - [add](https://llvm.org/docs/LangRef.html#add-instruction)
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If `instruction` is not one of the above-listed accepted opcodes.
+    fn generate_binary_op(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        use InstructionOpcode::{Add, And, Sub};
+
+        // The opcode we are operating on affects part of the name we need to generate
+        // for the polyfill call.
+        let opcode = instruction.get_opcode();
+        let op_name = match opcode {
+            Add => "add",
+            And => "and",
+            Sub => "sub",
+            _ => panic!("{opcode:?} is not a valid binary operation for generate_binary_op"),
+        };
+
+        // The next things that determine the call name are the types of the operands,
+        // of which we should see two.
+        let operands = instruction
+            .get_operands()
+            .map(|operand| extract_value_operand(operand, opcode))
+            .collect::<Result<Vec<_>>>()?;
+
+        if operands.len() != 2 {
+            Err(Error::MalformedLLVM(format!(
+                "Binary opcode {opcode:?} did not have two operands"
+            )))?;
+        }
+
+        let operand_types = operands
+            .iter()
+            .map(|op| LLVMType::try_from(op.get_type()))
+            .collect::<Result<Vec<_>>>()?;
+
+        // We also need to grab the return type.
+        let return_type = LLVMType::try_from(instruction.get_type())?;
+
+        // Given that, we can generate the name for the polyfill.
+        let polyfill_name = self.polyfills.polyfill_or_err(
+            op_name,
+            operand_types.as_slice(),
+            Some(&return_type),
+        )?;
+
+        // Now we know what we are calling, we need to generate the actual call to the
+        // polyfill. We start with the operands.
+        let inputs = operands
+            .iter()
+            .map(|operand| {
+                let name = operand.get_name().to_str()?;
+                let id = func_ctx.lookup_variable(name).unwrap_or_else(|| {
+                    panic!("Expected variable with name {name} but it was not defined")
+                });
+
+                Ok(id)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // We then need to get the output variable for this opcode.
+        let outputs = make_opcode_output(&instruction, bb, func_ctx)?;
+
+        // Finally we can generate the call itself into the block.
+        bb.simple_call_builtin(polyfill_name, inputs, outputs);
+
+        Ok(())
     }
 
     /// Generates the FLO code that corresponds to an LLVM
@@ -698,12 +786,32 @@ impl ObjectGenerator {
             return Ok(());
         }
 
+        // To lookup opcodes we need the types of the arguments and return value.
+        let args = instruction
+            .get_operands()
+            .collect_vec()
+            .split_last()
+            .map(|(_, args)| args.to_vec())
+            .unwrap_or_default();
+        let value_operands = args
+            .into_iter()
+            .map(|a| extract_value_operand(a, instruction.get_opcode()))
+            .collect::<Result<Vec<_>>>()?;
+        let operand_types = value_operands
+            .iter()
+            .map(|op| LLVMType::try_from(op.get_type()))
+            .collect::<Result<Vec<_>>>()?;
+        let return_type = LLVMType::try_from(instruction.get_type())?;
+
         // If it is NOT one of these, we have to actually generate the call, and to do
         // that we need to know whether it is an internal or external call.
         let function_ref = if let Some(id) = func_ctx.module_functions().get_by_left(&function_name)
         {
             BlockRef::Local(*id)
-        } else if let Some(polyfill_name) = self.polyfills.polyfill(&function_name) {
+        } else if let Some(polyfill_name) =
+            self.polyfills
+                .polyfill(&function_name, &operand_types, Some(&return_type))
+        {
             BlockRef::Builtin(polyfill_name.to_string())
         } else {
             BlockRef::External(function_name)
@@ -712,17 +820,10 @@ impl ObjectGenerator {
         // We then need to put together the operands by grabbing the variables from the
         // context and passing them in. Given that the function name is the LAST
         // operand, it is the one we want to ignore.
-        let args = instruction
-            .get_operands()
-            .collect_vec()
-            .split_last()
-            .map(|(_, args)| args.to_vec())
-            .unwrap_or_default();
-        let arg_names = args
+        let arg_names = value_operands
             .into_iter()
-            .map(|a| {
-                let op = extract_value_operand(a, instruction.get_opcode())?;
-                name_from_bv(op)?
+            .map(|bv| {
+                name_from_bv(bv)?
                     .ok_or(Error::malformed_llvm("Operand to call did not have a name"))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -737,16 +838,7 @@ impl ObjectGenerator {
 
         // We also the need to handle providing the return value, if one exists, using
         // the type and whether the instruction has a name telling us.
-        let outputs = if let Some(name) = instruction.get_name() {
-            let output_name = name.to_str()?.to_string();
-            let instruction_type = LLVMType::try_from(instruction.get_type())?;
-            let flo_type = ObjectContext::flo_type_of(&instruction_type)?;
-            let output_var = bb.add_variable(flo_type.clone());
-            func_ctx.register_local(output_var, &output_name, flo_type);
-            vec![output_var]
-        } else {
-            Vec::new()
-        };
+        let outputs = make_opcode_output(&instruction, bb, func_ctx)?;
 
         // We have no diagnostics or locations for now.
         let diagnostics = Vec::default();
@@ -806,7 +898,11 @@ impl ObjectGenerator {
             .collect::<Result<Vec<_>>>()?;
 
         // Let's get the name of the corresponding builtin and prepare our arguments
-        let name = self.polyfills.polyfill_or_err("store")?;
+        let name = self.polyfills.polyfill_or_err(
+            "store",
+            &[LLVMType::i64, LLVMType::ptr],
+            Some(&LLVMType::void),
+        )?;
         let returns = vec![];
 
         // Finally we can generate the operation into the block.
@@ -872,7 +968,11 @@ impl ObjectGenerator {
         let alloc_count = expect_int_from_bv(raw_alloc_count);
 
         // We need a block reference, which here is guaranteed to be to a polyfill.
-        let call_ref = self.polyfills.polyfill_or_err("alloca")?;
+        let call_ref = self.polyfills.polyfill_or_err(
+            "alloca",
+            &[LLVMType::i64, LLVMType::i64],
+            Some(&LLVMType::ptr),
+        )?;
 
         // We also need arguments and returns with their types.
         let alloc_size = bb.simple_assign_new_const(ConstantValue {
