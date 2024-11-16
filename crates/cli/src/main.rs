@@ -12,7 +12,7 @@ use anyhow::Result;
 use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
-use hieratika_cairoc::generate_flat_lowered;
+use hieratika_cairoc::{export::save_flo, generate_flat_lowered};
 
 use crate::args::Arguments;
 mod args;
@@ -51,10 +51,7 @@ fn run_build_command(args: &BuildArgs) -> Result<()> {
     match args.compiler_type {
         CompilerType::Cairo => {
             let files = generate_flat_lowered(&args.path)?;
-            // TODO (#73) Save the output to .flat files in the same folder structure.
-            for f in files {
-                println!("{f:?}");
-            }
+            save_flo(&files)?;
         }
     }
     Ok(())
