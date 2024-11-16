@@ -184,7 +184,6 @@ mod test {
                     .extension()
                     .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
                 {
-                    println!("Flat lowered {:?}", file.path());
                     generate_flat_lowered(&file.path()).unwrap();
                 }
             });

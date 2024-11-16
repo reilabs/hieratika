@@ -2,6 +2,7 @@
 //! generating a `FlatLoweredObject`.
 
 use hieratika_errors::compile::llvm::{Error, Result};
+use hieratika_flo::{builders::BlockBuilder, types::VariableId};
 use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::core::{LLVMGetIndices, LLVMGetNumIndices},
@@ -11,6 +12,7 @@ use itertools::Either;
 
 use crate::{
     llvm::{typesystem::LLVMType, TopLevelEntryKind},
+    obj_gen::data::{FunctionContext, ObjectContext},
     pass::analysis::module_map::ModuleMap,
 };
 
@@ -266,4 +268,30 @@ pub fn get_indices(instruction: &InstructionValue) -> Option<Vec<u64>> {
         }
         _ => None,
     }
+}
+
+/// Generates the output variable for an opcode.
+///
+/// # Errors
+///
+/// - [`Error`] if the opcode type cannot be converted into an [`LLVMType`], or
+///   if the resultant type cannot be converted into a flo
+///   [`hieratika_flo::types::Type`].
+pub fn make_opcode_output(
+    instruction: &InstructionValue,
+    bb: &mut BlockBuilder,
+    func_ctx: &mut FunctionContext,
+) -> Result<Vec<VariableId>> {
+    let output = if let Some(name) = instruction.get_name() {
+        let output_name = name.to_str()?.to_string();
+        let instruction_type = LLVMType::try_from(instruction.get_type())?;
+        let flo_type = ObjectContext::flo_type_of(&instruction_type)?;
+        let output_var = bb.add_variable(flo_type.clone());
+        func_ctx.register_local(output_var, &output_name, flo_type);
+        vec![output_var]
+    } else {
+        Vec::new()
+    };
+
+    Ok(output)
 }

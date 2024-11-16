@@ -42,7 +42,7 @@ use crate::{constant::BYTE_SIZE, llvm::data_layout::DataLayout};
 ///
 /// It is intended that this type is used as having value semantics, and not
 /// ever have a reference returned to it.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 #[allow(non_camel_case_types)] // To better match the LLVM internal convention
 pub enum LLVMType {
     /// The boolean type, represented inside LLVM by the `i1`
@@ -65,13 +65,13 @@ pub enum LLVMType {
     i128,
 
     /// The IEEE-754 `binary16` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
-    half,
+    f16,
 
     /// The IEEE-754 `binary32` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
-    float,
+    f32,
 
     /// The IEEE-754 `binary64` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
-    double,
+    f64,
 
     /// Used to specify locations in memory as described in the
     /// [LLVM IR reference](https://llvm.org/docs/LangRef.html#pointer-type).
@@ -156,9 +156,9 @@ impl LLVMType {
                 | Self::i32
                 | Self::i64
                 | Self::i128
-                | Self::half
-                | Self::float
-                | Self::double
+                | Self::f16
+                | Self::f32
+                | Self::f64
                 | Self::ptr
                 | Self::void
                 | Self::Metadata
@@ -184,7 +184,7 @@ impl LLVMType {
     /// otherwise.
     #[must_use]
     pub fn is_float(&self) -> bool {
-        matches!(self, Self::half | Self::float | Self::double)
+        matches!(self, Self::f16 | Self::f32 | Self::f64)
     }
 
     /// Returns `self` as a function type if it exists, and otherwise returns
@@ -219,9 +219,9 @@ impl LLVMType {
             LLVMType::i32 => layout.expect_int_spec_of(32).size,
             LLVMType::i64 => layout.expect_int_spec_of(64).size,
             LLVMType::i128 => layout.expect_int_spec_of(128).size,
-            LLVMType::half => layout.expect_float_spec_of(16).size,
-            LLVMType::float => layout.expect_float_spec_of(32).size,
-            LLVMType::double => layout.expect_float_spec_of(64).size,
+            LLVMType::f16 => layout.expect_float_spec_of(16).size,
+            LLVMType::f32 => layout.expect_float_spec_of(32).size,
+            LLVMType::f64 => layout.expect_float_spec_of(64).size,
             LLVMType::ptr => layout.default_pointer_layout().size,
             LLVMType::void => 0,
             LLVMType::Array(array_ty) => array_ty.size_of(layout),
@@ -244,9 +244,9 @@ impl LLVMType {
             LLVMType::i32 => layout.expect_int_spec_of(32).abi_alignment,
             LLVMType::i64 => layout.expect_int_spec_of(64).abi_alignment,
             LLVMType::i128 => layout.expect_int_spec_of(128).abi_alignment,
-            LLVMType::half => layout.expect_float_spec_of(16).abi_alignment,
-            LLVMType::float => layout.expect_float_spec_of(32).abi_alignment,
-            LLVMType::double => layout.expect_float_spec_of(64).abi_alignment,
+            LLVMType::f16 => layout.expect_float_spec_of(16).abi_alignment,
+            LLVMType::f32 => layout.expect_float_spec_of(32).abi_alignment,
+            LLVMType::f64 => layout.expect_float_spec_of(64).abi_alignment,
             LLVMType::ptr => layout.default_pointer_layout().abi_alignment,
             LLVMType::void => 0,
             LLVMType::Array(array_ty) => array_ty.align_of(layout),
@@ -265,15 +265,15 @@ impl LLVMType {
 impl Display for LLVMType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let result = match self {
-            LLVMType::bool => "bool".to_string(),
+            LLVMType::bool => "i1".to_string(),
             LLVMType::i8 => "i8".to_string(),
             LLVMType::i16 => "i16".to_string(),
             LLVMType::i32 => "i32".to_string(),
             LLVMType::i64 => "i64".to_string(),
             LLVMType::i128 => "i128".to_string(),
-            LLVMType::half => "half".to_string(),
-            LLVMType::float => "float".to_string(),
-            LLVMType::double => "double".to_string(),
+            LLVMType::f16 => "f16".to_string(),
+            LLVMType::f32 => "f32".to_string(),
+            LLVMType::f64 => "f64".to_string(),
             LLVMType::ptr => "ptr".to_string(),
             LLVMType::void => "void".to_string(),
             LLVMType::Metadata => "metadata".to_string(),
@@ -301,7 +301,7 @@ impl Display for LLVMType {
             }
         };
 
-        writeln!(f, "{result}")
+        write!(f, "{result}")
     }
 }
 
@@ -396,9 +396,9 @@ impl<'ctx> TryFrom<&FloatType<'ctx>> for LLVMType {
             .ok_or(Error::UnsupportedType(value.to_string()))?
             * BYTE_SIZE as i64;
         let ret_val = match float_size_bits {
-            16 => Self::half,
-            32 => Self::float,
-            64 => Self::double,
+            16 => Self::f16,
+            32 => Self::f32,
+            64 => Self::f64,
             _ => Err(Error::UnsupportedType(value.to_string()))?,
         };
         Ok(ret_val)
@@ -553,7 +553,7 @@ impl<'ctx> TryFrom<&VoidType<'ctx>> for LLVMType {
 
 /// An [array](https://llvm.org/docs/LangRef.html#array-type) is a sequential
 /// arrangement of a number of elements of the given type linearly in memory.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct LLVMArray {
     /// The number of elements in the array type.
     pub count: usize,
@@ -636,7 +636,7 @@ impl<'ctx> TryFrom<&ArrayType<'ctx>> for LLVMArray {
 /// Note that struct elements do not have names, and can only be accessed by
 /// index. This makes LLVM struct types far more akin to what we call a
 /// Tuple in most languages.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct LLVMStruct {
     /// If the structure is packed, it has one-byte alignment with no
     /// padding between elements.
@@ -735,7 +735,7 @@ impl<'ctx> TryFrom<&StructType<'ctx>> for LLVMStruct {
 
 /// A [function](https://llvm.org/docs/LangRef.html#function-type) is akin
 /// to a function signature.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct LLVMFunction {
     /// The type returned from the function.
     pub return_type: Box<LLVMType>,
