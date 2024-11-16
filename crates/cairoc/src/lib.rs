@@ -94,18 +94,22 @@ fn build_db() -> RootDatabase {
     db
 }
 
-/// This function creates and prints the error message when `function_id` fails
-/// to compile.
-fn print_compiler_error(db: &RootDatabase, function_id: ConcreteFunctionWithBodyId) {
+/// This function prints warnings or errors from the Rust compiler.
+fn print_compiler_diagnostics(db: &RootDatabase, function_id: ConcreteFunctionWithBodyId) {
     let function_id = function_id.function_with_body_id(db);
     let semantic_function_id = function_id.base_semantic_function(db);
+
     let declaration_diagnostics = db.function_declaration_diagnostics(semantic_function_id);
-    if declaration_diagnostics.check_error_free().is_err() {
+    if !declaration_diagnostics
+        .get_diagnostics_without_duplicates(db)
+        .is_empty()
+    {
         let declaration_diagnostics = declaration_diagnostics.format(db.upcast());
         eprintln!("{declaration_diagnostics}");
     }
+
     let body_diagnostics = db.function_body_diagnostics(semantic_function_id);
-    if body_diagnostics.check_error_free().is_err() {
+    if !body_diagnostics.get_diagnostics_without_duplicates(db).is_empty() {
         let body_diagnostics = body_diagnostics.format(db.upcast());
         eprintln!("{body_diagnostics}");
     }
@@ -125,12 +129,10 @@ fn get_flat_lowered_function(
         }
         .intern(db),
     );
+    print_compiler_diagnostics(db, function_id);
     match db.final_concrete_function_with_body_lowered(function_id) {
         Ok(f) => Some(f),
-        Err(_) => {
-            print_compiler_error(db, function_id);
-            None
-        }
+        Err(_) => None,
     }
 }
 
