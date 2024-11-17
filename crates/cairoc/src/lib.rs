@@ -20,6 +20,7 @@ use cairo_lang_lowering::{
 };
 use cairo_lang_semantic::db::SemanticGroup;
 use cairo_lang_utils::Upcast;
+use export::clean_crate;
 use hieratika_errors::compile::cairo::{Error, Result};
 use itertools::Itertools;
 
@@ -122,6 +123,10 @@ fn get_flat_lowered_function(
 pub fn generate_flat_lowered(filename: &Path) -> Result<CrateLowered> {
     let mut db = build_db();
     let crate_ids = setup_project(&mut db, filename)?;
+    for crate_id in crate_ids.iter() {
+        let crate_name = crate_id.name(&db);
+        clean_crate(&crate_name)?;
+    }
     let mut lowered_functions = HashMap::new();
     let mut errors_found = false;
     for (_, function_id) in get_all_funcs(&db, &crate_ids)? {

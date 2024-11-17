@@ -75,7 +75,12 @@ fn write_flo_to_file(filename: &Path, data: &[u8]) -> Result<()> {
 
 /// This function exports all flo objects in `crate_lowered` to files.
 ///
-/// Each filename is matches the function name it's being exported.
+/// Each filename matches the function name it's being exported. In case of
+/// error, the status of files exported is undefined.
+///
+/// # Errors
+///
+/// - [`Error::FileIO`] if there is any error exporting `.lowered` files.
 pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
     for (function_name, lowered) in crate_lowered {
         let path = get_flo_path(function_name);
@@ -85,10 +90,37 @@ pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
     Ok(())
 }
 
+/// Deletes all the `.lowered` files exported in the folder `target/cairo/flo`.
+///
+/// In case of error, the number of files deleted is undefined.
+///
+/// # Errors
+///
+/// - [`Error::FileIO`] if there is any error deleting the files and folders.
 pub fn clean_all() -> Result<()> {
     let root_folder = get_flo_folder();
     let root_path = Path::new(&root_folder);
-    remove_dir_all(root_path)?;
+    if root_path.exists() {
+        remove_dir_all(root_path)?;
+    }
+    Ok(())
+}
+
+/// Deletes all the `.lowered` files exported in the folder
+/// `target/cairo/flo/<crate_name>`.
+///
+/// In case of error, the number of files deleted is undefined.
+///
+/// # Errors
+///
+/// - [`Error::FileIO`] if there is any error deleting the files and folders.
+pub fn clean_crate(crate_name: &str) -> Result<()> {
+    let root_folder = get_flo_folder();
+    let crate_path = [root_folder, crate_name.to_owned()].iter().join("/");
+    let crate_path = Path::new(&crate_path);
+    if crate_path.exists() {
+        remove_dir_all(crate_path)?;
+    }
     Ok(())
 }
 
