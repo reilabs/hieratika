@@ -3,7 +3,7 @@
 
 use std::{
     env,
-    fs::{create_dir_all, OpenOptions},
+    fs::{create_dir_all, remove_dir_all, OpenOptions},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
@@ -85,9 +85,16 @@ pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
     Ok(())
 }
 
+pub fn clean_all() -> Result<()> {
+    let root_folder = get_flo_folder();
+    let root_path = Path::new(&root_folder);
+    remove_dir_all(root_path)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    use std::path::{absolute, PathBuf};
 
     use crate::export::{get_flo_filename, get_flo_folder, get_flo_path, target_dir};
 
@@ -109,13 +116,13 @@ mod test {
     #[test]
     fn test_get_flo_path() {
         let full_function_name = "core::poseidon::poseidon_hash_span".to_string();
-        let flo_filename = get_flo_path(&full_function_name).canonicalize().unwrap();
+        let flo_filename = absolute(get_flo_path(&full_function_name)).unwrap();
         println!("{flo_filename:?}");
         let output_path = format!(
             "{}/cairo/flo/core/poseidon/poseidon_hash_span.lowered",
             target_dir()
         );
-        let output_path = PathBuf::from(output_path).canonicalize().unwrap();
+        let output_path = absolute(PathBuf::from(output_path)).unwrap();
         assert_eq!(flo_filename, output_path);
     }
 }

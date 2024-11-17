@@ -12,7 +12,10 @@ use anyhow::Result;
 use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
-use hieratika_cairoc::{export::save_flo, generate_flat_lowered};
+use hieratika_cairoc::{
+    export::{clean_all, save_flo},
+    generate_flat_lowered,
+};
 
 use crate::args::Arguments;
 mod args;
@@ -38,6 +41,7 @@ fn main() {
 fn run(args: Arguments) -> Result<()> {
     match args.command {
         Command::Build(build_args) => run_build_command(&build_args)?,
+        Command::Clean => clean_all()?,
     }
     Ok(())
 }
