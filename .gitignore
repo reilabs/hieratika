@@ -11,3 +11,4 @@ result
 # Linting and Formatting
 package-lock.json
 .husky/_
+compiler-rt/target
