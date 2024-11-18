@@ -57,8 +57,9 @@ fn get_flo_path(full_function_name: &str) -> PathBuf {
 ///
 /// # Errors
 ///
-/// - [`Error::FileIO`] if there are issues creating the missing folders of the
-///   path of `filename` or if there are issues writing `data` to `filename`.
+/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there are issues
+///   creating the missing folders of the path of `filename` or if there are
+///   issues writing `data` to `filename`.
 fn write_flo_to_file(filename: &Path, data: &[u8]) -> Result<()> {
     let prefix = filename.parent().unwrap_or(Path::new(""));
     create_dir_all(prefix)?;
@@ -80,7 +81,8 @@ fn write_flo_to_file(filename: &Path, data: &[u8]) -> Result<()> {
 ///
 /// # Errors
 ///
-/// - [`Error::FileIO`] if there is any error exporting `.lowered` files.
+/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there is any error
+///   exporting `.lowered` files.
 pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
     for (function_name, lowered) in crate_lowered {
         let path = get_flo_path(function_name);
@@ -96,7 +98,8 @@ pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
 ///
 /// # Errors
 ///
-/// - [`Error::FileIO`] if there is any error deleting the files and folders.
+/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there is any error
+///   deleting the files and folders.
 pub fn clean_all() -> Result<()> {
     let root_folder = get_flo_folder();
     let root_path = Path::new(&root_folder);
@@ -113,7 +116,8 @@ pub fn clean_all() -> Result<()> {
 ///
 /// # Errors
 ///
-/// - [`Error::FileIO`] if there is any error deleting the files and folders.
+/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there is any error
+///   deleting the files and folders.
 pub fn clean_crate(crate_name: &str) -> Result<()> {
     let root_folder = get_flo_folder();
     let crate_path = [root_folder, crate_name.to_owned()].iter().join("/");
