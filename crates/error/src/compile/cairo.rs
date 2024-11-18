@@ -12,6 +12,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`cairo_lang_lowering::FlatLowered`].
 #[derive(Debug, Error)]
 pub enum Error {
+    /// `FileIO` variant is used for io errors.
+    #[error(transparent)]
+    FileIO(#[from] std::io::Error),
+
     #[error("Could not query the Salsa database: {0:?}")]
     SalsaDbError(DiagnosticAdded),
 
