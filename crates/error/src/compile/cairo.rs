@@ -19,4 +19,7 @@ pub enum Error {
     /// generate [`cairo_lang_lowering::FlatLowered`].
     #[error(transparent)]
     ProjectNotCreated(#[from] ProjectError),
+
+    #[error("Failure during compilation of Cairo project.")]
+    DiagnosticsError,
 }

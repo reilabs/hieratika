@@ -23,6 +23,11 @@ hieratika-compiler.workspace = true
 itertools.workspace = true
 tracing.workspace = true
 
+[dev-dependencies]
+assert_cmd = "2.0.16"
+indoc = "2.0.5"
+predicates = "3.1.2"
+
 [[bin]]
 name = "hieratika"
 path = "src/main.rs"
