@@ -5,6 +5,7 @@ pub mod or_i32;
 pub mod or_i64;
 pub mod or_i128;
 
+use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};
 use core::integer::Bitwise;
 extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
@@ -32,16 +33,8 @@ fn or<
     lhs: u128, rhs: u128
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can still fit in the concrete type.
-    let bit_size = BitSize::<T>::bits();
-    let _: T = match lhs.try_into() {
-        Option::Some(value) => value,
-        Option::None => { panic!("lhs = {} does not fit in u{}", lhs, bit_size) },
-    };
-
-    let _: T = match rhs.try_into() {
-        Option::Some(value) => value,
-        Option::None => { panic!("rhs = {} does not fit in u{}", rhs, bit_size) },
-    };
+    assert_fits_in_type::<T>(lhs);
+    assert_fits_in_type::<T>(rhs);
 
     // Use the `bitwise` built-in function. It returns the tuple of the `(and, xor, or)` results. We
     // discard the uninteresting results.
