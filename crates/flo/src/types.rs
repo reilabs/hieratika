@@ -139,11 +139,17 @@ pub enum BlockExit {
 }
 
 /// A representation of atomic ordering constraints used for fence statements to
+
 /// prevent certain kinds of reordering during optimization.
+
 ///
+
 /// The types mirror [those in LLVM](https://llvm.org/docs/LangRef.html#atomic-memory-ordering-constraints)
+
 /// and the documentation on each variant is a reproduction of that from the
+
 /// LLVM language reference.
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum MemoryOrdering {
     /// The set of values that can be read is governed by the happens-before
@@ -197,6 +203,9 @@ pub enum MemoryOrdering {
     /// corresponds to the C/C++ `memory_order_seq_cst` and Java volatile.
     SequentiallyConsistent,
 }
+///
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 
 /// Describes a single step in program execution.
 ///
