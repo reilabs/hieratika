@@ -8,5 +8,5 @@
 
 # Checklist
 
-- [ ] Code is formatted by Rustfmt.
+- [ ] Code is formatted by Rustfmt or `scarb fmt`.
 - [ ] Documentation has been updated if necessary.
