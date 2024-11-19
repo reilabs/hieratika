@@ -1,17 +1,17 @@
-use core::integer::Bitwise;
-extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
+use crate::alu::or::or;
 
 pub fn __llvm_or_i1_i1(lhs: u128, rhs: u128) -> u128 {
     if lhs > 1 {
-        panic!("lhs = {:?} does not fit in bool", lhs)
+        panic!("lhs = {:?} does not fit in i1", lhs)
     }
 
     if rhs > 1 {
-        panic!("rhs = {:?} does not fit in bool", rhs)
+        panic!("rhs = {:?} does not fit in i1", rhs)
     };
 
-    let (_, _, or_result) = bitwise(lhs, rhs);
-    or_result
+    // There is no dedicated 1-bit type so after making sure that lhs and rhs
+    // fit in 1 bit, promote them to u8, do the job and return the LSB.
+    or::<u8>(lhs, rhs) & 0x1
 }
 
 #[cfg(test)]
