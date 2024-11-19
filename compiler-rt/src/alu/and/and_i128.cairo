@@ -1,9 +1,7 @@
-use core::integer::Bitwise;
-extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
+use crate::alu::and::and;
 
 pub fn __llvm_and_i128_i128(lhs: u128, rhs: u128) -> u128 {
-    let (and_result, _, _) = bitwise(lhs, rhs);
-    and_result
+    and::<u128>(lhs, rhs)
 }
 
 #[cfg(test)]

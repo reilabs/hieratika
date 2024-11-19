@@ -1,19 +1,7 @@
-use core::integer::Bitwise;
-extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
+use crate::alu::and::and;
 
 pub fn __llvm_and_i64_i64(lhs: u128, rhs: u128) -> u128 {
-    let _: u64 = match lhs.try_into() {
-        Option::Some(value) => value,
-        Option::None => { panic!("lhs = {:?} does not fit in u64", lhs) },
-    };
-
-    let _: u64 = match rhs.try_into() {
-        Option::Some(value) => value,
-        Option::None => { panic!("rhs = {:?} does not fit in u64", rhs) },
-    };
-
-    let (and_result, _, _) = bitwise(lhs, rhs);
-    and_result
+    and::<u64>(lhs, rhs)
 }
 
 #[cfg(test)]

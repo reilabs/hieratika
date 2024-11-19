@@ -1,5 +1,4 @@
-use core::integer::Bitwise;
-extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise) nopanic;
+use crate::alu::and::and;
 
 pub fn __llvm_and_i1_i1(lhs: u128, rhs: u128) -> u128 {
     if lhs > 1 {
@@ -10,8 +9,9 @@ pub fn __llvm_and_i1_i1(lhs: u128, rhs: u128) -> u128 {
         panic!("rhs = {:?} does not fit in i1", rhs)
     };
 
-    let (and_result, _, _) = bitwise(lhs, rhs);
-    and_result
+    // There is no dedicated 1-bit type so after making sure that lhs and rhs
+    // fit in 1 bit, promote them to u8, do the job and return the LSB.
+    and::<u8>(lhs, rhs) & 0x1
 }
 
 #[cfg(test)]
