@@ -1,12 +1,12 @@
 [package]
-name = "hieratika-cairoc"
+name = "hieratika-lifter"
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "Generates FLO objects from Cairo projects."
+description = "Tool to lift Cairo FlatLowered into a Heiratika FLO."
 keywords.workspace = true
 categories.workspace = true
 
@@ -14,17 +14,19 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+ariadne.workspace = true
+clap.workspace = true
 cairo-lang-compiler.workspace = true
 cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
+cairo-lang-diagnostics = { path = "../../cairo/crates/cairo-lang-diagnostics" }
 cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
 cairo-lang-lowering.workspace = true
 cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
-cairo-lang-sierra-generator.workspace = true
-cairo-lang-utils.workspace = true
-hieratika-errors.workspace = true
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-compiler.workspace = true
+itertools.workspace = true
+tracing.workspace = true
+hieratika-cairoc.workspace = true
 hieratika-flo.workspace = true
-itertools.workspace = true
-
-[dev-dependencies]
-itertools.workspace = true
-rayon = "1.10.0"
+hieratika-errors.workspace = true
+bimap.workspace = true

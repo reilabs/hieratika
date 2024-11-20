@@ -13,7 +13,7 @@ fn test_hieratika_cli_error_output() {
     let cairo_filename_path = Path::new(cairo_filename).canonicalize().unwrap();
     let cairo_filename_path = cairo_filename_path.to_str().unwrap();
 
-    cmd.arg("build").arg("cairo").arg(cairo_filename);
+    cmd.arg("build").arg("cairo").arg(cairo_filename).arg("/dev/null");
 
     let error_1 = formatdoc! {"
     error: Trait has no implementation in context: core::traits::Add::<()>.
