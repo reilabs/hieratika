@@ -16,7 +16,7 @@ use core::num::traits::{BitSize, Bounded};
 // Please note that this implementation is valid up to 64-bit values due to extra bits
 // needed to accommodate overflows that happen during computation. A 128-bit implementation
 // uses different approach.
-fn shl<
+pub fn shl<
     T,
     // The trait bounds are chosen so that:
     //
