@@ -9,6 +9,7 @@ members = [
   "crates/error",
   "crates/cairoc",
   "crates/flo",
+  "crates/lifter",
   "crates/rust-test-input",
 ]
 
@@ -48,6 +49,7 @@ hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
+hieratika-lifter = { path = "crates/lifter" }
 thiserror = "1.0.63"
 tracing = "0.1.40"
 

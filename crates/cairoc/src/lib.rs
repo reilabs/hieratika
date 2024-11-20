@@ -27,14 +27,19 @@ use hieratika_errors::compile::cairo::{Error, Result};
 pub mod export;
 
 /// This alias contains the mapping between function name and its
+
 /// [`MultiLowering`] representation.
+
 pub type CrateLowered = HashMap<String, Arc<MultiLowering>>;
 
 /// This alias contains the mapping between crate name and its Sierra program.
+
 pub type CrateSierra = HashMap<String, Arc<SierraProgramWithDebug>>;
 
 /// Returns a dictionary mapping function names to their ids for all the
+
 /// functions in the given crate.
+
 fn get_all_funcs(
     db: &dyn LoweringGroup,
     crate_ids: &[CrateId],
@@ -59,7 +64,9 @@ fn get_all_funcs(
 }
 
 /// Initialises a Salsa database to compile Cairo programs. It also checks for
+
 /// the presence of `corelib`.
+
 fn build_db() -> RootDatabase {
     let auto_withdraw_gas = false;
     let mut db = RootDatabase::default();
@@ -82,6 +89,7 @@ fn build_db() -> RootDatabase {
 }
 
 /// This function prints warnings or errors from the Rust compiler.
+
 fn print_compiler_diagnostics(db: &RootDatabase, function_id: FunctionWithBodyId) {
     let declaration_diagnostics = db.function_declaration_diagnostics(function_id);
     if !declaration_diagnostics
@@ -100,7 +108,9 @@ fn print_compiler_diagnostics(db: &RootDatabase, function_id: FunctionWithBodyId
 }
 
 /// This function returns the `FlatLowered` object if there are no errors
+
 /// compiling the Cairo `function_id`. Otherwise, it returns `None`.
+
 fn get_flat_lowered_function(
     db: &RootDatabase,
     function_id: FunctionWithBodyId,
@@ -113,16 +123,26 @@ fn get_flat_lowered_function(
 }
 
 /// This function returns the `FlatLowered` object of a Cairo program. The
+
 /// filename can be either a project or a single file.
+
 ///
+
 /// # Errors
+
 ///
+
 /// - [`Error::SalsaDbError`] if there are issues querying the Salsa database
+
 ///   during the compilation process.
+
 /// - [`Error::ProjectNotCreated`] if the filename isn't a valid Cairo file or
+
 ///   project.
+
 /// - [`Error::DiagnosticsError`] if any Cairo file fails to compile.
-pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatabase)> {
+
+pub fn generate_flat_lowered(filename: &Path) -> Result<CairoFlatLowered> {
     let mut db = build_db();
     let crate_ids = setup_project(&mut db, filename)?;
     for crate_id in crate_ids.iter() {
@@ -145,16 +165,26 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatab
     if errors_found {
         return Err(Error::DiagnosticsError);
     }
-    Ok((lowered_functions, db))
+    Ok(CairoFlatLowered {
+        cairo_ir: lowered_functions,
+        cairo_db: db,
+    })
 }
 
 /// This function generates the Sierra program from the Salsa `db` for a given
+
 /// list of `crate_ids`.
+
 ///
+
 /// # Errors
+
 ///
+
 /// - [`Error::SalsaDbError`] if there are issues querying the Salsa database
+
 ///   during the compilation process.
+
 pub fn generate_sierra(db: &RootDatabase, crate_ids: Vec<CrateId>) -> Result<CrateSierra> {
     let mut sierra_programs = HashMap::new();
     for crate_id in crate_ids {
@@ -166,15 +196,36 @@ pub fn generate_sierra(db: &RootDatabase, crate_ids: Vec<CrateId>) -> Result<Cra
 }
 
 /// This function generates the Sierra program for all the crates present in the
+
 /// Salsa `db`.
+
 ///
+
 /// # Errors
+
 ///
+
 /// - [`Error::SalsaDbError`] if there are issues querying the Salsa database
+
 ///   during the compilation process.
+
 pub fn generate_sierra_all_crates(db: &RootDatabase) -> Result<CrateSierra> {
     let crate_ids = db.crates();
     generate_sierra(db, crate_ids)
+}
+
+use hieratika_flo::FlatLoweredObject;
+use itertools::Itertools;
+
+/// Container for Cairo FlatLowered IR an its associated intern db.
+
+pub struct CairoFlatLowered {
+    /// A mapping between external symbol names and their associated Cairo
+    /// FlatLowered objects.
+    pub cairo_ir: HashMap<String, Arc<MultiLowering>>,
+
+    /// The intern database for the types referenced in the Cairo IR.
+    pub cairo_db: RootDatabase,
 }
 
 #[cfg(test)]
@@ -213,12 +264,12 @@ mod test {
     #[test]
     fn flat_lowered_simple_sum() {
         let filename = "test_data/add.cairo";
-        let (flat_lowered, _) = generate_flat_lowered(Path::new(&filename)).unwrap();
-        assert_eq!(2, flat_lowered.len());
+        let cfl = generate_flat_lowered(Path::new(&filename)).unwrap();
+        assert_eq!(2, cfl.cairo_ir.len());
 
         let filename = "../../cairo/examples/complex_input.cairo";
-        let (flat_lowered, _) = generate_flat_lowered(Path::new(&filename)).unwrap();
-        assert_eq!(1, flat_lowered.len());
+        let cfl = generate_flat_lowered(Path::new(&filename)).unwrap();
+        assert_eq!(1, cfl.cairo_ir.len());
     }
 
     #[test]
@@ -234,8 +285,8 @@ mod test {
         let expected_sierra_program =
             compile_prepared_db_program(&mut db, main_crate_ids.clone(), compiler_config).unwrap();
 
-        let (_, db) = generate_flat_lowered(filename).unwrap();
-        let sierra_program = generate_sierra(&db, main_crate_ids).unwrap();
+        let cfl = generate_flat_lowered(filename).unwrap();
+        let sierra_program = generate_sierra(&cfl.cairo_db, main_crate_ids).unwrap();
         assert_eq!(sierra_program.len(), 1);
         assert_eq!(
             sierra_program.get("add").unwrap().program,

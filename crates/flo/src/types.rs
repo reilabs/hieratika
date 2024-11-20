@@ -203,10 +203,6 @@ pub enum MemoryOrdering {
     /// corresponds to the C/C++ `memory_order_seq_cst` and Java volatile.
     SequentiallyConsistent,
 }
-///
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
-
 /// Describes a single step in program execution.
 ///
 /// See the _statement types_ for more information.
@@ -436,6 +432,14 @@ pub enum BlockRef {
     /// of the compiler.
     Builtin(String),
 
+    /// Specifies a block in the local translation unit, but which requires
+    /// relocation before being used. These can only exist in the process
+    /// of generating block references.
+    ///
+    /// Encountering this object outside of object-format translation is
+    /// a compile-time error.
+    Relocation(BlockId),
+
     /// **For Internal Use:** Indicates that this `BlockRef`'s target is
     /// unspecified, e.g. as part of a poisoned [`Variable`].
     ///
@@ -514,6 +518,7 @@ pub enum Type {
     Enum,
 
     // Integer types.
+    Felt,
     Unsigned8,
     Unsigned16,
     Unsigned32,

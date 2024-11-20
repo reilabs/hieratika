@@ -53,8 +53,8 @@ fn run(args: Arguments) -> Result<()> {
 fn run_build_command(args: &BuildArgs) -> Result<()> {
     match args.compiler_type {
         CompilerType::Cairo => {
-            let (files, _) = generate_flat_lowered(&args.path)?;
-            save_flo(&files)?;
+            let cfl = generate_flat_lowered(&args.path)?;
+            save_flo(&cfl)?;
         }
     }
     Ok(())

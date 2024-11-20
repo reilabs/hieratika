@@ -848,6 +848,7 @@ dependencies = [
  "cairo-lang-sierra-generator",
  "cairo-lang-utils",
  "hieratika-errors",
+ "hieratika-flo",
  "itertools 0.13.0",
  "rayon",
 ]
@@ -919,6 +920,28 @@ dependencies = [
  "bimap",
  "serde",
  "serde-lexpr",
+]
+
+[[package]]
+name = "hieratika-lifter"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "bimap",
+ "cairo-lang-compiler",
+ "cairo-lang-defs",
+ "cairo-lang-diagnostics",
+ "cairo-lang-filesystem",
+ "cairo-lang-lowering",
+ "cairo-lang-semantic",
+ "cairo-lang-utils",
+ "clap",
+ "hieratika-cairoc",
+ "hieratika-compiler",
+ "hieratika-errors",
+ "hieratika-flo",
+ "itertools 0.13.0",
+ "tracing",
 ]
 
 [[package]]

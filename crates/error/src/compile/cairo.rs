@@ -26,4 +26,16 @@ pub enum Error {
 
     #[error("Failure during compilation of Cairo project.")]
     DiagnosticsError,
+
+    #[error("encountered an unsupported type")]
+    UnsupportedTypeError,
+
+    #[error("cairo flatlowered had an unexpected refernece")]
+    InvalidFlatLoweredReference,
+
+    #[error("invalid constant found in flatlowered file")]
+    InvalidFlatLoweredConstant,
+
+    #[error("flatlowered constant couldn't be represented in u128")]
+    UnsupportedFlatLoweredConstantSize,
 }
