@@ -29,7 +29,7 @@ fn compiles_add() -> anyhow::Result<()> {
         flo.blocks.iter().find(|(_, b)| b.signature.is_some()).unwrap();
 
     // It should have 11 statements in its body
-    assert_eq!(hieratika_rust_test_input.statements.len(), 11);
+    assert_eq!(hieratika_rust_test_input.statements.len(), 13);
 
     // It should also end with a conditional branch instruction, which in FLO looks
     // like a match.

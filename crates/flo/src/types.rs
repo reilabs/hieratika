@@ -144,7 +144,7 @@ pub enum BlockExit {
 /// The types mirror [those in LLVM](https://llvm.org/docs/LangRef.html#atomic-memory-ordering-constraints)
 /// and the documentation on each variant is a reproduction of that from the
 /// LLVM language reference.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub enum MemoryOrdering {
     /// The set of values that can be read is governed by the happens-before
     /// partial order. A value cannot be read unless some operation wrote it.
@@ -225,6 +225,11 @@ pub enum Statement {
     /// "Derferences" a Snapshot, binding a new variable to the value captured
     /// at snapshot time.
     Desnap(DesnapStatement),
+
+    /// An operation that takes a variable `source_var` of type `T1`, and
+    /// performs a semantic conversion of the data's type to be `T2`, outputting
+    /// the result in the `target_var`.
+    Transmute(TransmuteStatement),
 
     /// For internal use -- indicates that this Statement is poisoned.
     Poisoned(PoisonType),
@@ -339,6 +344,28 @@ pub struct DesnapStatement {
     /// The variable to be 'populated' with the value of the snapshotted
     /// variable, at the time of its snapshotting.
     pub target: VariableId,
+
+    /// Any diagnostics associated with this statement.
+    pub diagnostics: Vec<DiagnosticId>,
+
+    /// The source location associated with this statement, if available.
+    pub location: Option<LocationId>,
+}
+
+/// An operation that takes a variable `source_var` of type `T1`, and
+/// performs a semantic conversion of the data's type to be `T2`, outputting
+/// the result in the `target_var`.
+///
+/// Note that the data in the variable **does not change**; all the bits
+/// remain the same. This is purely a conversion of how the data is
+/// interpreted.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct TransmuteStatement {
+    /// The variable of the initial type T1 that is converted from.
+    pub source_var: VariableId,
+
+    /// The variable of the target type T2 that is converted to.
+    pub target_var: VariableId,
 
     /// Any diagnostics associated with this statement.
     pub diagnostics: Vec<DiagnosticId>,

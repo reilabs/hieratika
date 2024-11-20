@@ -1,14 +1,19 @@
 //! This module contains miscellaneous utilities that are useful aids in
 //! generating a `FlatLoweredObject`.
 
+use std::ffi::CStr;
+
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
     builders::BlockBuilder,
-    types::{ConstantValue, VariableId},
+    types::{ConstantValue, MemoryOrdering, VariableId},
 };
 use inkwell::{
     basic_block::BasicBlock,
-    llvm_sys::core::{LLVMGetIndices, LLVMGetNumIndices, LLVMInt64Type},
+    llvm_sys::{
+        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMInt64Type, LLVMPrintValueToString},
+        LLVMAtomicOrdering,
+    },
     types::IntType,
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
@@ -128,6 +133,68 @@ pub fn get_var_or_const(
     Ok(id)
 }
 
+/// Gets the memory ordering from an instruction.
+///
+/// # Errors
+///
+/// - [`Error::MalformedLLVM`] if the `instruction` does not have a valid memory
+///   ordering attached to it.
+pub fn get_memory_ordering(instruction: &InstructionValue) -> Result<MemoryOrdering> {
+    // Unfortunately the LLVM C API does not support getting ordering constraints
+    // for anything other than loads and stores, so we are forced to parse the
+    // constraint out of the program text.
+    //
+    // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
+    // hence we are safe to convert it to the similarly non-owning str here for
+    // processing. When our `str` gets dropped, so does the `CStr` but the
+    // underlying allocation is left in the control of llvm-sys via Inkwell.
+    let value_as_c_string =
+        unsafe { CStr::from_ptr(LLVMPrintValueToString(instruction.as_value_ref())) };
+    let value_str = value_as_c_string.to_str()?;
+
+    // This ordering ensures that we will always pick the STRONGEST ordering
+    // available if multiple are present.
+    let flo_ordering = if value_str.contains("seq_cst") {
+        MemoryOrdering::SequentiallyConsistent
+    } else if value_str.contains("acq_rel") {
+        MemoryOrdering::AcquireRelease
+    } else if value_str.contains("release") {
+        MemoryOrdering::Release
+    } else if value_str.contains("acquire") {
+        MemoryOrdering::Acquire
+    } else if value_str.contains("monotonic") {
+        MemoryOrdering::Monotonic
+    } else if value_str.contains("unordered") {
+        MemoryOrdering::Unordered
+    } else {
+        Err(Error::MalformedLLVM(format!(
+            "{:?} instruction lacked a valid ordering",
+            instruction.get_opcode()
+        )))?
+    };
+
+    Ok(flo_ordering)
+}
+
+/// Converts the LLVM atomic ordering to a FLO memory ordering, or returns
+/// [`None`] if it is not atomic.
+#[must_use]
+pub fn llvm_ordering_to_memory_ordering(ordering: LLVMAtomicOrdering) -> Option<MemoryOrdering> {
+    match ordering {
+        LLVMAtomicOrdering::LLVMAtomicOrderingNotAtomic => None,
+        LLVMAtomicOrdering::LLVMAtomicOrderingUnordered => Some(MemoryOrdering::Unordered),
+        LLVMAtomicOrdering::LLVMAtomicOrderingMonotonic => Some(MemoryOrdering::Monotonic),
+        LLVMAtomicOrdering::LLVMAtomicOrderingAcquire => Some(MemoryOrdering::Acquire),
+        LLVMAtomicOrdering::LLVMAtomicOrderingRelease => Some(MemoryOrdering::Release),
+        LLVMAtomicOrdering::LLVMAtomicOrderingAcquireRelease => {
+            Some(MemoryOrdering::AcquireRelease)
+        }
+        LLVMAtomicOrdering::LLVMAtomicOrderingSequentiallyConsistent => {
+            Some(MemoryOrdering::SequentiallyConsistent)
+        }
+    }
+}
+
 /// Returns `true` if `inst` is **not** a
 /// [terminator instruction](https://llvm.org/docs/LangRef.html#terminator-instructions)
 /// or returns `false` otherwise.
@@ -209,21 +276,6 @@ pub fn extract_block_operand(
             "No operand was found where one was required",
         )),
     }
-}
-
-/// Extracts the operands to the provided `instruction` while asserting that
-/// they are all basic values (variants of [`BasicValueEnum`]).
-///
-/// # Errors
-///
-/// - [`Error::InvalidOpcodeOperand`] when one of the operands to `instruction`
-///   is a basic block.
-pub fn extract_value_operands(instruction: InstructionValue) -> Result<Vec<BasicValueEnum>> {
-    let opcode = instruction.get_opcode();
-    instruction
-        .get_operands()
-        .map(|operand| extract_value_operand(operand, opcode))
-        .collect::<Result<Vec<BasicValueEnum>>>()
 }
 
 /// Extracts pairs of `(name, type)` from the provided value operands.
