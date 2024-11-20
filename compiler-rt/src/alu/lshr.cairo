@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in lshr/lshr_<type>.cairo files.
-fn lshr<
+pub fn lshr<
     T,
     // The trait bounds are chosen so that:
     //
