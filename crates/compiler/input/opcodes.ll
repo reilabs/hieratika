@@ -212,3 +212,138 @@ bb3:
   %1 = phi i8 [0, %bb1], [10, %bb2]
   ret i8 %1
 }
+
+define i1 @hieratika_test_fcmp(float %left, float %right) unnamed_addr {
+start:
+  %0 = fcmp false float %left, %right
+  %1 = fcmp oeq float %left, %right
+  %2 = fcmp ogt float %left, %right
+  %3 = fcmp oge float %left, %right
+  %4 = fcmp olt float %left, %right
+  %5 = fcmp ole float %left, %right
+  %6 = fcmp one float %left, %right
+  %7 = fcmp ord float %left, %right
+  %8 = fcmp ueq float %left, %right
+  %9 = fcmp ugt float %left, %right
+  %10 = fcmp uge float %left, %right
+  %11 = fcmp ult float %left, %right
+  %12 = fcmp ule float %left, %right
+  %13 = fcmp une float %left, %right
+  %14 = fcmp uno float %left, %right
+  %15 = fcmp true float %left, %right
+  ret i1 %15
+}
+
+define i1 @hieratika_test_icmp(i64 %left, i64 %right) unnamed_addr {
+start:
+  %0 = icmp eq i64 %left, %right
+  %1 = icmp ne i64 %left, %right
+  %2 = icmp ugt i64 %left, %right
+  %3 = icmp uge i64 %left, %right
+  %4 = icmp ult i64 %left, %right
+  %5 = icmp ule i64 %left, %right
+  %6 = icmp sgt i64 %left, %right
+  %7 = icmp sge i64 %left, %right
+  %8 = icmp slt i64 %left, %right
+  %9 = icmp sle i64 %left, %right
+  ret i1 %9
+}
+
+define double @hieratika_test_bitcast(i64 %source) unnamed_addr {
+start:
+  %0 = bitcast i64 %source to double
+  ret double %0
+}
+
+define i64 @hieratika_test_select(i1 %branch) unnamed_addr {
+start:
+  %0 = select i1 %branch, i64 0, i64 100
+  ret i64 %0
+}
+
+define void @hieratika_test_atomicrmw(ptr %ptr) unnamed_addr {
+start:
+  %0 = atomicrmw xchg ptr %ptr, i64 0 acq_rel
+  %1 = atomicrmw add ptr %ptr, i64 0 acq_rel
+  %2 = atomicrmw sub ptr %ptr, i64 0 acq_rel
+  %3 = atomicrmw and ptr %ptr, i64 0 acq_rel
+  %4 = atomicrmw nand ptr %ptr, i64 0 acq_rel
+  %5 = atomicrmw or ptr %ptr, i64 0 acq_rel
+  %6 = atomicrmw xor ptr %ptr, i64 0 acq_rel
+  %7 = atomicrmw max ptr %ptr, i64 0 acq_rel
+  %8 = atomicrmw min ptr %ptr, i64 0 acq_rel
+  %9 = atomicrmw umax ptr %ptr, i64 0 acq_rel
+  %10 = atomicrmw umin ptr %ptr, i64 0 acq_rel
+  %11 = atomicrmw fadd ptr %ptr, double 0.0 acq_rel
+  %12 = atomicrmw fsub ptr %ptr, double 0.0 acq_rel
+  %13 = atomicrmw fmax ptr %ptr, double 0.0 acq_rel
+  %14 = atomicrmw fmin ptr %ptr, double 0.0 acq_rel
+  ret void
+}
+
+define void @hieratika_test_cmpxchg(ptr %ptr) unnamed_addr {
+start:
+  %0 = cmpxchg ptr %ptr, i64 1, i64 2 acquire acquire
+  ret void
+}
+
+define {i64, {i8, i1}} @hieratika_test_load(ptr %ptr) unnamed_addr {
+start:
+  %1 = load i64, ptr %ptr
+  %2 = load {i64, {i8, i1}}, ptr %ptr
+  %3 = load [5 x [5 x i8]], ptr %ptr
+  ret {i64, {i8, i1}} %2
+}
+
+define void @hieratika_test_store(ptr %ptr, [2 x [2 x i8]] %v1, {i64, {i8, i1}} %v2) unnamed_addr {
+start:
+  store i64 0, ptr %ptr
+  store [2 x [2 x i8]] %v1, ptr %ptr
+  store {i64, {i8, i1}} %v2, ptr %ptr
+
+  ret void
+}
+
+define i8 @hieratika_test_gep(ptr %ptr, i64 %array_idx) unnamed_addr {
+start:
+  ; Implicitly dereferences the pointer %ptr at offset 0 to yield `[10 x [5 x i8]]`. Then gets the
+  ; 6th element of that array `v1 : [5 x i8]`. Then gets the 5th element of `v1` to yield `v2 : i8`.
+  ; Then returns `*v2`.
+  %tmp = getelementptr [10 x [5 x i8]], ptr %ptr, i64 0, i64 5, i64 4
+
+  ; Implicitly dereferences the pointer %ptr at offset 1 to yield `{i64, [5 x {i8, i1}]}`. Then gets
+  ; the 2nd element in the structure `v1 : [5 x {i8, i1}]`. Then gets the %array_idx-th element in
+  ; `v1` to yield `v2 : {i8, i1}`. Then gets the 1st element in `v2` to yield `v3 : i8`. Then
+  ; returns `*v3`.
+  %tmp2 = getelementptr {i64, [5 x {i8, i1}]}, ptr %ptr, i64 1, i32 1, i64 %array_idx, i32 0
+
+  ; Implicitly dereferences the pointer %ptr at offset %array_idx to yield `{i64, {i8, i1}}`. Then
+  ; gets the 2nd element in the struct `v1 : {i8, i1}`. Then gets the 1st element in `v1` to yield
+  ; `v2 : i8`. Then returns `*v2`.
+  %elem_ptr = getelementptr {i64, {i8, i1}}, ptr %ptr, i64 %array_idx, i32 1, i32 0
+  %elem_val = load i8, ptr %elem_ptr
+  ret i8 %elem_val
+}
+
+define i16 @hieratika_test_extractvalue({i64, i32, {i16, i8}} %struct_val, [5 x [5 x i16]] %array_val) unnamed_addr {
+start:
+  ; We extract the {i16, i8} as the 3rd element of the struct, and then get the first element (the `i16` of it).
+  %from_struct = extractvalue {i64, i32, {i16, i8}} %struct_val, 2, 0
+
+  ; We extract the 3rd element of the outer array (of type [5 x i16]) and then the 5th element from that array.
+  %from_array = extractvalue [5 x [5 x i16]] %array_val, 2, 4
+
+  %res = add i16 %from_struct, %from_array
+  ret i16 %res
+}
+
+define void @hieratika_test_insertvalue({i64, i32, {i16, i8}} %struct_val, [5 x [5 x i16]] %array_val) unnamed_addr {
+start:
+  ; We insert the i16 value 1 into the i16 portion of the nested struct.
+  %into_struct = insertvalue {i64, i32, {i16, i8}} %struct_val, i16 1, 2, 0
+
+  ; We insert the i16 value 10 into the 4th element of the 1st element in the array.
+  %into_array = insertvalue [5 x [5 x i16]] %array_val, i16 10, 0, 3
+
+  ret void
+}

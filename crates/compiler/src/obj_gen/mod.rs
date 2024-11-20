@@ -1,10 +1,15 @@
 //! The infrastructure for building `FLO` objects to support the additional
 //! non-generic functionality not embedded in [`FlatLoweredObject`] itself.
+//!
+//! Any panicking function in this module will only call [`panic!`] if the error
+//! arises from a bug inside the library where there is no coherent state on
+//! which to fall back. Any error state arising from external input or incorrect
+//! usage will instead return an explicit [`Error`].
 
 pub mod data;
 pub mod util;
 
-use std::{cell::RefCell, ffi::CStr};
+use std::{cell::RefCell, collections::VecDeque};
 
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
@@ -14,7 +19,6 @@ use hieratika_flo::{
         BlockId,
         BlockRef,
         ConstantValue,
-        MemoryOrdering,
         PoisonType,
         Signature,
         Type,
@@ -26,39 +30,38 @@ use hieratika_flo::{
 };
 use inkwell::{
     basic_block::BasicBlock,
-    llvm_sys::core::LLVMPrintValueToString,
+    llvm_sys,
     module::Module,
     values::{
         AsValueRef,
+        BasicValueEnum,
         FunctionValue,
         GlobalValue,
         InstructionOpcode,
         InstructionValue,
         PhiValue,
     },
+    FloatPredicate,
     GlobalVisibility,
+    IntPredicate,
 };
 use itertools::Itertools;
 
 use crate::{
     context::SourceContext,
-    llvm::{special_intrinsics::SpecialIntrinsics, typesystem::LLVMType},
-    obj_gen::{
-        data::{FreshNameSupply, FunctionContext, ObjectContext},
-        util::{
-            expect_func_name_from_bv,
-            expect_int_from_bv,
-            extract_block_operand,
-            extract_value_operand,
-            extract_value_operands,
-            get_indices,
-            get_var_or_const,
-            is_non_terminator_instruction,
-            is_terminator_instruction,
-            make_opcode_output,
-            should_define_func,
-        },
+    llvm::{
+        special_intrinsics::SpecialIntrinsics,
+        typesystem::{LLVMArray, LLVMStruct, LLVMType},
     },
+    messages::{
+        assert_correct_opcode,
+        missing_indices_error,
+        non_constant_constant_error,
+        only_on_aggregates_error,
+        operand_count_error,
+        INSTRUCTION_NAMED,
+    },
+    obj_gen::data::{FreshNameSupply, FunctionContext, ObjectContext},
     pass::{
         analysis::module_map::{BuildModuleMap, FunctionInfo, GlobalInfo},
         data::DynPassDataMap,
@@ -216,7 +219,7 @@ impl ObjectGenerator {
 
             // If it is a DEFINITION we need to generate an entry point block for it that we
             // can reference later.
-            if should_define_func(function_name, module_map) {
+            if util::should_define_func(function_name, module_map) {
                 let block_id = data.flo.new_empty_block();
                 data.module_functions.insert(function_name.to_string(), block_id);
             }
@@ -230,15 +233,19 @@ impl ObjectGenerator {
             // We can only generate code for a function if it actually is _defined_.
             // Otherwise, we just have to skip it; declarations are used for
             // sanity checks but cannot result in generated code.
-            if should_define_func(function_name, module_map) {
-                let func_data = module_map
-                    .functions
-                    .get(function_name)
-                    .expect("Function was defined but not discovered by module mapping");
-                let entry_block_id = data
-                    .module_functions
-                    .get_by_left(function_name)
-                    .expect("Function block was allocated but missing");
+            if util::should_define_func(function_name, module_map) {
+                let func_data = module_map.functions.get(function_name).unwrap_or_else(|| {
+                    panic!(
+                        "The function {function_name} referenced but is unknown in the module map"
+                    )
+                });
+                let entry_block_id =
+                    data.module_functions.get_by_left(function_name).unwrap_or_else(|| {
+                        panic!(
+                            "The entrypoint for function {function_name} is missing in the \
+                             compilation context"
+                        )
+                    });
                 self.generate_function(&function, *entry_block_id, function_name, func_data, data)?;
             }
         }
@@ -279,7 +286,7 @@ impl ObjectGenerator {
         // The function signature gives us our inputs, which are necessary to be
         // referenced later. To that end, we generate it first, as it does not depend on
         // the availability of any blocks.
-        let sig = self.generate_signature(func_info, data, &mut func_ctx)?;
+        let sig = self.generate_signature(func_name, func_info, data, &mut func_ctx)?;
 
         // Next we can iterate over the basic blocks in the function and create stubs
         // for each. This means that we have targets during later generation.
@@ -333,11 +340,11 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the type of the function in `func_info` is not a function type.
-    /// - If any of the function arguments is missing a name.
     /// - If any component type (parameter or return types) of `func_info` is a
     ///   function type.
     pub fn generate_signature(
         &self,
+        func_name: &str,
         func_info: &FunctionInfo,
         data: &mut ObjectContext,
         func_ctx: &mut FunctionContext,
@@ -352,7 +359,9 @@ impl ObjectGenerator {
             .map(|(t, name)| {
                 let typ = ObjectContext::flo_type_of(t)?;
                 let var_id = data.flo.add_variable(typ.clone());
-                let name = name.as_ref().expect("Function definitions must have named arguments");
+                let name = name.as_ref().ok_or(Error::MalformedLLVM(format!(
+                    "The function definition for {func_name} did not have names for all arguments"
+                )))?;
                 func_ctx.register_local(var_id, name, typ);
 
                 Ok(var_id)
@@ -445,7 +454,7 @@ impl ObjectGenerator {
         // variable is inherently uninitialized. FLO provides an "initializers"
         // mechanism that provides blocks that are executed by the CRT0.
         if let Some(_initializer_code) = global.get_initializer() {
-            // TODO (#24) Actually implement this.
+            // TODO (#36) Actually implement this.
         }
 
         Ok(())
@@ -465,7 +474,7 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is a terminator instruction (see
-    ///   [`is_non_terminator_instruction`] for more information).
+    ///   [`util::is_non_terminator_instruction`] for more information).
     pub fn generate_instruction(
         &self,
         instruction: InstructionValue,
@@ -479,7 +488,11 @@ impl ObjectGenerator {
         // instruction and hence something we can handle here. If it isn't, we just need
         // to bail.
         let opcode = instruction.get_opcode();
-        assert!(is_non_terminator_instruction(opcode));
+        assert!(
+            util::is_non_terminator_instruction(opcode),
+            "Expected a non-terminator instruction, but found {:?} instead",
+            instruction.get_opcode()
+        );
 
         // LLVM likes to use anonymous names for certain instructions, so if we find one
         // of those we have to give it an _actual_ name. These names are allocated from
@@ -502,13 +515,13 @@ impl ObjectGenerator {
             Alloca => self.generate_alloca(instruction, bb, func_ctx),
             And => self.generate_binary_operation(instruction, bb, func_ctx),
             AShr => self.generate_binary_operation(instruction, bb, func_ctx),
-            AtomicCmpXchg => unimplemented!("AtomicCmpXchg"),
-            AtomicRMW => unimplemented!("AtomicRMW"),
-            BitCast => unimplemented!("BitCast"),
+            AtomicCmpXchg => self.generate_cmpxchg(instruction, bb, func_ctx),
+            AtomicRMW => self.generate_atomicrmw(instruction, bb, func_ctx),
+            BitCast => self.generate_bitcast(instruction, bb, func_ctx),
             Call => self.generate_call(instruction, bb, func_ctx),
             ExtractValue => self.generate_extract_value(instruction, bb, func_ctx),
             FAdd => self.generate_binary_operation(instruction, bb, func_ctx),
-            FCmp => unimplemented!("FCmp"),
+            FCmp => self.generate_comparison(instruction, bb, func_ctx),
             FDiv => self.generate_binary_operation(instruction, bb, func_ctx),
             Fence => self.generate_fence(instruction, bb),
             FMul => self.generate_binary_operation(instruction, bb, func_ctx),
@@ -520,18 +533,18 @@ impl ObjectGenerator {
             Freeze => Ok(()),
             FRem => self.generate_binary_operation(instruction, bb, func_ctx),
             FSub => self.generate_binary_operation(instruction, bb, func_ctx),
-            GetElementPtr => unimplemented!("GetElementPtr"),
-            ICmp => unimplemented!("ICmp"),
-            InsertValue => unimplemented!("InsertValue"),
+            GetElementPtr => self.generate_gep(instruction, bb, func_ctx),
+            ICmp => self.generate_comparison(instruction, bb, func_ctx),
+            InsertValue => self.generate_insert_value(instruction, bb, func_ctx),
             IntToPtr => self.generate_conversion(instruction, bb, func_ctx),
-            Load => unimplemented!("Load"),
+            Load => self.generate_load(instruction, bb, func_ctx),
             LShr => self.generate_binary_operation(instruction, bb, func_ctx),
             Mul => self.generate_binary_operation(instruction, bb, func_ctx),
             Or => self.generate_binary_operation(instruction, bb, func_ctx),
             Phi => self.generate_phi(instruction, bb, func_ctx),
             PtrToInt => self.generate_conversion(instruction, bb, func_ctx),
             SDiv => self.generate_binary_operation(instruction, bb, func_ctx),
-            Select => unimplemented!("Select"),
+            Select => self.generate_select(instruction, bb, func_ctx),
             SExt => self.generate_conversion(instruction, bb, func_ctx),
             Shl => self.generate_binary_operation(instruction, bb, func_ctx),
             SIToFP => self.generate_conversion(instruction, bb, func_ctx),
@@ -554,6 +567,1477 @@ impl ObjectGenerator {
     }
 
     /// Generates the FLO code that corresponds to an LLVM
+    /// [insertvalue](https://llvm.org/docs/LangRef.html#insertvalue-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ an `insertvalue`.
+    /// - If any extraction index is out of bounds for the number of fields in
+    ///   the type being extracted from.
+    fn generate_insert_value(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::InsertValue);
+
+        // We should have two operands. The first is the aggregate value into which we
+        // insert, while the latter is the value to insert.
+        let &[aggregate, value] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::InsertValue))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 2))?
+        };
+
+        let aggregate_type = LLVMType::try_from(aggregate.get_type())?;
+        let aggregate_id = util::get_var_or_const(&aggregate, bb, func_ctx)?;
+        let value_id = util::get_var_or_const(&value, bb, func_ctx)?;
+
+        // We also need the indices, which describe where in the value we are going to
+        // be inserting the value.
+        let mut indices: VecDeque<u64> = util::get_indices(&instruction)
+            .ok_or_else(|| missing_indices_error(&instruction))?
+            .into();
+
+        // Here, things get a little complicated, as we have to recursively take apart
+        // the aggregate, insert the value, and then put it back together again with the
+        // new value.
+        let value_with_insertion = self.generate_insert_value_into(
+            instruction,
+            aggregate_id,
+            &aggregate_type,
+            value_id,
+            &mut indices,
+            bb,
+        )?;
+
+        // This returned value needs to be registered in the function context so it can
+        // be referenced later.
+        let value_with_insertion_name =
+            instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        let value_with_insertion_type =
+            ObjectContext::flo_type_of(&LLVMType::try_from(instruction.get_type())?)?;
+        func_ctx.register_local(
+            value_with_insertion,
+            value_with_insertion_name,
+            value_with_insertion_type,
+        );
+
+        // We are done!
+        Ok(())
+    }
+
+    /// Performs the recursive destructuring and construction of aggregate types
+    /// in order to perform the `insertvalue` operation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the operation cannot be generated for some reason.
+    #[allow(clippy::only_used_in_recursion)] // For consistency with other generation methods.
+    fn generate_insert_value_into(
+        &self,
+        instruction: InstructionValue,
+        aggregate: VariableId,
+        aggregate_type: &LLVMType,
+        value_to_insert: VariableId,
+        remaining_indices: &mut VecDeque<u64>,
+        bb: &mut BlockBuilder,
+    ) -> Result<VariableId> {
+        if let Some(current_index) = remaining_indices.pop_front() {
+            // Our indices are constrained by u32::MAX, so this is safe.
+            #[allow(clippy::cast_possible_truncation)]
+            let current_index = current_index as usize;
+
+            // As we have to take apart the structure, we need variables into which we
+            // destructure it.
+            let var_type_pairs = match &aggregate_type {
+                LLVMType::Structure(struct_val) => struct_val
+                    .elements
+                    .iter()
+                    .map(|ty| {
+                        let flo_type = ObjectContext::flo_type_of(ty)?;
+                        Ok((bb.add_variable(flo_type), ty.clone()))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                LLVMType::Array(array_val) => (0..array_val.count)
+                    .map(|_| {
+                        let flo_type = ObjectContext::flo_type_of(array_val.typ.as_ref())?;
+                        Ok((bb.add_variable(flo_type), array_val.typ.as_ref().clone()))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                _ => Err(only_on_aggregates_error(&instruction, aggregate_type))?,
+            };
+
+            // We then issue the destructure call, which pulls apart our aggregate into its
+            // components.
+            let mut component_vars = var_type_pairs.iter().map(|(id, _)| *id).collect_vec();
+            bb.simple_destructure(aggregate, component_vars.clone());
+
+            // Now that we have it pulled apart, we need to get our "new" aggregate out of
+            // those components.
+            let (next_aggregate_id, next_aggregate_type) =
+                var_type_pairs.get(current_index).ok_or(Error::MalformedLLVM(format!(
+                    "InsertValue encountered with out-of-bounds index {current_index}"
+                )))?;
+
+            // We then call recursively to get the result of inserting the value.
+            let returned_value = self.generate_insert_value_into(
+                instruction,
+                *next_aggregate_id,
+                next_aggregate_type,
+                value_to_insert,
+                remaining_indices,
+                bb,
+            )?;
+
+            // Once we have that back, we have to put everything back together again! We
+            // start by assembling the variables to perform construction from. These are the
+            // same as the ones destructured into, except in the path where the insertion
+            // was made.
+            component_vars[current_index] = returned_value;
+
+            // Then we build the thing itself.
+            let result_variable = bb.simple_construct_into_new_variable(
+                ObjectContext::flo_type_of(aggregate_type)?,
+                component_vars,
+            );
+
+            Ok(result_variable)
+        } else {
+            Ok(value_to_insert)
+        }
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [extractvalue](https://llvm.org/docs/LangRef.html#extractvalue-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ an `extractvalue`.
+    /// - If any extraction index is out of bounds for the number of fields in
+    ///   the type being extracted from.
+    #[allow(clippy::unused_self)] // For consistency with the majority of generate_* methods
+    fn generate_extract_value(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::ExtractValue);
+
+        // We start by grabbing the single operand to the opcode. While definitions look
+        // like they have multiple, extractvalue takes one operand and then some
+        // arbitrary number of indices which have to be obtained separately.
+        let &[extract_from] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::ExtractValue))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 1))?
+        };
+        let extract_from_type = LLVMType::try_from(extract_from.get_type())?;
+        let extract_from_id = util::get_var_or_const(&extract_from, bb, func_ctx)?;
+
+        // We also need to know _where_ in the operand we are grabbing the values from.
+        // This is given as a path of indices in the instruction, that are guaranteed to
+        // be in bounds for the specified type.
+        let indices = util::get_indices(&instruction).ok_or(missing_indices_error(&instruction))?;
+
+        // We then have to go through, index by index, and extract the nested structure
+        // or array bit by bit. While the indices are constant, the source variable is
+        // not a pointer so we cannot compute an offset statically for this instruction.
+        let mut current_extraction_type = extract_from_type;
+        let mut current_extraction_var = extract_from_id;
+        for index in indices {
+            // Our indices cannot exceed u32::MAX by construction.
+            #[allow(clippy::cast_possible_truncation)]
+            let index = index as usize;
+
+            let output_variables = match &current_extraction_type {
+                LLVMType::Structure(struct_type) => struct_type
+                    .elements
+                    .iter()
+                    .enumerate()
+                    .map(|(ix, ty)| {
+                        let flo_ty = ObjectContext::flo_type_of(ty)?;
+                        let poison = if ix == index {
+                            PoisonType::None
+                        } else {
+                            PoisonType::Unused
+                        };
+                        let out_var = bb.context.variables.insert(&Variable {
+                            typ: flo_ty,
+                            linkage: VariableLinkage::Local,
+                            poison,
+                            diagnostics: Vec::new(),
+                            location: None,
+                        });
+
+                        Ok((out_var, ty.clone()))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                LLVMType::Array(array_type) => {
+                    let array_elem_flo_ty = ObjectContext::flo_type_of(&array_type.typ)?;
+                    (0..array_type.count)
+                        .map(|ix| {
+                            let poison = if ix == index {
+                                PoisonType::None
+                            } else {
+                                PoisonType::Unused
+                            };
+                            let out_var = bb.context.variables.insert(&Variable {
+                                typ: array_elem_flo_ty.clone(),
+                                linkage: VariableLinkage::Local,
+                                poison,
+                                diagnostics: Vec::new(),
+                                location: None,
+                            });
+
+                            Ok((out_var, array_type.typ.as_ref().clone()))
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                }
+                _ => Err(only_on_aggregates_error(
+                    &instruction,
+                    &current_extraction_type,
+                ))?,
+            };
+
+            // This should never fail by construction, so we bail with an error if somehow
+            // it is.
+            let (next_extraction_var, next_extraction_type) =
+                output_variables.get(index).ok_or(Error::MalformedLLVM(format!(
+                    "ExtractValue encountered with out-of-bounds index {index}"
+                )))?;
+
+            // We then pull apart the first level of the value using FLO's destructuring
+            // operation.
+            bb.simple_destructure(
+                current_extraction_var,
+                output_variables.iter().map(|(id, _)| *id).collect_vec(),
+            );
+
+            // Finally, we update our state variables for the next iteration.
+            current_extraction_var = *next_extraction_var;
+            current_extraction_type = (*next_extraction_type).clone();
+        }
+
+        // At the end of the loop, the variable `current_extraction_var` contains the
+        // extracted value, so we give that a name and make it available in the function
+        // context for subsequent compilation to reference.
+        let extracted_value_id = current_extraction_var;
+        let extracted_value_typ =
+            ObjectContext::flo_type_of(&LLVMType::try_from(instruction.get_type())?)?;
+        let extracted_value_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        func_ctx.register_local(
+            extracted_value_id,
+            extracted_value_name,
+            extracted_value_typ,
+        );
+
+        // We are done!
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [getelementptr](https://llvm.org/docs/LangRef.html#getelementptr-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a `getelementptr`.
+    /// - If any name is used before being defined.
+    #[allow(clippy::too_many_lines)] // It cannot be reasonably split up.
+    pub fn generate_gep(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        fn compute_offset_const_type_size(
+            gep_index: &BasicValueEnum,
+            typ: &LLVMType,
+            bb: &mut BlockBuilder,
+            func_ctx: &mut FunctionContext,
+            polyfills: &PolyfillMap,
+        ) -> Result<VariableId> {
+            // If the gep_index is constant, we can compute this at compile time.
+            let const_value = if let BasicValueEnum::IntValue(int_val) = gep_index {
+                // Our indices never exceed u32::MAX by construction.
+                #[allow(clippy::cast_possible_truncation)]
+                int_val.get_zero_extended_constant().map(|c| c as usize)
+            } else {
+                let typ = LLVMType::try_from(gep_index.get_type())?;
+                Err(Error::MalformedLLVM(format!(
+                    "GetElementPtr instruction had non-integral index value with type {typ}"
+                )))?
+            };
+
+            let actual_offset = if let Some(const_value) = const_value {
+                let offset = const_value * typ.size_of();
+
+                // In this case, it is a constant that we can compute at compile time.
+                bb.simple_assign_new_const(ConstantValue {
+                    value: offset as u128,
+                    typ:   Type::Unsigned64,
+                })
+            } else {
+                // In this case it is non-constant, so we have to defer the offset computation
+                // to runtime.
+                let type_size_felts_const = bb.simple_assign_new_const(ConstantValue {
+                    value: typ.size_of() as u128,
+                    typ:   Type::Unsigned64,
+                });
+
+                // The value is the size of the source type of the pointer
+                // multiplied by the offset, which we have to embed as a runtime
+                // computation.
+                let mul_func = polyfills.try_get_polyfill(
+                    "mul",
+                    &[LLVMType::i64, LLVMType::i64],
+                    &LLVMType::i64,
+                )?;
+                let gep_index_offset = util::get_var_or_const(gep_index, bb, func_ctx)?;
+                let actual_offset = bb.add_variable(Type::Unsigned64);
+                bb.simple_call_builtin(
+                    mul_func,
+                    vec![type_size_felts_const, gep_index_offset],
+                    vec![actual_offset],
+                );
+
+                // Finally, we return the result of that runtime computation to be used in the
+                // call to the GEP polyfill.
+                actual_offset
+            };
+
+            Ok(actual_offset)
+        }
+
+        assert_correct_opcode(&instruction, InstructionOpcode::GetElementPtr);
+
+        // In order to have some idea of how to generate this, we need to know the
+        // source type of the element at the pointer into which the GEP is indexing.
+        let source_type = LLVMType::try_from(instruction.get_gep_source_element_type()?)?;
+
+        // This source type has to be of either an array or struct type.
+        if !matches!(source_type, LLVMType::Structure(_) | LLVMType::Array(_)) {
+            Err(only_on_aggregates_error(&instruction, &source_type))?;
+        }
+
+        // The GEP instruction has an arbitrary number of operands. The first is the
+        // pointer from which the extraction is performed, while the subsequent operands
+        // are the indices.
+        let operands = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::GetElementPtr))
+            .collect::<Result<Vec<_>>>()?;
+
+        // We can safely directly index here as the instruction is malformed if it does
+        // not have a pointer operand.
+        let pointer = operands[0];
+        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+
+        // The remaining operands are the indices, which can be constant or variable,
+        // that we need to pull out.
+        let indices = &operands.as_slice()[1..];
+
+        // Given we are going to be calling it a lot, let's grab the polyfill name. Its
+        // arguments are the pointer to compute from and the offset of that pointer to
+        // begin from, and it returns the computed pointer.
+        let gep = self.polyfills.try_get_polyfill(
+            "getelementptr",
+            &[LLVMType::ptr, LLVMType::i64],
+            &LLVMType::ptr,
+        )?;
+
+        // Unfortunately, due to the way that these indices can be non-constant, we
+        // cannot just compute the offset into a nested structure at compile time.
+        // Instead, we have to handle the multiple indices by decomposing the type
+        // information one by one.
+        let mut current_type = LLVMType::ptr;
+        let mut current_ptr_var = pointer_id;
+
+        // In each iteration of the loop we want to compute the single-level GEP for
+        // that index on the resultant type.
+        for (ix, gep_index) in indices.iter().enumerate() {
+            // Here, we are always indexing at some offset directly into the pointer.
+            if ix == 0 {
+                // For the purposes of the call, the actual offset passed to the polyfill is the
+                // GEP offset on the pointer multiplied by the pointer increment.
+                let actual_offset = compute_offset_const_type_size(
+                    gep_index,
+                    &source_type,
+                    bb,
+                    func_ctx,
+                    &self.polyfills,
+                )?;
+
+                // Then we can issue the call to the first offset within the GEP instruction.
+                let result_id = bb.add_variable(Type::Pointer);
+                bb.simple_call_builtin(gep, vec![current_ptr_var, actual_offset], vec![result_id]);
+
+                // Then we update our state variables, assigning the source type to our current
+                // type and the output of the top-level gep to the next pointer.
+                current_type = source_type.clone();
+                current_ptr_var = result_id;
+            } else {
+                // In all other cases we have to dispatch based on the type,
+                // which for the purposes of GEP can only be either a
+                // (potentially-nested) struct or array type.
+                match current_type {
+                    LLVMType::Structure(struct_type) => {
+                        let gep_index_type = LLVMType::try_from(gep_index.get_type())?;
+
+                        // For the purposes of an index into a structure, the GEP index must be a
+                        // constant i32. This means we can compute the offset from the last pointer
+                        // at compile time as it is constant.
+                        let gep_index_value = match gep_index {
+                            // Our indices never exceed u32::MAX by construction.
+                            #[allow(clippy::cast_possible_truncation)]
+                            BasicValueEnum::IntValue(int_val) if int_val.is_const() => int_val
+                                .get_zero_extended_constant()
+                                .ok_or(non_constant_constant_error(&gep_index_type))?
+                                as usize,
+                            _ => Err(non_constant_constant_error(&gep_index_type))?,
+                        };
+
+                        // Our offset is then the sum of the sizes of all the elements in the struct
+                        // _before_ the element indicated by the GEP index.
+                        let felts_before_index: usize = struct_type
+                            .elements
+                            .iter()
+                            .take(gep_index_value)
+                            .map(LLVMType::size_of)
+                            .sum();
+                        let const_offset = bb.simple_assign_new_const(ConstantValue {
+                            value: felts_before_index as u128,
+                            typ:   Type::Signed64,
+                        });
+
+                        // The output variable is a pointer.
+                        let output_var = bb.add_variable(Type::Pointer);
+
+                        // We then call the GEP polyfill...
+                        bb.simple_call_builtin(
+                            gep,
+                            vec![current_ptr_var, const_offset],
+                            vec![output_var],
+                        );
+
+                        // ...and update our state variables.
+                        current_ptr_var = output_var;
+                        current_type = struct_type.elements[gep_index_value].clone();
+                    }
+                    LLVMType::Array(array_type) => {
+                        let actual_offset = compute_offset_const_type_size(
+                            gep_index,
+                            &source_type,
+                            bb,
+                            func_ctx,
+                            &self.polyfills,
+                        )?;
+
+                        // Then we can issue the call to the first offset within the GEP
+                        // instruction.
+                        let result_id = bb.add_variable(Type::Pointer);
+                        bb.simple_call_builtin(
+                            gep,
+                            vec![current_ptr_var, actual_offset],
+                            vec![result_id],
+                        );
+
+                        // Then we update our state variables, assigning the source type to our
+                        // current type and the output of the top-level gep
+                        // to the next pointer.
+                        current_type = array_type.typ.as_ref().clone();
+                        current_ptr_var = result_id;
+                    }
+                    _ => Err(only_on_aggregates_error(&instruction, &current_type))?,
+                }
+            }
+        }
+
+        // As the final value of next_pointer_var is the result of calling the last
+        // portion of the GEP, this is one we need to absolutely register in the
+        // function context.
+        let output_var_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        func_ctx.register_local(current_ptr_var, output_var_name, Type::Pointer);
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [store](https://llvm.org/docs/LangRef.html#store-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a `store`.
+    /// - If any name is used before being defined.
+    pub fn generate_store(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        #[allow(clippy::enum_glob_use)] // We use all variants here.
+        use LLVMType::*;
+        assert_correct_opcode(&instruction, InstructionOpcode::Store);
+
+        // We need to handle atomic behavior of the load and store, if it exists, by
+        // using fences to prevent reordering.
+        let atomic =
+            util::llvm_ordering_to_memory_ordering(instruction.get_atomic_ordering()?.into());
+        if let Some(ordering) = atomic {
+            bb.add_fence(ordering);
+        }
+
+        // The store instruction should have two direct operands: the value to store,
+        // and the pointer into which the value is stored.
+        let &[stored_val, pointer] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::Load))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 2))?
+        };
+        let stored_val_var = util::get_var_or_const(&stored_val, bb, func_ctx)?;
+        let pointer_var = util::get_var_or_const(&pointer, bb, func_ctx)?;
+
+        // Storing is complex for us, as we can only provide polyfills that can store
+        // primitive types (the numerics and pointers). To that end, we have to handle
+        // the store differently based on the type being stored.
+        let stored_type = LLVMType::try_from(stored_val.get_type())?;
+        match &stored_type {
+            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                // In the case of directly storing a primitive, the offset is _always_ going to
+                // be zero.
+                self.store_primitive(&stored_type, stored_val_var, pointer_var, 0, bb)?;
+            }
+            Array(array_type) => {
+                // Arrays are complex. As we can only load primitive types from the memory
+                // model, we have to break down the array piece by piece and load them
+                // individually while keeping track of the offset.
+                //
+                // The initial offset will always be zero.
+                self.store_array(array_type, stored_val_var, pointer_var, 0, bb)?;
+            }
+            Structure(struct_type) => {
+                // Structures are complex. As we can only load primitive types from the memory
+                // model, we have to break down the structure piece by piece and load them
+                // individually, while keeping track of the offset.
+                //
+                // The initial offset will always be zero.
+                self.store_struct(struct_type, stored_val_var, pointer_var, 0, bb)?;
+            }
+            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                "Encountered a Store instruction attempting to store a value of type \
+                 {stored_type}, but this is not valid"
+            )))?,
+        };
+
+        // Finally we add the fence _afterward_.
+        if let Some(ordering) = atomic {
+            bb.add_fence(ordering);
+        }
+
+        // And we are done.
+        Ok(())
+    }
+
+    /// Stores a primitive of the provided `typ` at the provided `ptr` and
+    /// `offset`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the store for any reason.
+    ///
+    /// # Panics
+    ///
+    /// If the provided `typ` is not a primitive type.
+    pub fn store_primitive(
+        &self,
+        typ: &LLVMType,
+        stored_value: VariableId,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<()> {
+        use LLVMType::{bool, f16, f32, f64, i128, i16, i32, i64, i8, ptr};
+        assert!(
+            matches!(
+                typ,
+                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr
+            ),
+            "Primitive type expected, but {typ} found instead"
+        );
+
+        // We can load from any offset on the pointer, so we have to construct a
+        // constant for that offset. As this constant is purely used once, we never add
+        // it to the function context.
+        let offset = bb.simple_assign_new_const(ConstantValue {
+            value: initial_offset as u128,
+            typ:   Type::Signed64,
+        });
+
+        // Next, we need to look up the polyfill to call.
+        let polyfill_name =
+            self.polyfills
+                .try_get_polyfill("store", &[typ.clone(), ptr, i64], &LLVMType::void)?;
+
+        // The store opcode has no return value, so we can simply generate the call
+        // here, passing the value to store, the pointer to store to, and the offset
+        // from that pointer to store at.
+        bb.simple_call_builtin(polyfill_name, vec![stored_value, pointer, offset], vec![]);
+
+        Ok(())
+    }
+
+    /// Stores the provided `struct_value` at the provided `pointer` offset by
+    /// `initial_offset`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the store for any reason.
+    pub fn store_struct(
+        &self,
+        struct_type: &LLVMStruct,
+        struct_value: VariableId,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<()> {
+        #[allow(clippy::enum_glob_use)] // We do actually make use of all of them here.
+        use LLVMType::*;
+
+        // As we can only store primitive types, we have to pull the struct apart, piece
+        // by piece.
+        let struct_elements = struct_type.elements.as_slice();
+
+        // In order to perform the necessary destructure, we need output variables of
+        // the corresponding types. They are kept anonymous in the parent function as
+        // they are only used locally.
+        let element_variables = struct_elements
+            .iter()
+            .map(|elem_ty| {
+                let flo_ty = ObjectContext::flo_type_of(elem_ty)?;
+                Ok(bb.add_variable(flo_ty))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        bb.simple_destructure(struct_value, element_variables.clone());
+
+        // At this point, we have each of `element_variables` filled with a struct
+        // element, and need to store those into the pointer at the corresponding
+        // offsets.
+        let mut accumulated_offset = initial_offset;
+
+        for (elem_ty, elem_val) in struct_elements.iter().zip(element_variables.into_iter()) {
+            match elem_ty {
+                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                    self.store_primitive(elem_ty, elem_val, pointer, accumulated_offset, bb)?;
+                }
+                Array(array_type) => {
+                    self.store_array(array_type, elem_val, pointer, accumulated_offset, bb)?;
+                }
+                Structure(struct_type) => {
+                    self.store_struct(struct_type, elem_val, pointer, accumulated_offset, bb)?;
+                }
+                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                    "Encountered a Store instruction attempting to store a value of type \
+                     {elem_ty}, but this is not valid"
+                )))?,
+            }
+
+            accumulated_offset += elem_ty.size_of();
+        }
+
+        // There is nothing to return, so we are done.
+        Ok(())
+    }
+
+    /// Stores the provided `array_value` at the provided `pointer` offset by
+    /// `initial_offset`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the store for any reason.
+    pub fn store_array(
+        &self,
+        array_type: &LLVMArray,
+        array_value: VariableId,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<()> {
+        #[allow(clippy::enum_glob_use)] // We do actually use all of them here.
+        use LLVMType::*;
+
+        // As we can only store primitive types, we have to pull the array apart, piece
+        // by piece. We do this using destructuring operations.
+        let array_elem_type = array_type.typ.as_ref();
+        let array_elem_type_flo = ObjectContext::flo_type_of(array_elem_type)?;
+        let array_elem_count = array_type.count;
+
+        // In order to destructure, we need a series of variables _into_ which we
+        // destructure. These are kept anonymous in the function context as they are
+        // only used locally.
+        let array_elements = (0..array_elem_count)
+            .map(|_| bb.add_variable(array_elem_type_flo.clone()))
+            .collect_vec();
+        bb.simple_destructure(array_value, array_elements.clone());
+
+        // At this point we have each of `array_elements` filled with a single element
+        // (of whatever type) from the array, each of which needs to be stored. In order
+        // to do this, we have to store from each variable, accumulating the offset as
+        // needed.
+        let mut accumulated_offset = initial_offset;
+
+        for array_element in array_elements {
+            match &array_elem_type {
+                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                    self.store_primitive(
+                        array_elem_type,
+                        array_element,
+                        pointer,
+                        accumulated_offset,
+                        bb,
+                    )?;
+                }
+                Array(array_type) => {
+                    self.store_array(array_type, array_element, pointer, accumulated_offset, bb)?;
+                }
+                Structure(struct_type) => {
+                    self.store_struct(struct_type, array_element, pointer, accumulated_offset, bb)?;
+                }
+                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                    "Encountered a Store instruction attempting to store a value of type \
+                     {array_elem_type}, but this is not valid"
+                )))?,
+            }
+
+            accumulated_offset += array_elem_type.size_of();
+        }
+
+        // There is nothing to return, so we are done.
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [load](https://llvm.org/docs/LangRef.html#load-instruction) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `load` instruction.
+    /// - If the provided instruction is missing an output name.
+    fn generate_load(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        #[allow(clippy::enum_glob_use)] // We use all variants here.
+        use LLVMType::*;
+        assert_correct_opcode(&instruction, InstructionOpcode::Load);
+
+        // We need to handle atomic behavior of the load and store, if it exists, by
+        // using fences to prevent reordering.
+        let atomic =
+            util::llvm_ordering_to_memory_ordering(instruction.get_atomic_ordering()?.into());
+        if let Some(ordering) = atomic {
+            bb.add_fence(ordering);
+        }
+
+        // The one operand we should have to the load instruction is the pointer from
+        // which to load.
+        let &[pointer] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::Load))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 1))?
+        };
+        let pointer_var = util::get_var_or_const(&pointer, bb, func_ctx)?;
+
+        // Loading is quite complex for us, as we can only provide polyfills that can
+        // load primitive types (the numerics and pointers). To that end, we have to
+        // handle the type being loaded differently.
+        let output_type = LLVMType::try_from(instruction.get_type())?;
+        let output_var = match &output_type {
+            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                // In the case of directly loading a primitive, the offset is _always_ going to
+                // be zero.
+                self.load_primitive(&output_type, pointer_var, 0, bb)?
+            }
+            Array(array_type) => {
+                // Arrays are complex. As we can only load primitive types from the memory
+                // model, we have to break down the array piece by piece and load them
+                // individually while keeping track of the offset.
+                //
+                // The initial offset will always be zero.
+                self.load_array(array_type, pointer_var, 0, bb)?
+            }
+            Structure(struct_type) => {
+                // Structures are complex. As we can only load primitive types from the memory
+                // model, we have to break down the structure piece by piece and load them
+                // individually, while keeping track of the offset.
+                //
+                // The initial offset will always be zero.
+                self.load_structure(struct_type, pointer_var, 0, bb)?
+            }
+            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                "Encountered a Load instruction attempting to load a value of type {output_type}, \
+                 but this is not valid"
+            )))?,
+        };
+
+        // We then need to register this result variable in the function context
+        let output_type_flo = ObjectContext::flo_type_of(&output_type)?;
+        let output_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        func_ctx.register_local(output_var, output_name, output_type_flo);
+
+        // Finally we add the fence _afterward_.
+        if let Some(ordering) = atomic {
+            bb.add_fence(ordering);
+        }
+
+        Ok(())
+    }
+
+    /// Loads a primitive of the provided `typ` from the provided `ptr`,
+    /// starting at the provided `offset`.
+    ///
+    /// It returns a variable that corresponds to the result of loading the
+    /// primitive in question.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the load for any reason.
+    ///
+    /// # Panics
+    ///
+    /// If the provided `typ` is not a primitive type.
+    pub fn load_primitive(
+        &self,
+        typ: &LLVMType,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<VariableId> {
+        use LLVMType::{bool, f16, f32, f64, i128, i16, i32, i64, i8, ptr};
+        assert!(
+            matches!(
+                typ,
+                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr
+            ),
+            "Primitive type expected, but {typ} found instead"
+        );
+
+        // We can load from any offset on the pointer, so we have to construct a
+        // constant for that offset. As this constant is purely used once, we never add
+        // it to the function context.
+        let offset = bb.simple_assign_new_const(ConstantValue {
+            value: initial_offset as u128,
+            typ:   Type::Signed64,
+        });
+
+        // Next, we need to look up the polyfill to call.
+        let polyfill_name = self.polyfills.try_get_polyfill("load", &[ptr, i64], typ)?;
+
+        // We also need a variable to write our output into.
+        let output_type_flo = ObjectContext::flo_type_of(typ)?;
+        let output_var = bb.add_variable(output_type_flo.clone());
+
+        // And we can call the builtin, passing our pointer, offset, and getting the
+        // result back.
+        bb.simple_call_builtin(polyfill_name, vec![pointer, offset], vec![output_var]);
+
+        Ok(output_var)
+    }
+
+    /// Loads a structure of the provided `struct_type` from the provided `ptr`,
+    /// starting at the provided `offset`.
+    ///
+    /// It returns a variable that corresponds to the result of loading the
+    /// struct in question.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the load for any reason.
+    pub fn load_structure(
+        &self,
+        struct_type: &LLVMStruct,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<VariableId> {
+        #[allow(clippy::enum_glob_use)] // We make use of all of them here.
+        use LLVMType::*;
+
+        // We need to track the offset from the pointer as we load elements.
+        let mut accumulated_offset = initial_offset;
+
+        // We need to get a variable that is the result of loading each component type.
+        let component_variables: Vec<VariableId> = struct_type
+            .elements
+            .iter()
+            .map(|elem_ty| {
+                // We have to start by dispatching based on the child type
+                let loaded_var = match elem_ty {
+                    bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                        self.load_primitive(elem_ty, pointer, accumulated_offset, bb)?
+                    }
+                    Array(array_type) => {
+                        self.load_array(array_type, pointer, accumulated_offset, bb)?
+                    }
+                    Structure(struct_type) => {
+                        self.load_structure(struct_type, pointer, accumulated_offset, bb)?
+                    }
+                    void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                        "Encountered a Load instruction attempting to load a value of type \
+                         {elem_ty}, but this is not valid"
+                    )))?,
+                };
+
+                // We always have to finish by incrementing the offset by the size of the thing
+                // we just loaded so that the next load proceeds correctly.
+                let increment_offset_by = elem_ty.size_of();
+                accumulated_offset += increment_offset_by;
+
+                // Then we return the loaded variable for use in the struct constructor.
+                Ok(loaded_var)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // We then have to build the struct type itself using the construct operation in
+        // FLO, and that is the variable that contains our loaded struct.
+        let struct_type_flo = ObjectContext::flo_type_of(&LLVMType::from(struct_type))?;
+        let struct_var =
+            bb.simple_construct_into_new_variable(struct_type_flo, component_variables);
+
+        Ok(struct_var)
+    }
+
+    /// Loads an array of the provided `array_type` from the provided `ptr`,
+    /// starting at the provided `offset`.
+    ///
+    /// It returns a variable that corresponds to the result of loading the
+    /// array in question.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the load for any reason.
+    pub fn load_array(
+        &self,
+        array_type: &LLVMArray,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<VariableId> {
+        #[allow(clippy::enum_glob_use)] // We make use of all of them here.
+        use LLVMType::*;
+
+        let mut accumulated_offset = initial_offset;
+        let array_elem_type = array_type.typ.as_ref();
+        let array_elem_count = array_type.count;
+
+        // We need a variable that is the result of loading each element type.
+        let mut component_variables: Vec<VariableId> = Vec::new();
+        for _ in 0..array_elem_count {
+            component_variables.push(match array_elem_type {
+                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                    self.load_primitive(array_elem_type, pointer, accumulated_offset, bb)?
+                }
+                Array(array_type) => {
+                    self.load_array(array_type, pointer, accumulated_offset, bb)?
+                }
+                Structure(struct_type) => {
+                    self.load_structure(struct_type, pointer, accumulated_offset, bb)?
+                }
+                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                    "Encountered a Load instruction attempting to load a value of type \
+                     {array_elem_type}, but this is not valid"
+                )))?,
+            });
+
+            // We always have to finish by incrementing the offset by the size of the thing
+            // we just loaded so that the next load proceeds correctly.
+            let increment_offset_by = array_elem_type.size_of();
+            accumulated_offset += increment_offset_by;
+        }
+
+        // In FLO, we do not have any first-class array type, so arrays are structures
+        // instead. To that end, we have to construct our structure.
+        let flo_type = ObjectContext::flo_type_of(&LLVMType::from(array_type))?;
+        let result_var = bb.simple_construct_into_new_variable(flo_type, component_variables);
+
+        Ok(result_var)
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [cmpxchg](https://llvm.org/docs/LangRef.html#i-cmpxchg) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `cmpxchg` instruction.
+    /// - If the provided instruction is missing an output name.
+    fn generate_cmpxchg(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        use llvm_sys::core::{LLVMGetCmpXchgFailureOrdering, LLVMGetCmpXchgSuccessOrdering};
+        assert_correct_opcode(&instruction, InstructionOpcode::AtomicCmpXchg);
+
+        // The atomic cmpxchg instruction has TWO orderings associated with it. One is
+        // for success, and one is for failure. We will put barriers in place for BOTH
+        // as we care about reordering guarantees and not atomicity guarantees.
+        //
+        // Using both of these getters is safe as the above assert has already
+        // guaranteed that this is a cmpxchg instruction, which is the safety condition
+        // for calling these getters.
+        let success_ordering = util::llvm_ordering_to_memory_ordering(unsafe {
+            LLVMGetCmpXchgSuccessOrdering(instruction.as_value_ref())
+        })
+        .ok_or(Error::malformed_llvm(
+            "AtomicCmpXchg instruction is required to have a success memory ordering but none was \
+             present",
+        ))?;
+        let failure_ordering = util::llvm_ordering_to_memory_ordering(unsafe {
+            LLVMGetCmpXchgFailureOrdering(instruction.as_value_ref())
+        })
+        .ok_or(Error::malformed_llvm(
+            "AtomicCmpXchg instruction is required to have a failure memory ordering but none was \
+             present",
+        ))?;
+
+        // We then need to get the operands to the instruction, which should have three.
+        // The first is a pointer to a value of some type T, the second and third are
+        // both values of type T. The pointer is loaded and compared to the first value
+        // of type T. If the values are the same, the second value of type T is written
+        // to the pointer.
+        let &[pointer, compare_to, replace_with] = instruction
+            .get_operands()
+            .map(|operand| util::extract_value_operand(operand, InstructionOpcode::AtomicCmpXchg))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 3))?
+        };
+        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let pointer_typ = LLVMType::try_from(pointer.get_type())?;
+        let compare_to_id = util::get_var_or_const(&compare_to, bb, func_ctx)?;
+        let compare_to_typ = LLVMType::try_from(compare_to.get_type())?;
+        let replace_with_id = util::get_var_or_const(&replace_with, bb, func_ctx)?;
+        let replace_with_typ = LLVMType::try_from(replace_with.get_type())?;
+
+        // We then need a place to put the result, which is typed as `{T, i1}`.
+        let target_type_llvm =
+            LLVMType::make_struct(false, &[compare_to_typ.clone(), LLVMType::bool]);
+        let target_type_flo = ObjectContext::flo_type_of(&target_type_llvm)?;
+        let result_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        let target_var = bb.add_variable(target_type_flo.clone());
+        func_ctx.register_local(target_var, result_name, target_type_flo);
+
+        // Finally, we need to get the name of the specific polyfill to call.
+        let polyfill_name = self.polyfills.try_get_polyfill(
+            "cmpxchg",
+            &[pointer_typ, compare_to_typ, replace_with_typ],
+            &target_type_llvm,
+        )?;
+
+        // We start by adding the fences before.
+        bb.add_fence(success_ordering);
+        bb.add_fence(failure_ordering);
+
+        // We can now issue the call.
+        bb.simple_call_builtin(
+            polyfill_name,
+            vec![pointer_id, compare_to_id, replace_with_id],
+            vec![target_var],
+        );
+
+        // And add the fences afterward.
+        bb.add_fence(success_ordering);
+        bb.add_fence(failure_ordering);
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [atomicrmw](https://llvm.org/docs/LangRef.html#atomicrmw-instruction) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `atomicrmw` instruction.
+    /// - If the provided instruction is missing an output name.
+    fn generate_atomicrmw(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        use llvm_sys::{core::LLVMGetAtomicRMWBinOp, LLVMAtomicRMWBinOp};
+        assert_correct_opcode(&instruction, InstructionOpcode::AtomicRMW);
+
+        // We need to start by finding out which of the possible operations this is.
+        let atomic_op = match unsafe { LLVMGetAtomicRMWBinOp(instruction.as_value_ref()) } {
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXchg => "xchg",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpAdd => "add",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpSub => "sub",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpAnd => "and",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpNand => "nand",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpOr => "or",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXor => "xor",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMax => "max",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMin => "min",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMax => "umax",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMin => "umin",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFAdd => "fadd",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFSub => "fsub",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFMax => "fmax",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFMin => "fmin",
+        };
+        let name_header = format!("atomicrmw_{atomic_op}");
+
+        // We then have to pull out the operands, which should be a pointer and some
+        // other type.
+        let &[pointer_op, numeric_op] = instruction
+            .get_operands()
+            .map(|operand| util::extract_value_operand(operand, InstructionOpcode::AtomicRMW))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 2))?
+        };
+        let pointer_op_id = util::get_var_or_const(&pointer_op, bb, func_ctx)?;
+        let pointer_op_type = LLVMType::try_from(pointer_op.get_type())?;
+        let numeric_op_id = util::get_var_or_const(&numeric_op, bb, func_ctx)?;
+        let numeric_op_type = LLVMType::try_from(numeric_op.get_type())?;
+
+        // We then need a variable into which we return the result.
+        let return_type_llvm = numeric_op_type.clone();
+        let return_type_flo = ObjectContext::flo_type_of(&return_type_llvm)?;
+        let return_var = bb.add_variable(return_type_flo.clone());
+        let return_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        func_ctx.register_local(return_var, return_name, return_type_flo);
+
+        // The last thing we need is the concrete name of the specific polyfill
+        // implementation to use.
+        let polyfill_name = self.polyfills.try_get_polyfill(
+            &name_header,
+            &[pointer_op_type, numeric_op_type],
+            &return_type_llvm,
+        )?;
+
+        // As we have machine-level atomicity but FLO does not know to treat atomicrmw
+        // specially, we need to insert fences around this instruction.
+        let ordering = util::get_memory_ordering(&instruction)?;
+        bb.add_fence(ordering);
+
+        // Finally, we can generate the call to the appropriate polyfill.
+        bb.simple_call_builtin(
+            polyfill_name,
+            vec![pointer_op_id, numeric_op_id],
+            vec![return_var],
+        );
+
+        // And we have to fence after it as well.
+        bb.add_fence(ordering);
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [select](https://llvm.org/docs/LangRef.html#select-instruction) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `select` instruction.
+    /// - If the provided instruction is missing an output name.
+    #[allow(clippy::unused_self)] // For uniformity with the other `generate_*` methods
+    fn generate_select(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::Select);
+
+        // Select should have three operands.
+        let &[condition, if_true, if_false] = instruction
+            .get_operands()
+            .map(|operand| util::extract_value_operand(operand, InstructionOpcode::Select))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 3))?
+        };
+        let condition_id = util::get_var_or_const(&condition, bb, func_ctx)?;
+        let if_true_id = util::get_var_or_const(&if_true, bb, func_ctx)?;
+        let if_false_id = util::get_var_or_const(&if_false, bb, func_ctx)?;
+        let return_typ = bb.context.variables.get(if_true_id).typ.clone();
+
+        // We also need a return value, which has a type matching that of the `if_true`
+        // and `if_false` branches.
+        let return_id = bb.add_variable(return_typ.clone());
+        func_ctx.register_local(
+            return_id,
+            instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?,
+            return_typ.clone(),
+        );
+
+        // Unfortunately we cannot have branching anywhere but the end of a block, so to
+        // do this inline we need to generate a function. To do this, we need a
+        // signature, and that requires fresh variables inside it.
+        let inner_condition_id = bb.add_variable(Type::Bool);
+        let inner_if_true_id = bb.add_variable(return_typ.clone());
+        let inner_if_false_id = bb.add_variable(return_typ.clone());
+        let inner_return_id = bb.add_variable(return_typ);
+        let signature = Signature {
+            params:   vec![inner_condition_id, inner_if_true_id, inner_if_false_id],
+            returns:  vec![inner_return_id],
+            location: None,
+        };
+
+        // We can branch, but only to blocks, so we also need blocks for each arm.
+        let if_true_block = bb.context.add_block(|bb| -> Result<()> {
+            bb.end_with_return(vec![inner_if_true_id]);
+
+            Ok(())
+        })?;
+        let if_false_block = bb.context.add_block(|bb| -> Result<()> {
+            bb.end_with_return(vec![inner_if_false_id]);
+
+            Ok(())
+        })?;
+
+        // Unfortunately, we cannot branch without a block end, so we have to create
+        // another function within this function.
+        let select_block = bb.context.add_function(&signature, |bb| -> Result<()> {
+            bb.end_with_if(inner_condition_id, if_true_block, if_false_block, None);
+
+            Ok(())
+        })?;
+
+        // Finally, we have to call the implementing function.
+        bb.simple_call_local(
+            select_block,
+            vec![condition_id, if_true_id, if_false_id],
+            vec![return_id],
+        );
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [bitcast](https://llvm.org/docs/LangRef.html#i-bitcast) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `bitcast` instruction.
+    #[allow(clippy::unused_self)] // For uniformity with the other generate_* methods
+    fn generate_bitcast(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::BitCast);
+
+        // The most important part of generating a bitcast is knowing the target type,
+        // which we get from the instruction itself.
+        let target_type = instruction.get_type();
+        let target_type_llvm = LLVMType::try_from(target_type)?;
+        let target_type_flo = ObjectContext::flo_type_of(&target_type_llvm)?;
+
+        // We also need the operand that is the source variable.
+        let &[source_var] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::BitCast))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 1))?
+        };
+        let source_var_id = util::get_var_or_const(&source_var, bb, func_ctx)?;
+
+        // From here, we emit a transmute statement into the block, and register that
+        // variable in the function context.
+        let result_var =
+            bb.simple_reinterpret_bits_into_new_variable(source_var_id, target_type_flo.clone());
+        func_ctx.register_local(
+            result_var,
+            instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?,
+            target_type_flo,
+        );
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [icmp](https://llvm.org/docs/LangRef.html#icmp-instruction) or
+    /// [fcmp](https://llvm.org/docs/LangRef.html#fcmp-instruction) instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a valid `icmp` or `fcmp`
+    ///   instruction.
+    fn generate_comparison(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        let opcode = instruction.get_opcode();
+        let op_name = match opcode {
+            InstructionOpcode::FCmp => {
+                let header = "fcmp";
+                let fcmp_predicate = instruction.get_fcmp_predicate().ok_or(
+                    Error::malformed_llvm("FCmp instruction was missing its predicate"),
+                )?;
+                let pred_string = match fcmp_predicate {
+                    FloatPredicate::OEQ => "oeq",
+                    FloatPredicate::OGE => "oge",
+                    FloatPredicate::OGT => "ogt",
+                    FloatPredicate::OLE => "ole",
+                    FloatPredicate::OLT => "olt",
+                    FloatPredicate::ONE => "one",
+                    FloatPredicate::ORD => "ord",
+                    FloatPredicate::PredicateFalse => "false",
+                    FloatPredicate::PredicateTrue => "true",
+                    FloatPredicate::UEQ => "ueq",
+                    FloatPredicate::UGE => "uge",
+                    FloatPredicate::UGT => "ugt",
+                    FloatPredicate::ULE => "ule",
+                    FloatPredicate::ULT => "ult",
+                    FloatPredicate::UNE => "une",
+                    FloatPredicate::UNO => "uno",
+                };
+                format!("{header}_{pred_string}")
+            }
+            InstructionOpcode::ICmp => {
+                let header = "icmp";
+                let icmp_predicate = instruction.get_icmp_predicate().ok_or(
+                    Error::malformed_llvm("ICmp instruction was missing its predicate"),
+                )?;
+                let pred_string = match icmp_predicate {
+                    IntPredicate::EQ => "eq",
+                    IntPredicate::NE => "ne",
+                    IntPredicate::UGT => "ugt",
+                    IntPredicate::UGE => "uge",
+                    IntPredicate::ULT => "ult",
+                    IntPredicate::ULE => "ule",
+                    IntPredicate::SGT => "sgt",
+                    IntPredicate::SGE => "sge",
+                    IntPredicate::SLT => "slt",
+                    IntPredicate::SLE => "sle",
+                };
+                format!("{header}_{pred_string}")
+            }
+            _ => Err(Error::MalformedLLVM(format!(
+                "FCmp or ICmp instruction expected but found {opcode:?} instead"
+            )))?,
+        };
+
+        // Both icmp and fcmp take two operands of the same type, which we need to grab
+        // to pass them.
+        let operands = instruction
+            .get_operands()
+            .map(|op| {
+                let bv = util::extract_value_operand(op, instruction.get_opcode())?;
+                let id = util::get_var_or_const(&bv, bb, func_ctx)?;
+                let typ = LLVMType::try_from(bv.get_type())?;
+
+                Ok((id, typ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if operands.len() != 2 {
+            Err(operand_count_error(&instruction, 2))?;
+        }
+
+        // We also need the return variable.
+        let ret_var_type = LLVMType::try_from(instruction.get_type())?;
+        let ret_var = bb.add_variable(ObjectContext::flo_type_of(&ret_var_type)?);
+        func_ctx.register_local(
+            ret_var,
+            instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?,
+            ObjectContext::flo_type_of(&ret_var_type)?,
+        );
+
+        // At this point, all we need is the polyfill name.
+        let op_name = self.polyfills.try_get_polyfill(
+            &op_name,
+            &[operands[0].1.clone(), operands[1].1.clone()],
+            &ret_var_type,
+        )?;
+
+        // Finally, we can generate the call.
+        bb.simple_call_builtin(op_name, vec![operands[0].0, operands[1].0], vec![ret_var]);
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
     /// [phi](https://llvm.org/docs/LangRef.html#phi-instruction) instruction.
     ///
     /// # Errors
@@ -571,10 +2055,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Phi),
-            "The argument to generate_fence was not a fence instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Phi);
 
         // To get information about the Phi we need to convert it into a phi instruction
         // type, which we know is safe because we have already checked that the
@@ -598,7 +2079,7 @@ impl ObjectGenerator {
             // We start by resolving the incoming value to an identifier, handling both
             // constants and variables.
             incoming_value_names.push(value.get_name().to_str()?.to_string());
-            incoming_value_ids.push(get_var_or_const(&value, bb, func_ctx)?);
+            incoming_value_ids.push(util::get_var_or_const(&value, bb, func_ctx)?);
             incoming_value_types.push(LLVMType::try_from(value.get_type())?);
 
             // We then need to check that we know of the block, and its identifier.
@@ -641,10 +2122,10 @@ impl ObjectGenerator {
             let gen_comparison_call = |param: &VariableId| -> Result<VariableId> {
                 let parameters = vec![*param, *compare_param];
                 let ret_var = bb.add_variable(Type::Bool);
-                let call_name = self.polyfills.try_polyfill(
+                let call_name = self.polyfills.try_get_polyfill(
                     "icmp_eq",
                     &[LLVMType::i128, LLVMType::i128],
-                    Some(&LLVMType::bool),
+                    &LLVMType::bool,
                 )?;
 
                 bb.call_builtin(call_name, parameters, vec![ret_var], Vec::new(), None);
@@ -703,10 +2184,7 @@ impl ObjectGenerator {
 
         // We also need an output variable for the phi, that corresponds to the output
         // variable for the original phi instruction.
-        let phi_output_var_name = instruction
-            .get_name()
-            .expect("Instruction should be named but wasn't")
-            .to_str()?;
+        let phi_output_var_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
         let phi_output_var = bb.add_variable(phi_result_type_flo.clone());
         func_ctx.register_local(phi_output_var, phi_output_var_name, phi_result_type_flo);
 
@@ -717,13 +2195,7 @@ impl ObjectGenerator {
 
         // With that, we can finally call our phi function, thereby completing the
         // compilation of the phi instruction in this block.
-        bb.call_local(
-            phi_func,
-            incoming_value_ids,
-            vec![phi_output_var],
-            Vec::new(),
-            None,
-        );
+        bb.simple_call_local(phi_func, incoming_value_ids, vec![phi_output_var]);
 
         Ok(())
     }
@@ -760,40 +2232,35 @@ impl ObjectGenerator {
             InstructionOpcode::Trunc => "trunc",
             InstructionOpcode::UIToFP => "uitofp",
             InstructionOpcode::ZExt => "zext",
-            _ => panic!(
-                "The argument to generate_conversion was {opcode:?} and not a conversion opcode",
-            ),
+            _ => Err(Error::MalformedLLVM(format!(
+                "Conversion instruction expcted but found {opcode:?} instead"
+            )))?,
         };
 
         // First, we need to find out the target type and allocate an output variable.
         let llvm_target_type = LLVMType::try_from(instruction.get_type())?;
         let flo_target_type = ObjectContext::flo_type_of(&llvm_target_type)?;
-        let output_name = instruction
-            .get_name()
-            .expect("An instruction was not named but should be")
-            .to_str()?;
+        let output_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
         let output_var = bb.add_variable(flo_target_type.clone());
         func_ctx.register_local(output_var, output_name, flo_target_type);
 
         // We then need to get the operand
         let &[source_op] = instruction
             .get_operands()
-            .map(|operand| extract_value_operand(operand, opcode))
+            .map(|operand| util::extract_value_operand(operand, opcode))
             .collect::<Result<Vec<_>>>()?
             .as_slice()
         else {
-            Err(Error::malformed_llvm(
-                "A conversion instruction had more than one operand",
-            ))?
+            Err(operand_count_error(&instruction, 1))?
         };
         let source_op_type = LLVMType::try_from(source_op.get_type())?;
-        let source_op_id = get_var_or_const(&source_op, bb, func_ctx)?;
+        let source_op_id = util::get_var_or_const(&source_op, bb, func_ctx)?;
 
         // We then need to get the name of the polyfill in question.
-        let poly_name = self.polyfills.try_polyfill(
+        let poly_name = self.polyfills.try_get_polyfill(
             conversion_name,
             &[source_op_type],
-            Some(&llvm_target_type),
+            &llvm_target_type,
         )?;
 
         // From here, we can generate the call
@@ -816,38 +2283,9 @@ impl ObjectGenerator {
     /// - If the provided instruction is _not_ a `fence`.
     #[allow(clippy::unused_self)] // For uniformity with the other generator functions
     fn generate_fence(&self, instruction: InstructionValue, bb: &mut BlockBuilder) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Fence),
-            "The argument to generate_fence was not a fence instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Fence);
 
-        // Unfortunately the LLVM C API does not support getting ordering constraints
-        // for anything other than loads and stores, so we are forced to parse the
-        // constraint out of the program text.
-        //
-        // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
-        // hence we are safe to convert it to the similarly non-owning str here for
-        // processing. When our `str` gets dropped, so does the `CStr` but the
-        // underlying allocation is left in the control of llvm-sys via Inkwell.
-        let value_as_c_string =
-            unsafe { CStr::from_ptr(LLVMPrintValueToString(instruction.as_value_ref())) };
-        let value_str = value_as_c_string.to_str()?;
-        let flo_ordering = if value_str.contains("acquire") {
-            MemoryOrdering::Acquire
-        } else if value_str.contains("release") {
-            MemoryOrdering::Release
-        } else if value_str.contains("acq_rel") {
-            MemoryOrdering::AcquireRelease
-        } else if value_str.contains("seq_cst") {
-            MemoryOrdering::SequentiallyConsistent
-        } else {
-            Err(Error::malformed_llvm(
-                "Fence instruction lacked a valid ordering",
-            ))?
-        };
-
-        // Then we can add the fence.
-        bb.add_fence(flo_ordering);
+        bb.add_fence(util::get_memory_ordering(&instruction)?);
 
         Ok(())
     }
@@ -897,20 +2335,20 @@ impl ObjectGenerator {
             InstructionOpcode::UDiv => "udiv",
             InstructionOpcode::URem => "urem",
             InstructionOpcode::Xor => "xor",
-            _ => panic!("{opcode:?} is not a valid binary operation for generate_binary_opcode"),
+            _ => Err(Error::MalformedLLVM(format!(
+                "Binary operation instruction expected but found {opcode:?} instead"
+            )))?,
         };
 
         // The next things that determine the call name are the types of the operands,
         // of which we should see two.
         let operands = instruction
             .get_operands()
-            .map(|operand| extract_value_operand(operand, opcode))
+            .map(|operand| util::extract_value_operand(operand, opcode))
             .collect::<Result<Vec<_>>>()?;
 
         if operands.len() != 2 {
-            Err(Error::MalformedLLVM(format!(
-                "Binary opcode {opcode:?} did not have two operands"
-            )))?;
+            Err(operand_count_error(&instruction, 2))?;
         }
 
         let operand_types = operands
@@ -924,17 +2362,17 @@ impl ObjectGenerator {
         // Given that, we can generate the name for the polyfill.
         let polyfill_name =
             self.polyfills
-                .try_polyfill(op_name, operand_types.as_slice(), Some(&return_type))?;
+                .try_get_polyfill(op_name, operand_types.as_slice(), &return_type)?;
 
         // Now we know what we are calling, we need to generate the actual call to the
         // polyfill. We start with the operands.
         let inputs = operands
             .iter()
-            .map(|operand| get_var_or_const(operand, bb, func_ctx))
+            .map(|operand| util::get_var_or_const(operand, bb, func_ctx))
             .collect::<Result<Vec<_>>>()?;
 
         // We then need to get the output variable for this opcode.
-        let outputs = make_opcode_output(&instruction, bb, func_ctx)?;
+        let outputs = util::make_opcode_output(&instruction, bb, func_ctx)?;
 
         // Finally we can generate the call itself into the block.
         bb.simple_call_builtin(polyfill_name, inputs, outputs);
@@ -961,18 +2399,18 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::FNeg),
-            "The argument to generate_fneg was not an fneg instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::FNeg);
 
         // We need our inputs and outputs for the polyfill.
-        let &[operand] = extract_value_operands(instruction)?.as_slice() else {
-            Err(Error::malformed_llvm(
-                "fneg opcode had more than one operand",
-            ))?
+        let &[operand] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::FNeg))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 1))?
         };
-        let input_id = get_var_or_const(&operand, bb, func_ctx)?;
+        let input_id = util::get_var_or_const(&operand, bb, func_ctx)?;
         let input_type = LLVMType::try_from(operand.get_type())?;
         let inputs = vec![input_id];
 
@@ -984,126 +2422,17 @@ impl ObjectGenerator {
         // We need to register the output variable in the function context.
         func_ctx.register_local(
             output,
-            instruction
-                .get_name()
-                .expect("Variable was not named but should have name by this point")
-                .to_str()?,
+            instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?,
             output_type_flo,
         );
 
         // We then need the _name_ of the polyfill.
         let polyfill_name =
             self.polyfills
-                .try_polyfill("fneg", &[input_type], Some(&output_type_llvm))?;
+                .try_get_polyfill("fneg", &[input_type], &output_type_llvm)?;
 
         // Finally, we can issue the call.
         bb.simple_call_builtin(polyfill_name, inputs, outputs);
-
-        Ok(())
-    }
-
-    /// Generates the FLO code that corresponds to an LLVM
-    /// [extractvalue](https://llvm.org/docs/LangRef.html#extractvalue-instruction)
-    /// instruction.
-    ///
-    /// # Errors
-    ///
-    /// - [`Error`] if the correct FLO representation of the instruction cannot
-    ///   be generated.
-    ///
-    /// # Panics
-    ///
-    /// - If the provided instruction is _not_ an `extractvalue`.
-    /// - If the `extractvalue` opcode had more than one non-index operand.
-    /// - If the `extractvalue` opcode did not have any indices.
-    /// - If any extraction index is out of bounds for the number of fields in
-    ///   the type being extracted from.
-    #[allow(clippy::unused_self)] // For consistency with the majority of generate_* methods
-    fn generate_extract_value(
-        &self,
-        instruction: InstructionValue,
-        bb: &mut BlockBuilder,
-        func_ctx: &mut FunctionContext,
-    ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::ExtractValue),
-            "The argument to generate_extract_value was not an extract value instruction"
-        );
-
-        // We start by grabbing the operand. Confusingly this looks like it has two, but
-        // only the value from which to extract (which must have a struct type) is an
-        // actual operand.
-        let &[operand] = extract_value_operands(instruction)?.as_slice() else {
-            Err(Error::malformed_llvm(
-                "The extractvalue instruction had more than one direct operand",
-            ))?
-        };
-        let input_struct = get_var_or_const(&operand, bb, func_ctx)?;
-
-        // We then get the indices from which to extract value(s), though we are
-        // currently not supporting more than one index.
-        let &[index] = get_indices(&instruction)
-            .expect("extractvalue did not have indices but must")
-            .as_slice()
-        else {
-            Err(Error::malformed_llvm(
-                "We do not currently support multiple indices",
-            ))?
-        };
-
-        // Destructuring in FLO is always complete, so we need a variable for every slot
-        // in the type.
-        let var_type = bb.context.variables.get(input_struct).typ;
-        let struct_types = match var_type {
-            Type::Struct(struct_type) => struct_type.members.clone(),
-            _ => Err(Error::malformed_llvm(
-                "Extractvalue called on non-struct type",
-            ))?,
-        };
-
-        let process_struct_ty = |(ix, ty): (usize, &Type)| -> Result<VariableId> {
-            // Using type annotation for `try_into` due to multiple implementations across
-            // different crates.
-            if ix == TryInto::<usize>::try_into(index).expect("Index exceeded bounds") {
-                // We only care about the one we are actually extracting so it gets registered
-                // with its name.
-                let out_var_name = instruction
-                    .get_name()
-                    .expect("Instruction should be named at this point")
-                    .to_str()?;
-                let out_var_id = bb.add_variable(ty.clone());
-                let expected_llvm_type = LLVMType::try_from(instruction.get_type())?;
-                let expected_flo_type = &ObjectContext::flo_type_of(&expected_llvm_type)?;
-                if expected_flo_type != ty {
-                    Err(Error::TypeMismatch(
-                        format!("{expected_flo_type:?}"),
-                        format!("{ty:?}"),
-                    ))?;
-                }
-                func_ctx.register_local(out_var_id, out_var_name, ty.clone());
-                Ok(out_var_id)
-            } else {
-                // In the other cases these are dead, so we never register them in the
-                // function's local scope.
-                let var = Variable {
-                    typ:         ty.clone(),
-                    linkage:     VariableLinkage::Unspecified,
-                    poison:      PoisonType::Unused,
-                    diagnostics: Vec::new(),
-                    location:    None,
-                };
-                Ok(bb.context.variables.insert(&var))
-            }
-        };
-
-        let out_vars = struct_types
-            .iter()
-            .enumerate()
-            .map(process_struct_ty)
-            .collect::<Result<Vec<_>>>()?;
-
-        // Now we can actually insert the destructure in question.
-        bb.simple_destructure(input_struct, out_vars);
 
         Ok(())
     }
@@ -1126,19 +2455,16 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Call),
-            "The argument to generate_call was not a call instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Call);
 
         // Let's start by grabbing the function being called, which is always the LAST
         // operand to the call instruction.
         let num_operands = instruction.get_num_operands();
-        let func_ptr_value = extract_value_operand(
+        let func_ptr_value = util::extract_value_operand(
             instruction.get_operand(num_operands - 1),
             InstructionOpcode::Call,
         )?;
-        let function_name = expect_func_name_from_bv(func_ptr_value);
+        let function_name = util::expect_func_name_from_bv(func_ptr_value);
 
         // There are certain unfortunate functions that need to be handled specially, so
         // we have to check if this is one of these, and drop it entirely if so.
@@ -1156,7 +2482,7 @@ impl ObjectGenerator {
             .unwrap_or_default();
         let value_operands = args
             .into_iter()
-            .map(|a| extract_value_operand(a, instruction.get_opcode()))
+            .map(|a| util::extract_value_operand(a, instruction.get_opcode()))
             .collect::<Result<Vec<_>>>()?;
         let operand_types = value_operands
             .iter()
@@ -1171,7 +2497,7 @@ impl ObjectGenerator {
             BlockRef::Local(*id)
         } else if let Some(polyfill_name) =
             self.polyfills
-                .polyfill(&function_name, &operand_types, Some(&return_type))
+                .get_polyfill(&function_name, &operand_types, &return_type)
         {
             BlockRef::Builtin(polyfill_name.to_string())
         } else {
@@ -1183,12 +2509,12 @@ impl ObjectGenerator {
         // operand, it is the one we want to ignore.
         let inputs = value_operands
             .into_iter()
-            .map(|op| get_var_or_const(&op, bb, func_ctx))
+            .map(|op| util::get_var_or_const(&op, bb, func_ctx))
             .collect::<Result<Vec<_>>>()?;
 
         // We also the need to handle providing the return value, if one exists, using
         // the type and whether the instruction has a name telling us.
-        let outputs = make_opcode_output(&instruction, bb, func_ctx)?;
+        let outputs = util::make_opcode_output(&instruction, bb, func_ctx)?;
 
         // We have no diagnostics or locations for now.
         let diagnostics = Vec::default();
@@ -1196,65 +2522,6 @@ impl ObjectGenerator {
 
         // Finally, we can build the call itself.
         bb.call(&function_ref, inputs, outputs, diagnostics, location);
-
-        Ok(())
-    }
-
-    /// Generates the FLO code that corresponds to an LLVM
-    /// [store](https://llvm.org/docs/LangRef.html#store-instruction)
-    /// instruction.
-    ///
-    /// # Errors
-    ///
-    /// - [`Error`] if the correct FLO representation of the instruction cannot
-    ///   be generated.
-    ///
-    /// # Panics
-    ///
-    /// - If the provided instruction is _not_ a `store`.
-    /// - If any name is used before being defined.
-    pub fn generate_store(
-        &self,
-        instruction: InstructionValue,
-        bb: &mut BlockBuilder,
-        func_ctx: &mut FunctionContext,
-    ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Store),
-            "The argument to generate_store was not a store instruction"
-        );
-
-        // We start by grabbing the operands, and checking that they are already
-        // defined and have the expected types.
-        let value_operands = extract_value_operands(instruction)?;
-        let operands = value_operands
-            .into_iter()
-            .map(|operand| {
-                let typ = LLVMType::try_from(operand.get_type())?;
-                let flo_type = ObjectContext::flo_type_of(&typ)?;
-                let var_id = get_var_or_const(&operand, bb, func_ctx)?;
-                let var_def = bb.context.variables.get(var_id);
-                if flo_type != var_def.typ {
-                    Err(Error::TypeMismatch(
-                        format!("{flo_type:?}"),
-                        format!("{v_ty:?}", v_ty = var_def.typ),
-                    ))?;
-                }
-
-                Ok(var_id)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        // Let's get the name of the corresponding builtin and prepare our arguments
-        let name = self.polyfills.try_polyfill(
-            "store",
-            &[LLVMType::i64, LLVMType::ptr],
-            Some(&LLVMType::void),
-        )?;
-        let returns = vec![];
-
-        // Finally we can generate the operation into the block.
-        bb.simple_call_builtin(name, operands, returns);
 
         Ok(())
     }
@@ -1282,44 +2549,37 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Alloca),
-            "The argument to generate_alloca was not an alloca instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Alloca);
 
-        // We need the data layout to properly calculate the size of the allocation.
-        let data_layout = &self
-            .pass_data
-            .get::<BuildModuleMap>()
-            .expect("Module mapping pass data was not available where it must be")
-            .data_layout;
-
-        // We can then grab the allocated type and its size.
-        let allocated_type = LLVMType::try_from(
-            instruction
-                .get_allocated_type()
-                .expect("Instruction known to be `alloca` had no allocated type"),
-        )?;
-        let type_size = allocated_type.size_of(data_layout);
+        // We can then grab the allocated type and its size in felts.
+        let allocated_type =
+            LLVMType::try_from(instruction.get_allocated_type().map_err(|_| {
+                Error::malformed_llvm(
+                    "Alloca instruction encountered without a specified type to allocate",
+                )
+            })?)?;
+        let type_size = allocated_type.size_of();
 
         // We also need to know the allocation count, which inkwell always fills in with
         // the default of 1 for us if not otherwise specified.
-        let &[raw_alloc_count] = extract_value_operands(instruction)?.as_slice() else {
-            Err(Error::invalid_opcode_operand(
-                instruction.get_opcode(),
-                "The count operand was missing",
-            ))?
+        let &[raw_alloc_count] = instruction
+            .get_operands()
+            .map(|op| util::extract_value_operand(op, InstructionOpcode::Alloca))
+            .collect::<Result<Vec<_>>>()?
+            .as_slice()
+        else {
+            Err(operand_count_error(&instruction, 1))?
         };
 
         // If this is not an integer then the previous stages should have caught
         // malformed IR.
-        let alloc_count = expect_int_from_bv(raw_alloc_count);
+        let alloc_count = util::expect_int_from_bv(raw_alloc_count);
 
         // We need a block reference, which here is guaranteed to be to a polyfill.
-        let call_ref = self.polyfills.try_polyfill(
+        let call_ref = self.polyfills.try_get_polyfill(
             "alloca",
             &[LLVMType::i64, LLVMType::i64],
-            Some(&LLVMType::ptr),
+            &LLVMType::ptr,
         )?;
 
         // We also need arguments and returns with their types.
@@ -1365,7 +2625,7 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is not a terminator instruction (see
-    ///   [`is_terminator_instruction`] for more information).
+    ///   [`util::is_terminator_instruction`] for more information).
     pub fn generate_block_exit(
         &self,
         instruction: InstructionValue,
@@ -1379,8 +2639,8 @@ impl ObjectGenerator {
         // handle as a block exit. If it isn't we just need to bail.
         let opcode = instruction.get_opcode();
         assert!(
-            is_terminator_instruction(opcode),
-            "Terminator instruction expected but {opcode:?} found"
+            util::is_terminator_instruction(opcode),
+            "Expected a terminator instruction, but found {opcode:?} instead",
         );
 
         // Then we need to correctly process the opcode into the correct block exit.
@@ -1417,10 +2677,7 @@ impl ObjectGenerator {
         instruction: InstructionValue,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Unreachable),
-            "The argument to generate_unreachable was not an unreachable instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Unreachable);
 
         bb.set_exit(&BlockExit::Panic(
             "Unreachable code was reachable".to_string(),
@@ -1448,10 +2705,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Return),
-            "The argument to generate_ret was not a ret instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Return);
 
         // This instruction takes two forms. The first takes one operand, which is the
         // value to return, while the other takes no operands, and just causes control
@@ -1464,15 +2718,15 @@ impl ObjectGenerator {
             }
             1 => {
                 // When there is one operand, we are returning a specific value back.
-                let value = extract_value_operand(operands[0], InstructionOpcode::Return)?;
+                let value = util::extract_value_operand(operands[0], InstructionOpcode::Return)?;
                 let value_type = LLVMType::try_from(value.get_type())?;
                 let expected_return_type = &func_ctx.typ().return_type;
                 assert_eq!(expected_return_type.as_ref(), &value_type);
 
-                vec![get_var_or_const(&value, bb, func_ctx)?]
+                vec![util::get_var_or_const(&value, bb, func_ctx)?]
             }
             _ => Err(Error::malformed_llvm(&format!(
-                "ret instruction encountered with {len} operands where only 0 or 1 are supported",
+                "Ret instruction had {len} operands where 0 or 1 were expected",
                 len = operands.len()
             )))?,
         };
@@ -1502,10 +2756,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        assert!(
-            matches!(instruction.get_opcode(), InstructionOpcode::Br),
-            "The argument to generate_br was not a br instruction"
-        );
+        assert_correct_opcode(&instruction, InstructionOpcode::Br);
 
         // First we have to grab the operands to the instruction. There are two forms of
         // the branch instruction which can be distinguished by the type of the first
@@ -1517,7 +2768,7 @@ impl ObjectGenerator {
         let generate_unconditional_br =
             |bb: &mut BlockBuilder, func_ctx: &mut FunctionContext| -> Result<()> {
                 // In this case, we have to generate the UNCONDITIONAL branch.
-                let target_block = extract_block_operand(operands[0], InstructionOpcode::Br)?;
+                let target_block = util::extract_block_operand(operands[0], InstructionOpcode::Br)?;
                 let target_name = target_block.get_name().to_str()?;
                 let block_id = func_ctx.try_lookup_block(target_name)?;
                 bb.end_with_goto(block_id);
@@ -1528,16 +2779,18 @@ impl ObjectGenerator {
         let generate_conditional_br =
             |bb: &mut BlockBuilder, func_ctx: &mut FunctionContext| -> Result<()> {
                 // In this case we have to generate the CONDITIONAL branch.
-                let condition = extract_value_operand(operands[0], InstructionOpcode::Br)?;
-                let true_block = extract_block_operand(operands[1], InstructionOpcode::Br)?;
-                let false_block = extract_block_operand(operands[2], InstructionOpcode::Br)?;
+                let condition = util::extract_value_operand(operands[0], InstructionOpcode::Br)?;
+                let true_block = util::extract_block_operand(operands[1], InstructionOpcode::Br)?;
+                let false_block = util::extract_block_operand(operands[2], InstructionOpcode::Br)?;
 
                 // The condition must be an already-extant variable.
-                let cond_id = get_var_or_const(&condition, bb, func_ctx)?;
-                if !matches!(bb.context.variables.get(cond_id).typ, Type::Bool) {
-                    Err(Error::malformed_llvm(
-                        "The condition to br was not a boolean",
-                    ))?;
+                let cond_id = util::get_var_or_const(&condition, bb, func_ctx)?;
+                let cond_typ = bb.context.variables.get(cond_id).typ;
+                if !matches!(&cond_typ, Type::Bool) {
+                    Err(Error::MalformedLLVM(format!(
+                        "Br instruction was encountered with a condition of type {cond_typ:?} but \
+                         a bool was expected"
+                    )))?;
                 }
 
                 // We should also know about each of the blocks that are targets.
@@ -1556,9 +2809,9 @@ impl ObjectGenerator {
             1 => generate_unconditional_br(bb, func_ctx),
             3 => generate_conditional_br(bb, func_ctx),
             _ => Err(Error::malformed_llvm(&format!(
-                "br instruction encountered with {len} operands where only 1 or 3 are supported",
+                "Br instruction had {len} operands where 1 or 3 were expected",
                 len = operands.len()
-            ))),
+            )))?,
         }
     }
 }

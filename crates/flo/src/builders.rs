@@ -23,6 +23,7 @@ use crate::{
         MatchArmId,
         MemoryOrdering,
         PoisonType,
+        ReinterpretBitsStatement,
         Signature,
         SnapStatement,
         Statement,
@@ -788,6 +789,79 @@ impl<'a> BlockBuilder<'a> {
     /// - If any of the included IDs don't exist in the FLO context
     pub fn simple_desnap_into_new_variable(&mut self, snap: VariableId) -> VariableId {
         self.desnap_into_new_variable(snap, vec![], None)
+    }
+
+    /// Adds a statement that reinterprets the bits of the type `T1` of one
+    /// variable into a new type `T2` in another variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_var` - The SSA variable of type `T1` to be transmuted.
+    /// * `target_var` - The SSA variable of type `T2` to have the transmuted
+    ///   data 'written' to.
+    pub fn reinterpret_bits(
+        &mut self,
+        source_var: VariableId,
+        target_var: VariableId,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> StatementId {
+        let stmt = ReinterpretBitsStatement {
+            source_var,
+            target_var,
+            diagnostics,
+            location,
+        };
+
+        self.add_statement(&Statement::ReinterpretBits(stmt))
+    }
+
+    /// Adds a statement that reinterprets the bits of the type `T1` of one
+    /// variable into a new type `T2` and binds it to a new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_var` - The SSA variable of type `T1` to be transmuted.
+    pub fn reinterpret_bits_into_new_variable(
+        &mut self,
+        source_var: VariableId,
+        target_type: Type,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        let target_var = self.add_variable(target_type);
+        self.reinterpret_bits(source_var, target_var, diagnostics, location);
+        target_var
+    }
+
+    /// Adds a statement that reinterprets the bits of the type `T1` of one
+    /// variable into a new type `T2` in another variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_var` - The SSA variable of type `T1` to be transmuted.
+    /// * `target_var` - The SSA variable of type `T2` to have the transmuted
+    ///   data 'written' to.
+    pub fn simple_reinterpret_bits(
+        &mut self,
+        source_var: VariableId,
+        target_var: VariableId,
+    ) -> StatementId {
+        self.reinterpret_bits(source_var, target_var, vec![], None)
+    }
+
+    /// Adds a statement that reinterprets the bits of the type `T1` of one
+    /// variable into a new type `T2` and binds it to a new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_var` - The SSA variable of type `T1` to be transmuted.
+    pub fn simple_reinterpret_bits_into_new_variable(
+        &mut self,
+        source_var: VariableId,
+        target_type: Type,
+    ) -> VariableId {
+        self.reinterpret_bits_into_new_variable(source_var, target_type, vec![], None)
     }
 }
 

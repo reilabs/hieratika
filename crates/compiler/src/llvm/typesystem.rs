@@ -22,8 +22,6 @@ use inkwell::{
 };
 use itertools::Itertools;
 
-use crate::llvm::data_layout::DataLayout;
-
 /// A representation of the LLVM [types](https://llvm.org/docs/LangRef.html#type-system)
 /// for use within the compiler.
 ///
@@ -211,53 +209,25 @@ impl LLVMType {
         self.as_function().expect("`self` value was not Self::Function")
     }
 
-    /// Gets the size of `self` in bits under the provided data layout.
+    /// Gets the size of `self` in felts.
     #[must_use]
-    pub fn size_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        #[allow(clippy::match_same_arms)] // The similarity is incidental
+    pub fn size_of(&self) -> usize {
+        #[allow(clippy::enum_glob_use)] // We do actually use them all here.
+        use LLVMType::*;
         match self {
-            LLVMType::bool => layout.expect_int_spec_of(1).size,
-            LLVMType::i8 => layout.expect_int_spec_of(8).size,
-            LLVMType::i16 => layout.expect_int_spec_of(16).size,
-            LLVMType::i32 => layout.expect_int_spec_of(32).size,
-            LLVMType::i64 => layout.expect_int_spec_of(64).size,
-            LLVMType::i128 => layout.expect_int_spec_of(128).size,
-            LLVMType::f16 => layout.expect_float_spec_of(16).size,
-            LLVMType::f32 => layout.expect_float_spec_of(32).size,
-            LLVMType::f64 => layout.expect_float_spec_of(64).size,
-            LLVMType::ptr => layout.default_pointer_layout().size,
-            LLVMType::void => 0,
-            LLVMType::Array(array_ty) => array_ty.size_of(layout),
-            LLVMType::Structure(struct_ty) => struct_ty.size_of(layout),
-            LLVMType::Function(func_ty) => func_ty.size_of(layout),
-            LLVMType::Metadata => 0,
+            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,
+            void | Metadata => 0,
+            Array(array_ty) => array_ty.size_of(),
+            Structure(struct_ty) => struct_ty.size_of(),
+            Function(func_ty) => func_ty.size_of(),
         }
     }
 
-    /// Gets the ABI alignment of `self` in bits under the provided data
-    /// layout.
+    /// Gets the ABI alignment of `self` in felts.
     #[must_use]
-    pub fn align_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        #[allow(clippy::match_same_arms)] // The similarity is incidental
-        match self {
-            LLVMType::bool => layout.expect_int_spec_of(1).abi_alignment,
-            LLVMType::i8 => layout.expect_int_spec_of(8).abi_alignment,
-            LLVMType::i16 => layout.expect_int_spec_of(16).abi_alignment,
-            LLVMType::i32 => layout.expect_int_spec_of(32).abi_alignment,
-            LLVMType::i64 => layout.expect_int_spec_of(64).abi_alignment,
-            LLVMType::i128 => layout.expect_int_spec_of(128).abi_alignment,
-            LLVMType::f16 => layout.expect_float_spec_of(16).abi_alignment,
-            LLVMType::f32 => layout.expect_float_spec_of(32).abi_alignment,
-            LLVMType::f64 => layout.expect_float_spec_of(64).abi_alignment,
-            LLVMType::ptr => layout.default_pointer_layout().abi_alignment,
-            LLVMType::void => 0,
-            LLVMType::Array(array_ty) => array_ty.align_of(layout),
-            LLVMType::Structure(struct_ty) => struct_ty.align_of(layout),
-            LLVMType::Function(func_ty) => func_ty.align_of(layout),
-            LLVMType::Metadata => 0,
-        }
+    pub fn align_of(&self) -> usize {
+        // At the moment we align everything to the nearest felt boundary.
+        1
     }
 }
 
@@ -569,32 +539,28 @@ impl LLVMArray {
         Self { count, typ }
     }
 
-    /// Gets the size of `self` in bits under the provided data layout.
+    /// Gets the size of `self` in felts.
     #[must_use]
-    pub fn size_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        let size_of_elem = self.typ.size_of(layout);
-        let align_of_elem = self.typ.align_of(layout);
-        let total_size_per_elem = if size_of_elem > align_of_elem {
-            align_of_elem * (1 + align_of_elem / size_of_elem)
-        } else {
-            align_of_elem
-        };
-
-        total_size_per_elem * self.count
+    pub fn size_of(&self) -> usize {
+        self.typ.size_of() * self.count
     }
 
-    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    /// Gets the ABI alignment of `self` in felts.
     #[must_use]
-    pub fn align_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        layout.aggregate_layout.abi_alignment
+    pub fn align_of(&self) -> usize {
+        1
     }
 }
 
 impl From<LLVMArray> for LLVMType {
     fn from(value: LLVMArray) -> Self {
-        LLVMType::Array(value)
+        LLVMType::from(&value)
+    }
+}
+
+impl From<&LLVMArray> for LLVMType {
+    fn from(value: &LLVMArray) -> Self {
+        LLVMType::Array(value.clone())
     }
 }
 
@@ -660,39 +626,28 @@ impl LLVMStruct {
         Self { packed, elements }
     }
 
-    /// Gets the size of `self` in bits under the provided data layout.
+    /// Gets the size of `self` in felts.
     #[must_use]
-    pub fn size_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        self.elements
-            .iter()
-            .map(|element| {
-                if self.packed {
-                    element.size_of(layout)
-                } else {
-                    let size_of_element = element.size_of(layout);
-                    let align_of_element = element.size_of(layout);
-                    if size_of_element > align_of_element {
-                        align_of_element * (1 + align_of_element / size_of_element)
-                    } else {
-                        align_of_element
-                    }
-                }
-            })
-            .sum()
+    pub fn size_of(&self) -> usize {
+        self.elements.iter().map(LLVMType::size_of).sum()
     }
 
-    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    /// Gets the ABI alignment of `self` in felts.
     #[must_use]
-    pub fn align_of(&self, layout: &DataLayout) -> usize {
-        // TODO (#29) Make this comply with the design for the memory model.
-        layout.aggregate_layout.abi_alignment
+    pub fn align_of(&self) -> usize {
+        1
     }
 }
 
 impl From<LLVMStruct> for LLVMType {
     fn from(value: LLVMStruct) -> Self {
-        LLVMType::Structure(value)
+        LLVMType::from(&value)
+    }
+}
+
+impl From<&LLVMStruct> for LLVMType {
+    fn from(value: &LLVMStruct) -> Self {
+        LLVMType::Structure(value.clone())
     }
 }
 
@@ -759,20 +714,21 @@ impl LLVMFunction {
         }
     }
 
-    /// Gets the size of `self` in bits under the provided data layout.
+    /// Gets the size of `self` in felts.
     ///
     /// This is given by the size of the function's return type.
     #[must_use]
-    pub fn size_of(&self, layout: &DataLayout) -> usize {
-        self.return_type.size_of(layout)
+    pub fn size_of(&self) -> usize {
+        self.return_type.size_of()
     }
 
-    /// Gets the ABI alignment of `self` in bits under the provided data layout.
+    /// Gets the ABI alignment of `self` in felts under the provided data
+    /// layout.
     ///
     /// This is given by the ABI alignment of the function's return type.
     #[must_use]
-    pub fn align_of(&self, layout: &DataLayout) -> usize {
-        self.return_type.align_of(layout)
+    pub fn align_of(&self) -> usize {
+        self.return_type.align_of()
     }
 }
 
