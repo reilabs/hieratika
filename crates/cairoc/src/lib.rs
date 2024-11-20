@@ -122,7 +122,7 @@ fn get_flat_lowered_function(
 /// - [`Error::ProjectNotCreated`] if the filename isn't a valid Cairo file or
 ///   project.
 /// - [`Error::DiagnosticsError`] if any Cairo file fails to compile.
-pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatabase)> {
+pub fn generate_flat_lowered(filename: &Path) -> Result<CairoFlatLowered> {
     let mut db = build_db();
     let crate_ids = setup_project(&mut db, filename)?;
     for crate_id in crate_ids.iter() {
@@ -144,7 +144,10 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatab
     if errors_found {
         return Err(Error::DiagnosticsError.into());
     }
-    Ok((lowered_functions, db))
+    Ok(CairoFlatLowered {
+        cairo_ir: lowered_functions,
+        cairo_db: db,
+    })
 }
 
 /// This function generates the Sierra program from the Salsa `db` for a given
@@ -174,6 +177,16 @@ pub fn generate_sierra(db: &RootDatabase, crate_ids: Vec<CrateId>) -> Result<Cra
 pub fn generate_sierra_all_crates(db: &RootDatabase) -> Result<CrateSierra> {
     let crate_ids = db.crates();
     generate_sierra(db, crate_ids)
+}
+
+/// Container for Cairo FlatLowered IR an its associated intern db.
+pub struct CairoFlatLowered {
+    /// A mapping between external symbol names and their associated Cairo
+    /// FlatLowered objects.
+    pub cairo_ir: HashMap<String, Arc<MultiLowering>>,
+
+    /// The intern database for the types referenced in the Cairo IR.
+    pub cairo_db: RootDatabase,
 }
 
 #[cfg(test)]
@@ -211,12 +224,12 @@ mod test {
     #[test]
     fn flat_lowered_simple_sum() {
         let filename = "test_data/add.cairo";
-        let (flat_lowered, _) = generate_flat_lowered(Path::new(&filename)).unwrap();
-        assert_eq!(2, flat_lowered.len());
+        let cfl = generate_flat_lowered(Path::new(&filename)).unwrap();
+        assert_eq!(2, cfl.cairo_ir.len());
 
         let filename = "../../cairo/examples/complex_input.cairo";
-        let (flat_lowered, _) = generate_flat_lowered(Path::new(&filename)).unwrap();
-        assert_eq!(1, flat_lowered.len());
+        let cfl = generate_flat_lowered(Path::new(&filename)).unwrap();
+        assert_eq!(1, cfl.cairo_ir.len());
     }
 
     #[test]
@@ -232,8 +245,8 @@ mod test {
         let expected_sierra_program =
             compile_prepared_db_program(&mut db, main_crate_ids.clone(), compiler_config).unwrap();
 
-        let (_, db) = generate_flat_lowered(filename).unwrap();
-        let sierra_program = generate_sierra(&db, main_crate_ids).unwrap();
+        let cfl = generate_flat_lowered(filename).unwrap();
+        let sierra_program = generate_sierra(&cfl.cairo_db, main_crate_ids).unwrap();
         assert_eq!(sierra_program.len(), 1);
         assert_eq!(
             sierra_program.get("add").unwrap().program,
