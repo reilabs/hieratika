@@ -17,14 +17,14 @@ pub fn __llvm_lshr_i1_i1(n: u128, shift: u128) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::__llvm_lshr_i1_i1;
-    use crate::alu::test_case::TestCase;
+    use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
-    pub const test_cases: [TestCase; 4] = [
+    pub const test_cases: [TestCaseTwoArgs; 4] = [
         // All possible 1-bit cases
-        TestCase { lhs: 0, rhs: 0, expected: 0 },
-        TestCase { lhs: 0, rhs: 1, expected: 0 },
-        TestCase { lhs: 1, rhs: 0, expected: 1 },
-        TestCase { lhs: 1, rhs: 1, expected: 0 },
+        TestCaseTwoArgs { lhs: 0, rhs: 0, expected: 0 },
+        TestCaseTwoArgs { lhs: 0, rhs: 1, expected: 0 },
+        TestCaseTwoArgs { lhs: 1, rhs: 0, expected: 1 },
+        TestCaseTwoArgs { lhs: 1, rhs: 1, expected: 0 },
     ];
 
     #[test]
