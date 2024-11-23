@@ -4,5 +4,6 @@ pub mod xor;
 pub mod shl;
 pub mod lshr;
 pub mod fshl;
+pub mod fshr;
 
 mod test_case;
