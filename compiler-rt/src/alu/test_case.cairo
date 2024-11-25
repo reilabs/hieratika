@@ -1,4 +1,13 @@
 #[derive(Drop)]
+// Test case for functions that have one input argument and return one value.
+pub struct TestCaseOneArg {
+    // The input argument of an arithmetic/logic operation.
+    pub arg: u128,
+    // The expected output value.
+    pub expected: u128,
+}
+
+#[derive(Drop)]
 // Test case for functions that have two input arguments and return one value.
 pub struct TestCaseTwoArgs {
     // The first input argument or the left-hand side of an arithmetic/logic operation.
