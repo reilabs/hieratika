@@ -5,5 +5,6 @@ pub mod shl;
 pub mod lshr;
 pub mod fshl;
 pub mod fshr;
+pub mod bitreverse;
 
 mod test_case;
