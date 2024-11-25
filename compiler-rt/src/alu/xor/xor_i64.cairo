@@ -1,12 +1,12 @@
 use crate::alu::xor::xor;
 
-pub fn __llvm__xor_i64_i64(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_xor_i64_i64(lhs: u128, rhs: u128) -> u128 {
     xor::<u64>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm__xor_i64_i64;
+    use super::__llvm_xor_i64_i64;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 43] = [
@@ -62,7 +62,7 @@ mod tests {
     fn test_i64() {
         for case in test_cases
             .span() {
-                assert_eq!(__llvm__xor_i64_i64(*case.lhs, *case.rhs), *case.expected);
+                assert_eq!(__llvm_xor_i64_i64(*case.lhs, *case.rhs), *case.expected);
             }
     }
 }
