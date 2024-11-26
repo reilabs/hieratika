@@ -8,5 +8,6 @@ pub mod fshr;
 pub mod bitreverse;
 pub mod bswap;
 pub mod ctpop;
+pub mod ctlz;
 
 mod test_case;
