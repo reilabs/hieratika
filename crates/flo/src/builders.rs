@@ -17,6 +17,7 @@ use crate::{
         DestructureStatement,
         Diagnostic,
         DiagnosticId,
+        GetBlockAddressStatement,
         Location,
         LocationId,
         MatchArm,
@@ -29,7 +30,9 @@ use crate::{
         Statement,
         StatementId,
         Type,
+        Variable,
         VariableId,
+        VariableLinkage,
     },
     FlatLoweredObject,
 };
@@ -257,12 +260,18 @@ impl<'a> BlockBuilder<'a> {
     pub fn assign_new_const(
         &mut self,
         value: ConstantValue,
+        linkage: VariableLinkage,
         diagnostics: Vec<DiagnosticId>,
         location: Option<LocationId>,
     ) -> StatementId {
-        let variable =
-            self.context
-                .add_variable_with_diagnostics(value.typ.clone(), vec![], location);
+        let variable = self.context.variables.insert(&Variable {
+            typ: value.typ.clone(),
+            linkage,
+            poison: PoisonType::None,
+            diagnostics: Vec::new(),
+            location: None,
+        });
+
         self.assign_const(variable, value, diagnostics, location);
 
         variable
@@ -289,10 +298,7 @@ impl<'a> BlockBuilder<'a> {
     /// * `typ` -  The type of the variable to be created.
     /// * `value` - The constant value to be assigned.
     pub fn simple_assign_new_const(&mut self, value: ConstantValue) -> VariableId {
-        let variable = self.context.add_variable(value.typ.clone());
-        self.assign_const(variable, value, vec![], None);
-
-        variable
+        self.assign_new_const(value, VariableLinkage::Local, Vec::new(), None)
     }
 
     /// Adds a call statement to the block.
@@ -862,6 +868,74 @@ impl<'a> BlockBuilder<'a> {
         target_type: Type,
     ) -> VariableId {
         self.reinterpret_bits_into_new_variable(source_var, target_type, vec![], None)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The identifier of the block to relocate.
+    pub fn get_block_address(
+        &mut self,
+        target_var: VariableId,
+        block: BlockId,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> StatementId {
+        let statement = GetBlockAddressStatement {
+            target_var,
+            block,
+            diagnostics,
+            location,
+        };
+
+        self.add_statement(&Statement::GetBlockAddress(statement))
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The identifier of the block to relocate.
+    pub fn get_new_block_address(
+        &mut self,
+        block: BlockId,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        let target_var = self.add_variable(Type::Pointer);
+        self.get_block_address(target_var, block, diagnostics, location);
+        target_var
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The identifier of the block to relocate.
+    pub fn simple_get_block_address(
+        &mut self,
+        target_var: VariableId,
+        block: BlockId,
+    ) -> StatementId {
+        self.get_block_address(target_var, block, vec![], None)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The identifier of the block to relocate.
+    pub fn simple_get_new_block_address(&mut self, block: BlockId) -> VariableId {
+        self.get_new_block_address(block, Vec::new(), None)
     }
 }
 

@@ -231,6 +231,12 @@ pub enum Statement {
     /// the result in the `target_var`.
     ReinterpretBits(ReinterpretBitsStatement),
 
+    /// A constant (compile-time) operation that resolves something that behaves
+    /// semantically akin to an address that references a block.
+    ///
+    /// This exists to enable re-writing or
+    GetBlockAddress(GetBlockAddressStatement),
+
     /// For internal use -- indicates that this Statement is poisoned.
     Poisoned(PoisonType),
 }
@@ -374,6 +380,29 @@ pub struct ReinterpretBitsStatement {
     pub location: Option<LocationId>,
 }
 
+/// An operation that performs a constant relocation of the provided `block`
+/// identifier at the point of linking.
+///
+/// This is necessary specifically to support the LLVM intrinsic
+/// [blockaddress](https://llvm.org/docs/LangRef.html#addresses-of-basic-blocks)
+/// constant that is necessary for the operation of indirect branch
+/// instructions.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct GetBlockAddressStatement {
+    /// The variable into which the statement writes the relocated identifier.
+    pub target_var: VariableId,
+
+    /// The local block identifier to relocate as a global identifier during
+    /// linking.
+    pub block: BlockId,
+
+    /// Any diagnostics associated with this statement.
+    pub diagnostics: Vec<DiagnosticId>,
+
+    /// The source location associated with this statement, if available.
+    pub location: Option<LocationId>,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockRef {
     /// Specifies a block in the local translation unit directly.
@@ -440,6 +469,11 @@ pub type VariableId = InternIdentifier;
 pub enum VariableLinkage {
     /// Indicates the variable exists directly in this translation unit.
     Local,
+
+    /// A variable that is a relocation and needs to be re-written on linking.
+    ///
+    /// Such variables are local to the current translation unit.
+    Relocation,
 
     /// Indicates that the variable exists in another translation unit, and
     /// should be resolved by the provided symbol.

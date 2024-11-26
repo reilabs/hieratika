@@ -3,6 +3,12 @@
 
 use std::ffi::CStr;
 
+use chumsky::{
+    error::Simple,
+    prelude::{just, none_of},
+    text::TextParser,
+    Parser,
+};
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
     builders::BlockBuilder,
@@ -11,10 +17,9 @@ use hieratika_flo::{
 use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::{
-        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMInt64Type, LLVMPrintValueToString},
+        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMPrintValueToString},
         LLVMAtomicOrdering,
     },
-    types::IntType,
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
 use itertools::Either;
@@ -98,11 +103,61 @@ pub fn get_var_or_const(
                     ptr_val.is_const(),
                     "Unnamed pointer value was not a constant: {ptr_val:?}"
                 );
-                ptr_val
-                    .const_to_int(unsafe { IntType::new(LLVMInt64Type()) })
-                    .get_zero_extended_constant()
-                    .expect("Pointer value already known to be constant had no constant value")
-                    as u128
+
+                // We cannot have direct pointer constants written out, but instead they take
+                // the form of a constant expression such as the `blockaddress` function. To
+                // make matters more complex, neither Inkwell nor llvm-sys provide ways to get
+                // at the arguments to the constant, so we are forced to parse it out manually.
+                //
+                // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
+                // hence we are safe to convert it to the similarly non-owning str here for
+                // processing. When our `str` gets dropped, so does the `CStr` but the
+                // underlying allocation is left in the control of llvm-sys via Inkwell.
+                let pointer_const_text_c =
+                    unsafe { CStr::from_ptr(LLVMPrintValueToString(ptr_val.as_value_ref())) };
+                let pointer_const_text_str = pointer_const_text_c.to_str()?;
+
+                // Next we can parse the blockaddr representation out of the string.
+                let block_addr =
+                    BlockAddress::parser().parse(pointer_const_text_str).map_err(|e| {
+                        Error::MalformedLLVM(format!(
+                            "Expected a valid blockaddress expression but found \
+                             {pointer_const_text_str} instead: {e:?}",
+                        ))
+                    })?;
+
+                // If this is a valid parse, we now have both the name of the function in which
+                // the block occurs, and the name of the block in that function from which the
+                // address is generated. We assume that:
+                //
+                // 1. The function exists in the current translation unit.
+                // 2. The block is valid in the specified function.
+                //
+                // All other conditions are a malformed LLVM error.
+                let target_function_blocks = func_ctx
+                    .module_blocks()
+                    .get(&block_addr.function_name)
+                    .ok_or_else(|| {
+                        Error::MalformedLLVM(format!(
+                            "blockaddress constant attempted to look up a block in non-local \
+                             function {}",
+                            &block_addr.function_name
+                        ))
+                    })?;
+
+                let block_id = target_function_blocks
+                    .get_by_left(&block_addr.block_ref)
+                    .ok_or_else(|| {
+                        Error::MalformedLLVM(format!(
+                            "blockaddress constant attempted to look up an unknown block {}",
+                            &block_addr.block_ref
+                        ))
+                    })?;
+
+                let result_variable = bb.simple_get_new_block_address(*block_id);
+
+                // This case is not part of the normal flow, so we do a direct return.
+                return Ok(result_variable);
             }
             BasicValueEnum::ArrayValue(_) => {
                 unimplemented!("Array value constants are not implemented (#91)")
@@ -131,6 +186,56 @@ pub fn get_var_or_const(
     };
 
     Ok(id)
+}
+
+/// A representation of a [`blockaddress`](https://llvm.org/docs/LangRef.html#addresses-of-basic-blocks)
+/// constant expression, used to aid in the management of pointer constants.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct BlockAddress {
+    /// The name of the function in which `block_ref` should be resolved.
+    pub function_name: String,
+
+    /// The reference to the block for which the block address should be
+    /// resolved within `function_name`.
+    pub block_ref: String,
+}
+
+impl BlockAddress {
+    /// Generates a parser for the `BlockAddress` type from the standard pointer
+    /// constant `blockaddress` expression.
+    #[must_use]
+    pub fn parser() -> impl Parser<char, BlockAddress, Error = Simple<char>> {
+        just("ptr")
+            .padded()
+            .ignore_then(just("blockaddress"))
+            .ignore_then(Self::arguments().delimited_by(just("("), just(")")))
+    }
+
+    /// Parses a function name as it is expected to occur in the first argument
+    /// of the `blockaddress` constant.
+    #[must_use]
+    pub fn function_name() -> impl Parser<char, String, Error = Simple<char>> {
+        just("@").ignore_then(none_of("@%,()").repeated().collect::<String>())
+    }
+
+    /// Parses a block reference as it is expected to appear in the second
+    /// argument of the `blockaddress` constant.
+    #[must_use]
+    pub fn block_ref() -> impl Parser<char, String, Error = Simple<char>> {
+        just("%").ignore_then(none_of("@%,()").repeated().collect::<String>())
+    }
+
+    /// Parses the arguments to the `blockaddress` constant expression.
+    #[must_use]
+    pub fn arguments() -> impl Parser<char, BlockAddress, Error = Simple<char>> {
+        Self::function_name()
+            .then_ignore(just(",").padded())
+            .then(Self::block_ref())
+            .map(|(function_name, block_ref)| Self {
+                function_name,
+                block_ref,
+            })
+    }
 }
 
 /// Gets the memory ordering from an instruction.
@@ -452,4 +557,61 @@ pub fn make_opcode_output(
     };
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod test {
+    use chumsky::Parser;
+
+    use crate::obj_gen::util::BlockAddress;
+
+    #[test]
+    fn can_parse_function_name_in_blockaddr() {
+        let result = BlockAddress::function_name().parse("@hieratika_test_indirectbr");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "hieratika_test_indirectbr");
+    }
+
+    #[test]
+    fn can_parse_block_ref_in_blockaddr() {
+        let result = BlockAddress::block_ref().parse("%bb1");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "bb1");
+    }
+
+    #[test]
+    fn can_parse_arguments_of_block_ref_in_blockaddr() {
+        let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr,%bb1");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            BlockAddress {
+                function_name: "hieratika_test_indirectbr".to_string(),
+                block_ref:     "bb1".to_string(),
+            }
+        );
+        let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr, %bb1");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            BlockAddress {
+                function_name: "hieratika_test_indirectbr".to_string(),
+                block_ref:     "bb1".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn can_parse_blockaddr() {
+        let result =
+            BlockAddress::parser().parse("ptr blockaddress(@hieratika_test_input, %exit_safe)");
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            BlockAddress {
+                function_name: "hieratika_test_input".to_string(),
+                block_ref:     "exit_safe".to_string(),
+            }
+        );
+    }
 }
