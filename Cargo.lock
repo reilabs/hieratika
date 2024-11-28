@@ -845,6 +845,7 @@ dependencies = [
  "cairo-lang-filesystem",
  "cairo-lang-lowering",
  "cairo-lang-semantic",
+ "cairo-lang-sierra-generator",
  "cairo-lang-utils",
  "hieratika-errors",
  "itertools 0.13.0",

@@ -19,6 +19,7 @@ cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
 cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
 cairo-lang-lowering.workspace = true
 cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
+cairo-lang-sierra-generator = { path = "../../cairo/crates/cairo-lang-sierra-generator" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 hieratika-errors.workspace = true
 itertools.workspace = true
