@@ -45,7 +45,7 @@ use itertools::Itertools;
 /// It is intended that this type is used as having value semantics, and not
 /// ever have a reference returned to it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-#[allow(non_camel_case_types)] // To better match the LLVM internal convention
+#[expect(non_camel_case_types)] // To better match the LLVM internal convention
 pub enum LLVMType {
     /// The boolean type, represented inside LLVM by the `i1`
     /// [integer type](https://llvm.org/docs/LangRef.html#integer-type).
@@ -212,8 +212,23 @@ impl LLVMType {
     /// Gets the size of `self` in felts.
     #[must_use]
     pub fn size_of(&self) -> usize {
-        #[allow(clippy::enum_glob_use)] // We do actually use them all here.
-        use LLVMType::*;
+        use LLVMType::{
+            bool,
+            f16,
+            f32,
+            f64,
+            i128,
+            i16,
+            i32,
+            i64,
+            i8,
+            ptr,
+            void,
+            Array,
+            Function,
+            Metadata,
+            Structure,
+        };
         match self {
             bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,
             void | Metadata => 0,

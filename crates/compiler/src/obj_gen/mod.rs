@@ -499,13 +499,14 @@ impl ObjectGenerator {
     ///
     /// - If the provided instruction is a terminator instruction (see
     ///   [`util::is_non_terminator_instruction`] for more information).
+    #[allow(clippy::too_many_lines)] // It cannot be split up any reasonable way.
     pub fn generate_instruction(
         &self,
         instruction: InstructionValue,
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We do actually use all of them here.
+        #[allow(clippy::enum_glob_use)]
         use InstructionOpcode::*;
 
         // Start by grabbing the opcode and checking that it is not a terminator
@@ -533,7 +534,7 @@ impl ObjectGenerator {
 
         // Then we need to correctly process the opcode into the correct piece of
         // functionality, most of which end up being polyfills here.
-        #[allow(clippy::match_same_arms)] // The commonality here is incidental.
+        #[expect(clippy::match_same_arms)] // The commonality here is incidental.
         match &opcode {
             Add => self.generate_binary_operation(instruction, bb, func_ctx),
             Alloca => self.generate_alloca(instruction, bb, func_ctx),
@@ -667,7 +668,7 @@ impl ObjectGenerator {
     /// # Errors
     ///
     /// - [`Error`] if the operation cannot be generated for some reason.
-    #[allow(clippy::only_used_in_recursion)] // For consistency with other generation methods.
+    #[expect(clippy::only_used_in_recursion)] // For consistency with other generation methods.
     fn generate_insert_value_into(
         &self,
         instruction: InstructionValue,
@@ -679,7 +680,7 @@ impl ObjectGenerator {
     ) -> Result<VariableId> {
         if let Some(current_index) = remaining_indices.pop_front() {
             // Our indices are constrained by u32::MAX, so this is safe.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             let current_index = current_index as usize;
 
             // As we have to take apart the structure, we need variables into which we
@@ -756,7 +757,7 @@ impl ObjectGenerator {
     /// - If the provided instruction is _not_ an `extractvalue`.
     /// - If any extraction index is out of bounds for the number of fields in
     ///   the type being extracted from.
-    #[allow(clippy::unused_self)] // For consistency with the majority of generate_* methods
+    #[expect(clippy::unused_self)] // For consistency with the majority of generate_* methods
     fn generate_extract_value(
         &self,
         instruction: InstructionValue,
@@ -791,7 +792,7 @@ impl ObjectGenerator {
         let mut current_extraction_var = extract_from_id;
         for index in indices {
             // Our indices cannot exceed u32::MAX by construction.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             let index = index as usize;
 
             let output_variables = match &current_extraction_type {
@@ -893,7 +894,7 @@ impl ObjectGenerator {
     ///
     /// - If the provided instruction is _not_ a `getelementptr`.
     /// - If any name is used before being defined.
-    #[allow(clippy::too_many_lines)] // It cannot be reasonably split up.
+    #[expect(clippy::too_many_lines)] // It cannot be reasonably split up.
     pub fn generate_gep(
         &self,
         instruction: InstructionValue,
@@ -910,7 +911,7 @@ impl ObjectGenerator {
             // If the gep_index is constant, we can compute this at compile time.
             let const_value = if let BasicValueEnum::IntValue(int_val) = gep_index {
                 // Our indices never exceed u32::MAX by construction.
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 int_val.get_zero_extended_constant().map(|c| c as usize)
             } else {
                 let typ = LLVMType::try_from(gep_index.get_type())?;
@@ -1039,7 +1040,7 @@ impl ObjectGenerator {
                         // at compile time as it is constant.
                         let gep_index_value = match gep_index {
                             // Our indices never exceed u32::MAX by construction.
-                            #[allow(clippy::cast_possible_truncation)]
+                            #[expect(clippy::cast_possible_truncation)]
                             BasicValueEnum::IntValue(int_val) if int_val.is_const() => int_val
                                 .get_zero_extended_constant()
                                 .ok_or(non_constant_constant_error(&gep_index_type))?
@@ -1131,7 +1132,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We use all variants here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
         assert_correct_opcode(&instruction, InstructionOpcode::Store);
 
@@ -1215,7 +1216,8 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        use LLVMType::{bool, f16, f32, f64, i128, i16, i32, i64, i8, ptr};
+        #[allow(clippy::enum_glob_use)]
+        use LLVMType::*;
         assert!(
             matches!(
                 typ,
@@ -1259,7 +1261,7 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We do actually make use of all of them here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
 
         // As we can only store primitive types, we have to pull the struct apart, piece
@@ -1321,7 +1323,7 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We do actually use all of them here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
 
         // As we can only store primitive types, we have to pull the array apart, piece
@@ -1392,7 +1394,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We use all variants here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
         assert_correct_opcode(&instruction, InstructionOpcode::Load);
 
@@ -1481,7 +1483,8 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        use LLVMType::{bool, f16, f32, f64, i128, i16, i32, i64, i8, ptr};
+        #[allow(clippy::enum_glob_use)]
+        use LLVMType::*;
         assert!(
             matches!(
                 typ,
@@ -1528,7 +1531,7 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        #[allow(clippy::enum_glob_use)] // We make use of all of them here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
 
         // We need to track the offset from the pointer as we load elements.
@@ -1591,7 +1594,7 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        #[allow(clippy::enum_glob_use)] // We make use of all of them here.
+        #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
 
         let mut accumulated_offset = initial_offset;
@@ -1828,7 +1831,7 @@ impl ObjectGenerator {
     ///
     /// - If the provided instruction is _not_ a valid `select` instruction.
     /// - If the provided instruction is missing an output name.
-    #[allow(clippy::unused_self)] // For uniformity with the other `generate_*` methods
+    #[expect(clippy::unused_self)] // For uniformity with the other `generate_*` methods
     fn generate_select(
         &self,
         instruction: InstructionValue,
@@ -1914,7 +1917,7 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is _not_ a valid `bitcast` instruction.
-    #[allow(clippy::unused_self)] // For uniformity with the other generate_* methods
+    #[expect(clippy::unused_self)] // For uniformity with the other generate_* methods
     fn generate_bitcast(
         &self,
         instruction: InstructionValue,
@@ -2305,7 +2308,7 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is _not_ a `fence`.
-    #[allow(clippy::unused_self)] // For uniformity with the other generator functions
+    #[expect(clippy::unused_self)] // For uniformity with the other generator functions
     fn generate_fence(&self, instruction: InstructionValue, bb: &mut BlockBuilder) -> Result<()> {
         assert_correct_opcode(&instruction, InstructionOpcode::Fence);
 
@@ -2658,8 +2661,19 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)] // We do actually use all of them here.
-        use InstructionOpcode::*;
+        use InstructionOpcode::{
+            Br,
+            CallBr,
+            CatchRet,
+            CatchSwitch,
+            CleanupRet,
+            IndirectBr,
+            Invoke,
+            Resume,
+            Return,
+            Switch,
+            Unreachable,
+        };
 
         // Start by grabbing the opcode and checking that it is indeed something we can
         // handle as a block exit. If it isn't we just need to bail.
