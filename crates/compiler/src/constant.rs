@@ -1,7 +1,13 @@
 //! Useful constants for use within the compiler.
 
 /// The size of a byte on our architecture.
-pub const BYTE_SIZE: usize = 8;
+pub const BYTE_SIZE_BITS: usize = 8;
+
+/// The size of a felt on our architecture.
+pub const FELT_SIZE_BITS: usize = 252;
+
+/// The size of a felt on our architecture, rounded to the nearest byte.
+pub const FELT_SIZE_BYTES: usize = (FELT_SIZE_BITS + (BYTE_SIZE_BITS - 1)) / BYTE_SIZE_BITS;
 
 /// The default layout on LLVM for a 16-bit float.
 ///

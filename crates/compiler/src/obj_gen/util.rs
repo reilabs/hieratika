@@ -2,10 +2,14 @@
 //! generating a `FlatLoweredObject`.
 
 use hieratika_errors::compile::llvm::{Error, Result};
-use hieratika_flo::{builders::BlockBuilder, types::VariableId};
+use hieratika_flo::{
+    builders::BlockBuilder,
+    types::{ConstantValue, VariableId},
+};
 use inkwell::{
     basic_block::BasicBlock,
-    llvm_sys::core::{LLVMGetIndices, LLVMGetNumIndices},
+    llvm_sys::core::{LLVMGetIndices, LLVMGetNumIndices, LLVMInt64Type},
+    types::IntType,
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
 use itertools::Either;
@@ -21,6 +25,108 @@ pub type InkwellOperand<'ctx> = Either<BasicValueEnum<'ctx>, BasicBlock<'ctx>>;
 
 /// A type used for optional operands in inkwell.
 pub type OptionalInkwellOperand<'ctx> = Option<InkwellOperand<'ctx>>;
+
+/// Returns a variable id that either points to a constant or is the variable
+/// definition corresponding to the name of the provided `value`.
+///
+/// # Errors
+///
+/// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+///   defined before its usage.
+///
+/// # Panics
+///
+/// - If any value is both non-constant and lacking a name.
+/// - If an array value constant is encountered, as these are currently
+///   unsupported.
+/// - If a struct value constant is encountered, as these are currently
+///   unsupported.
+pub fn get_var_or_const(
+    value: &BasicValueEnum,
+    bb: &mut BlockBuilder,
+    func_ctx: &mut FunctionContext,
+) -> Result<VariableId> {
+    // We can always _get_ the name of a value, but in the case where it is an
+    // inline constant this is the empty string.
+    let value_name = value.get_name().to_str()?;
+    let value_type = LLVMType::try_from(value.get_type())?;
+
+    let id: VariableId = if value_name.is_empty() {
+        // Here, it is truly anonymous, which means we have run into the case where it
+        // is simply an inline constant.
+        let const_value = match value {
+            BasicValueEnum::IntValue(int_val) => {
+                assert!(
+                    int_val.is_const(),
+                    "Unnamed integer value was not a constant: {int_val:?}"
+                );
+                let constant_value = int_val
+                    .get_zero_extended_constant()
+                    .expect("Integer already known to be a constant had no constant value");
+
+                // Unfortunately, our constants from LLVM are not in the same format as we need
+                // in FLO, so we have to convert it while maintaining the correct bytes. Here,
+                // we take advantage of Rust's casting behavior: casting between signed and
+                // unsigned of the same size is a no-op, and casting from a smaller unsigned
+                // number to a larger unsigned number causes zero-extension.
+                //
+                // See: https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics
+                constant_value as u128
+            }
+            BasicValueEnum::FloatValue(float_val) => {
+                assert!(
+                    float_val.is_const(),
+                    "Unnamed floating-point value was not a constant: {float_val:?}"
+                );
+                let (const_float, _) = float_val.get_constant().expect(
+                    "Floating-point value already known to be a constant had no constant value",
+                );
+
+                // Unfortunately, we do not natively support FP constants in FLO, so we have to
+                // represent the _bits_ of the float inside our constant value. This behavior
+                // is safe as we construct the value with the same bytes as the float, and then
+                // use the above-mentioned zero-extension to fit it into the u128.
+                u64::from_le_bytes(const_float.to_le_bytes()) as u128
+            }
+            BasicValueEnum::PointerValue(ptr_val) => {
+                assert!(
+                    ptr_val.is_const(),
+                    "Unnamed pointer value was not a constant: {ptr_val:?}"
+                );
+                ptr_val
+                    .const_to_int(unsafe { IntType::new(LLVMInt64Type()) })
+                    .get_zero_extended_constant()
+                    .expect("Pointer value already known to be constant had no constant value")
+                    as u128
+            }
+            BasicValueEnum::ArrayValue(_) => {
+                unimplemented!("Array value constants are not implemented (#91)")
+            }
+            BasicValueEnum::StructValue(_) => {
+                unimplemented!("Struct value constants are not implemented (#91)")
+            }
+            BasicValueEnum::VectorValue(_) => Err(Error::unsupported_type(
+                "LLVM vector types are not supported",
+            ))?,
+        };
+
+        // With the constant value obtained, we can shove it into the actual constant,
+        // and stick that in the context.
+        let flo_const = ConstantValue {
+            value: const_value,
+            typ:   ObjectContext::flo_type_of(&value_type)?,
+        };
+
+        // With that done, we can create the constant variable.
+        bb.simple_assign_new_const(flo_const)
+    } else {
+        // If the value name was _not_ empty, then it is a reference to what
+        // should be an existing variable.
+        func_ctx.try_lookup_variable(value_name)?
+    };
+
+    Ok(id)
+}
 
 /// Returns `true` if `inst` is **not** a
 /// [terminator instruction](https://llvm.org/docs/LangRef.html#terminator-instructions)
@@ -174,9 +280,9 @@ pub fn name_type_pairs_from_value_operands(
 /// Extracts an integer from the provided basic `value`, or returns [`None`]
 /// if `value` is non-integral.
 #[must_use]
-pub fn int_from_bv(value: BasicValueEnum) -> Option<i64> {
+pub fn int_from_bv(value: BasicValueEnum) -> Option<u64> {
     match value {
-        BasicValueEnum::IntValue(int_val) => int_val.get_sign_extended_constant(),
+        BasicValueEnum::IntValue(int_val) => int_val.get_zero_extended_constant(),
         _ => None,
     }
 }
@@ -187,7 +293,7 @@ pub fn int_from_bv(value: BasicValueEnum) -> Option<i64> {
 ///
 /// If the provided `value` is not an integral value.
 #[must_use]
-pub fn expect_int_from_bv(value: BasicValueEnum) -> i64 {
+pub fn expect_int_from_bv(value: BasicValueEnum) -> u64 {
     int_from_bv(value).expect("The provided value was not an integer")
 }
 

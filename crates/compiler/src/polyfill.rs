@@ -51,7 +51,8 @@
 //! unlikely that every single operation is beneficial to implement as a builtin
 //! or AIR instruction.
 
-pub mod mappings;
+// NOTE: When adding new polyfills, you will need to alter the expected number
+// of polyfills in the tests.
 
 use std::{
     collections::HashMap,
@@ -269,7 +270,7 @@ impl PolyfillMap {
     /// # Errors
     ///
     /// - [`Error::MissingPolyfill`] if the requested polyfill does not exist.
-    pub fn polyfill_or_err(
+    pub fn try_polyfill(
         &self,
         name: &str,
         param_types: &[LLVMType],
@@ -347,7 +348,7 @@ impl PolyfillMap {
 
     binop!(udiv, integer_types);
 
-    binop!(sdiv, float_types);
+    binop!(sdiv, integer_types);
 
     binop!(fdiv, float_types);
 
@@ -558,7 +559,7 @@ impl PolyfillMap {
 
     fn uitofp(&mut self) {
         for source_ty in Self::integer_types() {
-            for target_ty in Self::integer_types() {
+            for target_ty in Self::float_types() {
                 let op = LLVMOperation::of("uitofp", &[source_ty.clone()], target_ty.clone());
                 let name = format!("__llvm_uitofp_{source_ty}_to_{target_ty}");
                 self.mapping.insert(op, name);
@@ -568,7 +569,7 @@ impl PolyfillMap {
 
     fn sitofp(&mut self) {
         for source_ty in Self::integer_types() {
-            for target_ty in Self::integer_types() {
+            for target_ty in Self::float_types() {
                 let op = LLVMOperation::of("sitofp", &[source_ty.clone()], target_ty.clone());
                 let name = format!("__llvm_sitofp_{source_ty}_to_{target_ty}");
                 self.mapping.insert(op, name);
@@ -1164,13 +1165,13 @@ impl PolyfillMap {
     /// Gets the types that we want to generate integer operations over.
     #[must_use]
     pub fn integer_types() -> Vec<LLVMType> {
-        // i128 intentionally omitted for now
         vec![
             LLVMType::bool,
             LLVMType::i8,
             LLVMType::i16,
             LLVMType::i32,
             LLVMType::i64,
+            LLVMType::i128,
         ]
     }
 
@@ -1239,6 +1240,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 842);
+        assert_eq!(count, 952);
     }
 }
