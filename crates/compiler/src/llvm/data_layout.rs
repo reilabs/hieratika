@@ -822,7 +822,7 @@ mod test {
     };
 
     #[test]
-    #[allow(clippy::too_many_lines)] // We don't care as it's a test
+    #[expect(clippy::too_many_lines)] // We don't care as it's a test
     fn can_parse_data_layout() {
         let dl_string = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
 
@@ -958,7 +958,7 @@ mod test {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)] // We don't care as it's a test
+    #[expect(clippy::too_many_lines)] // We don't care as it's a test
     fn can_parse_data_layout_to_default() {
         let dl_string = "";
 

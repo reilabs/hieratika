@@ -196,7 +196,7 @@ impl FlatLoweredObject {
 
     /// Walks each of the tables and ensures no poisoned elements are left in
     /// expected places.
-    #[allow(clippy::needless_return)]
+    #[expect(clippy::needless_return)]
     pub(crate) fn panic_on_unexpected_poison(&self) {
         if self.allow_incomplete {
             return;

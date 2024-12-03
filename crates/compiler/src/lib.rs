@@ -102,8 +102,8 @@
 //! the external API for the compiler, and can be referenced in that context.
 
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)] // Allows for better API naming
-#![allow(clippy::multiple_crate_versions)] // Enforced by our dependencies
+#![expect(clippy::module_name_repetitions)] // Allows for better API naming
+#![expect(clippy::multiple_crate_versions)] // Enforced by our dependencies
 
 pub mod constant;
 pub mod context;

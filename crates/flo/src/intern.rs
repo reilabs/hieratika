@@ -12,7 +12,7 @@ use crate::{poison::Poisonable, types::PoisonType};
 pub(crate) type InternIdentifier = usize;
 
 /// The special table value that always contains a poisoned element.
-#[allow(clippy::unreadable_literal)]
+#[expect(clippy::unreadable_literal)]
 const POISON_ENTRY: usize = 0xdecea5ed;
 
 /// A type for generic tables of interned objects.
@@ -168,7 +168,7 @@ where
 //
 
 #[cfg(test)]
-#[allow(
+#[expect(
     clippy::cast_possible_truncation,
     clippy::needless_range_loop,
     clippy::unreadable_literal
