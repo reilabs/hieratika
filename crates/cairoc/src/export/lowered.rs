@@ -1,29 +1,19 @@
-//! This module contains the functions to export the generated 'MultiLowered'
-//! object to file.
+//! This module contains the functions to export Lowered struct to file.
+//! The export directory is `target/cairo/flo`.
 
 use std::{
-    env,
-    fs::{create_dir_all, remove_dir_all, OpenOptions},
-    io::{BufWriter, Write},
+    fs::remove_dir_all,
     path::{Path, PathBuf},
 };
 
 use hieratika_errors::compile::cairo::Result;
-use itertools::Itertools;
 
+use super::{target_dir, write_to_file};
 use crate::CrateLowered;
 
-fn target_dir() -> String {
-    // TODO: this is a temp directory. Decide how to deal with calls outside of
-    // the workspace.
-    format!("{}/../../target", env!("CARGO_MANIFEST_DIR"))
-}
-
 /// This function returns the root directory where all flo files are exported.
-fn get_flo_folder() -> String {
-    let cargo_target_dir = target_dir();
-    let base_folder = "/cairo/flo";
-    [cargo_target_dir, base_folder.to_owned()].iter().join("")
+fn get_flo_folder() -> PathBuf {
+    target_dir().join("cairo/flo")
 }
 
 /// This function returns the subfolder where a function flo is exported.
@@ -32,9 +22,9 @@ fn get_flo_folder() -> String {
 ///
 /// - `full_function_name` - the full path of a function_id as returned by the
 ///   SalsaDB.
-fn get_flo_filename(full_function_name: &str) -> String {
+fn get_flo_filename(full_function_name: &str) -> PathBuf {
     let filename = full_function_name.replace("::", "/");
-    format!("{filename}.lowered").to_string()
+    PathBuf::from(filename).with_extension("lowered")
 }
 
 /// This function generates the 'PathBuf' object of the filename containing the
@@ -47,31 +37,7 @@ fn get_flo_filename(full_function_name: &str) -> String {
 fn get_flo_path(full_function_name: &str) -> PathBuf {
     let flo_folder = get_flo_folder();
     let flo_filename = get_flo_filename(full_function_name);
-    let path = [flo_folder, flo_filename].iter().join("/");
-    PathBuf::from(&path)
-}
-
-/// This function writes `data` to `filename`.
-///
-/// Existing files are overwritten. Missing directories are created.
-///
-/// # Errors
-///
-/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there are issues
-///   creating the missing folders of the path of `filename` or if there are
-///   issues writing `data` to `filename`.
-fn write_flo_to_file(filename: &Path, data: &[u8]) -> Result<()> {
-    let prefix = filename.parent().unwrap_or(Path::new(""));
-    create_dir_all(prefix)?;
-    let output_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(filename)
-        .unwrap();
-    let mut f = BufWriter::new(output_file);
-    f.write_all(data)?;
-    Ok(())
+    flo_folder.join(flo_filename)
 }
 
 /// This function exports all flo objects in `crate_lowered` to files.
@@ -87,7 +53,7 @@ pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
     for (function_name, lowered) in crate_lowered {
         let path = get_flo_path(function_name);
         let flo = format!("{lowered:?}");
-        write_flo_to_file(&path, flo.as_bytes())?;
+        write_to_file(&path, flo.as_bytes())?;
     }
     Ok(())
 }
@@ -109,6 +75,15 @@ pub fn clean_all() -> Result<()> {
     Ok(())
 }
 
+/// This function returns the path of the directory which contains the lowered
+/// representation of `crate_name`.
+fn path_to_delete(crate_name: &str) -> PathBuf {
+    let root_folder = get_flo_folder();
+    let crate_name = PathBuf::from(crate_name);
+    let crate_name = crate_name.strip_prefix("/").unwrap_or(&crate_name);
+    root_folder.join(crate_name)
+}
+
 /// Deletes all the `.lowered` files exported in the folder
 /// `target/cairo/flo/<crate_name>`.
 ///
@@ -119,10 +94,9 @@ pub fn clean_all() -> Result<()> {
 /// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there is any error
 ///   deleting the files and folders.
 pub fn clean_crate(crate_name: &str) -> Result<()> {
-    let root_folder = get_flo_folder();
-    let crate_path = [root_folder, crate_name.to_owned()].iter().join("/");
-    let crate_path = Path::new(&crate_path);
+    let crate_path = path_to_delete(crate_name);
     if crate_path.exists() {
+        println!("Remove paths {}", crate_path.to_str().unwrap());
         remove_dir_all(crate_path)?;
     }
     Ok(())
@@ -132,12 +106,16 @@ pub fn clean_crate(crate_name: &str) -> Result<()> {
 mod test {
     use std::path::{absolute, PathBuf};
 
-    use crate::export::{get_flo_filename, get_flo_folder, get_flo_path, target_dir};
+    use super::path_to_delete;
+    use crate::export::{
+        lowered::{get_flo_filename, get_flo_folder, get_flo_path},
+        target_dir,
+    };
 
     #[test]
     fn test_get_flo_folder() {
         let flo_folder = get_flo_folder();
-        println!("{flo_folder}");
+        println!("{flo_folder:?}");
         assert!(flo_folder.ends_with("cairo/flo"));
     }
 
@@ -145,8 +123,19 @@ mod test {
     fn test_get_flo_filename() {
         let full_function_name = "core::poseidon::poseidon_hash_span".to_string();
         let flo_filename = get_flo_filename(&full_function_name);
-        println!("{flo_filename}");
-        assert_eq!(flo_filename, "core/poseidon/poseidon_hash_span.lowered");
+        println!("{flo_filename:?}");
+        assert_eq!(
+            flo_filename,
+            PathBuf::from("core/poseidon/poseidon_hash_span.lowered")
+        );
+    }
+
+    #[test]
+    fn test_path_to_delete() {
+        let crate_name = "/home/examples";
+        let path_to_delete = path_to_delete(crate_name);
+        println!("{path_to_delete:?}");
+        assert!(path_to_delete.ends_with("target/cairo/flo/home/examples"));
     }
 
     #[test]
@@ -154,11 +143,9 @@ mod test {
         let full_function_name = "core::poseidon::poseidon_hash_span".to_string();
         let flo_filename = absolute(get_flo_path(&full_function_name)).unwrap();
         println!("{flo_filename:?}");
-        let output_path = format!(
-            "{}/cairo/flo/core/poseidon/poseidon_hash_span.lowered",
-            target_dir()
-        );
-        let output_path = absolute(PathBuf::from(output_path)).unwrap();
+        let output_path = target_dir().join("cairo/flo/core/poseidon/poseidon_hash_span.lowered");
+        let output_path = absolute(output_path).unwrap();
+        println!("{output_path:?}");
         assert_eq!(flo_filename, output_path);
     }
 }

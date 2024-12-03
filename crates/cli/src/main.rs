@@ -13,7 +13,7 @@ use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
 use hieratika_cairoc::{
-    export::{clean_all, save_flo},
+    export::lowered::{clean_all, save_flo},
     generate_flat_lowered,
 };
 
@@ -54,7 +54,7 @@ fn run(args: Arguments) -> Result<()> {
 fn run_build_command(args: &BuildArgs) -> Result<()> {
     match args.compiler_type {
         CompilerType::Cairo => {
-            let files = generate_flat_lowered(&args.path)?;
+            let (files, _) = generate_flat_lowered(&args.path)?;
             save_flo(&files)?;
         }
     }
