@@ -10,5 +10,6 @@ pub mod bswap;
 pub mod ctpop;
 pub mod ctlz;
 pub mod add;
+pub mod add_with_overflow;
 
 mod test_case;
