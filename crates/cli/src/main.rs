@@ -13,7 +13,7 @@ use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
 use hieratika_cairoc::{
-    export::{clean_all, save_flo},
+    export::lowered::{clean_all, save_flo},
     generate_flat_lowered,
 };
 

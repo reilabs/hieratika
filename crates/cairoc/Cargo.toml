@@ -22,7 +22,7 @@ cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
 cairo-lang-sierra-generator = { path = "../../cairo/crates/cairo-lang-sierra-generator" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 hieratika-errors.workspace = true
-itertools.workspace = true
 
 [dev-dependencies]
+itertools.workspace = true
 rayon = "1.10.0"

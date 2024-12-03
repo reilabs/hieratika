@@ -21,9 +21,8 @@ use cairo_lang_lowering::{
 use cairo_lang_semantic::db::SemanticGroup;
 use cairo_lang_sierra_generator::{db::SierraGenGroup, program_generator::SierraProgramWithDebug};
 use cairo_lang_utils::Upcast;
-use export::clean_crate;
+use export::lowered::clean_crate;
 use hieratika_errors::compile::cairo::{Error, Result};
-use itertools::Itertools;
 
 pub mod export;
 
@@ -67,9 +66,8 @@ fn build_db() -> RootDatabase {
 
     // Using absolute path to ensure `corelib` is found from any working directory
     // hieratika is executed.
-    let cargo_path = env!("CARGO_MANIFEST_DIR");
-    let filename = [cargo_path, "/../../cairo/corelib/src"].iter().join("");
-    let corelib_path = Path::new(&filename);
+    let cargo_path = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let corelib_path = cargo_path.join("../../cairo/corelib/src");
     init_dev_corelib(&mut db, corelib_path.to_path_buf());
 
     let add_withdraw_gas_flag_id = FlagId::new(db.upcast(), "add_withdraw_gas");
@@ -129,6 +127,7 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatab
     let crate_ids = setup_project(&mut db, filename)?;
     for crate_id in crate_ids.iter() {
         let crate_name = crate_id.name(&db);
+        println!("crate_name {crate_name}");
         clean_crate(&crate_name)?;
     }
     let mut lowered_functions = HashMap::new();
@@ -205,6 +204,7 @@ mod test {
                     .extension()
                     .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
                 {
+                    println!("Filepath {:?}", file.path());
                     generate_flat_lowered(&file.path()).unwrap();
                 }
             });
