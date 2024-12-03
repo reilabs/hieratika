@@ -15,8 +15,49 @@ use crate::llvm::typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType};
 /// A mapping from the names of locally-defined functions to their identifiers.
 pub type ModuleFunctions = BiHashMap<String, BlockId>;
 
+/// A mapping from function names to all blocks in the function, which can then
+/// be further looked up by the block name to get the block identifier.
+pub type ModuleBlocks = HashMap<String, BiHashMap<String, BlockId>>;
+
 /// A mapping from the names of locally-defined globals to their identifiers.
 pub type ModuleGlobals = BiHashMap<String, VariableId>;
+
+/// An object map contains a mapping from the module
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ObjectMap {
+    /// A mapping from the names of locally-defined functions to their
+    /// identifiers.
+    pub module_functions: ModuleFunctions,
+
+    /// A mapping from function names to all blocks in the function, which can
+    /// then be further looked up by the block name to get the block identifier.
+    pub module_blocks: ModuleBlocks,
+
+    /// A mapping from the names of locally-defined globals to their
+    /// identifiers.
+    pub module_globals: ModuleGlobals,
+}
+
+impl Default for ObjectMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ObjectMap {
+    /// Creates a new, empty, object map.
+    #[must_use]
+    pub fn new() -> Self {
+        let module_functions = ModuleFunctions::new();
+        let module_blocks = ModuleBlocks::new();
+        let module_globals = ModuleGlobals::new();
+        Self {
+            module_functions,
+            module_blocks,
+            module_globals,
+        }
+    }
+}
 
 /// The data store for the in-progress work of the object generator.
 ///
@@ -35,19 +76,11 @@ pub struct ObjectContext {
     /// generation.
     pub flo: FlatLoweredObject,
 
-    /// A mapping from the names of locally-defined functions to their
-    /// identifiers.
+    /// A map of the structure of the module.
     ///
-    /// Behavior may be inconsistent if the identifier was not allocated in the
-    /// `flo` object contained in `Self`.
-    pub module_functions: ModuleFunctions,
-
-    /// A mapping from the names of locally-defined globals to their
-    /// identifiers.
-    ///
-    /// Behavior may be inconsistent if the identifier was not allocated in the
-    /// `flo` object contained in `Self`.
-    pub module_globals: ModuleGlobals,
+    /// Behavior may be inconsistent if the identifiers within are not allocated
+    /// in the `flo` object contained in `Self`.
+    pub map: ObjectMap,
 }
 
 /// Functionality that requires access to the FLO context directly.
@@ -57,32 +90,9 @@ impl ObjectContext {
     #[must_use]
     pub fn new(name: &str) -> Self {
         let flo = FlatLoweredObject::new(name);
-        let module_functions = ModuleFunctions::default();
-        let module_globals = ModuleGlobals::default();
+        let map = ObjectMap::new();
 
-        Self {
-            flo,
-            module_functions,
-            module_globals,
-        }
-    }
-
-    /// Gets a copy of the top-level functions defined in this module.
-    ///
-    /// Please note that any updates made to `self.module_functions` will not be
-    /// reflected in this copy.
-    #[must_use]
-    pub fn copy_module_functions(&self) -> ModuleFunctions {
-        self.module_functions.clone()
-    }
-
-    /// Gets a copy of the top-level globals defined in this module.
-    ///
-    /// Please note that any updates made to `self.module_globals` will not be
-    /// reflected in this copy.
-    #[must_use]
-    pub fn copy_module_globals(&self) -> ModuleGlobals {
-        self.module_globals.clone()
+        Self { flo, map }
     }
 }
 
@@ -203,10 +213,6 @@ pub struct FunctionContext {
     /// from names to block identifiers.
     blocks: BiHashMap<String, BlockId>,
 
-    /// The global variables accessible to the function as a bidirectional
-    /// mapping from names to identifiers.
-    globals: ModuleGlobals,
-
     /// The local variables that occur in the function as a bidirectional
     /// mapping from names to identifiers.
     locals: BiHashMap<String, VariableId>,
@@ -215,22 +221,18 @@ pub struct FunctionContext {
     /// consistency checking during compilation.
     var_types: HashMap<VariableId, Type>,
 
-    /// A mapping from the names of functions defined in the same module as the
-    /// function described by `self` to their identifiers.
+    /// A map of the object in which the function described by `self` exists.
     ///
-    /// Behavior may be inconsistent if the identifier was not allocated in the
-    /// same `flo` object as the function that `self` describes.
-    module_functions: ModuleFunctions,
+    /// Behavior may be inconsistent if the identifiers in `map` are not
+    /// allocated from the same `flo` object in which this function is
+    /// allocated.
+    map: ObjectMap,
 }
 
 impl FunctionContext {
     /// Creates a new, empty instance of the function context.
     #[must_use]
-    pub fn new(
-        func_type: LLVMFunction,
-        module_functions: ModuleFunctions,
-        globals: ModuleGlobals,
-    ) -> Self {
+    pub fn new(func_type: LLVMFunction, map: ObjectMap) -> Self {
         let blocks = BiHashMap::new();
         let locals = BiHashMap::new();
         let var_types = HashMap::new();
@@ -238,10 +240,9 @@ impl FunctionContext {
         Self {
             func_type,
             blocks,
-            globals,
             locals,
             var_types,
-            module_functions,
+            map,
         }
     }
 
@@ -255,7 +256,7 @@ impl FunctionContext {
     /// variables.
     #[must_use]
     pub fn globals(&self) -> &BiHashMap<String, VariableId> {
-        &self.globals
+        &self.map.module_globals
     }
 
     /// Gets a reference to the mapping between names and identifiers for local
@@ -299,10 +300,11 @@ impl FunctionContext {
         // We look up in locals and then in globals. This order is very intentional, as
         // it implicitly supports shadowing even though this should not occur in LLVM
         // IR.
-        self.locals
+        self.locals.get_by_left(name).copied().or(self
+            .map
+            .module_globals
             .get_by_left(name)
-            .copied()
-            .or(self.globals.get_by_left(name).copied())
+            .copied())
     }
 
     /// Looks up the variable with the given `name` in the function context,
@@ -343,7 +345,14 @@ impl FunctionContext {
     /// `self`.
     #[must_use]
     pub fn module_functions(&self) -> &ModuleFunctions {
-        &self.module_functions
+        &self.map.module_functions
+    }
+
+    /// Gets a reference to the mapping between the names and identifiers of all
+    /// blocks in the same module as the function described by `self`.
+    #[must_use]
+    pub fn module_blocks(&self) -> &ModuleBlocks {
+        &self.map.module_blocks
     }
 }
 

@@ -66,7 +66,8 @@ pub fn non_constant_constant_error(typ: &LLVMType) -> Error {
     ))
 }
 
-/// Generates an [`Error::MalformedLLVM`] with a message
+/// Generates an [`Error::MalformedLLVM`] with a message about the index for a
+/// `GetElementPtr` instruction not being constant when it was required to be.
 #[must_use]
 pub fn non_const_gep_index_error(typ: &LLVMType) -> Error {
     Error::MalformedLLVM(format!(

@@ -63,7 +63,7 @@ use crate::{
     },
     obj_gen::data::{FreshNameSupply, FunctionContext, ObjectContext},
     pass::{
-        analysis::module_map::{BuildModuleMap, FunctionInfo, GlobalInfo},
+        analysis::module_map::{BuildModuleMap, FunctionInfo, GlobalInfo, ModuleMap},
         data::DynPassDataMap,
     },
     polyfill::PolyfillMap,
@@ -212,45 +212,81 @@ impl ObjectGenerator {
             }
         }
 
-        // We start by generating the entry points for every locally-defined function so
-        // that we can reference them later.
+        // We then need to generate the object map, which tells us how to go from names
+        // to blocks in the entire module. This ensures that we not only have defined
+        // entry points for every locally-defined function, but also a complete record
+        // of all the blocks defined in the module.
+        //
+        // This will not contain any function blocks for functions that are declared, as
+        // they do not have a body to be generated in this translation unit.
+        self.generate_blocks_map(module, data, module_map)?;
+
+        // With that done, we have to actually generate the code for the functions that
+        // are defined locally.
         for function in module.get_functions() {
             let function_name = function.get_name().to_str()?;
 
-            // If it is a DEFINITION we need to generate an entry point block for it that we
-            // can reference later.
-            if util::should_define_func(function_name, module_map) {
-                let block_id = data.flo.new_empty_block();
-                data.module_functions.insert(function_name.to_string(), block_id);
-            }
-        }
-
-        // We then go through our functions, as these are the things we actually need to
-        // generate code for.
-        for function in module.get_functions() {
-            let function_name = function.get_name().to_str()?;
-
-            // We can only generate code for a function if it actually is _defined_.
-            // Otherwise, we just have to skip it; declarations are used for
-            // sanity checks but cannot result in generated code.
-            if util::should_define_func(function_name, module_map) {
+            // We only generate code if the function is actually defined, and it will only
+            // exist in the object map if it is indeed defined.
+            if let Some(entry_block_id) = data.map.module_functions.get_by_left(function_name) {
                 let func_data = module_map.functions.get(function_name).unwrap_or_else(|| {
                     panic!(
                         "The function {function_name} referenced but is unknown in the module map"
                     )
                 });
-                let entry_block_id =
-                    data.module_functions.get_by_left(function_name).unwrap_or_else(|| {
-                        panic!(
-                            "The entrypoint for function {function_name} is missing in the \
-                             compilation context"
-                        )
-                    });
+
                 self.generate_function(&function, *entry_block_id, function_name, func_data, data)?;
             }
         }
 
         // Having generated both of these portions into the FLO, we are done for now.
+        Ok(())
+    }
+
+    /// This function generates the module structure to enable references of
+    /// functions and blocks from other parts of the module.
+    ///
+    /// It is responsible for filling the functions and blocks portions of the
+    /// [`ObjectContext.map`] field.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the object map cannot be generated properly.
+    pub fn generate_blocks_map(
+        &self,
+        module: &Module,
+        data: &mut ObjectContext,
+        module_map: &ModuleMap,
+    ) -> Result<()> {
+        let map = &mut data.map;
+
+        // We iterate over each function, registering both its entry point, and the
+        // blocks within it into the map.
+        for function in module.get_functions() {
+            let function_name = function.get_name().to_str()?;
+            let function_blocks = map.module_blocks.entry(function_name.to_string()).or_default();
+
+            // If it is a DEFINITION we need to generate and register the empty blocks for
+            // it so we can reference them later.
+            if util::should_define_func(function_name, module_map) {
+                // We start by iterating over all the basic blocks in the function, and creating
+                // an empty stub for each. These are inserted as needed into the object map.
+                for (ix, block) in function.get_basic_blocks().iter().enumerate() {
+                    let block_name = block.get_name().to_str()?;
+                    let block_id = data.flo.new_empty_block();
+
+                    // We first register the block into the blocks mapping.
+                    function_blocks.insert(block_name.to_string(), block_id);
+
+                    // However, if this is the first block, we also know that it
+                    // is the function entry block, so we have to put that in the correct table.
+                    if ix == 0 {
+                        map.module_functions.insert(function_name.to_string(), block_id);
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -277,52 +313,40 @@ impl ObjectGenerator {
     ) -> Result<()> {
         // We use the function context to keep track of all the data needed to correctly
         // generate the FLO code for the function. This includes in-scope variables.
-        let mut func_ctx = FunctionContext::new(
-            func_info.typ.clone(),
-            data.copy_module_functions(),
-            data.copy_module_globals(),
-        );
+        let mut func_ctx = FunctionContext::new(func_info.typ.clone(), data.map.clone());
 
         // The function signature gives us our inputs, which are necessary to be
         // referenced later. To that end, we generate it first, as it does not depend on
         // the availability of any blocks.
         let sig = self.generate_signature(func_name, func_info, data, &mut func_ctx)?;
 
-        // Next we can iterate over the basic blocks in the function and create stubs
-        // for each. This means that we have targets during later generation.
-        for (ix, block) in func.get_basic_blocks().iter().enumerate() {
-            // Create a poisoned block and insert it so we have block ids to reference for
-            // control flow when building the function's blocks.
-            let block_name = block.get_name().to_str()?.to_string();
-
-            // In the case of the _first_ block, this is special as it
-            // represents a function entry, so we actually need to generate the
-            // function signature.
-            let block_id = if ix == 0 {
-                func_entry_id
-            } else {
-                data.flo.new_empty_block()
-            };
-
-            // No matter the kind of block, we need to push it into our blocks mapping to be
-            // able to create control flow properly later.
-            func_ctx.register_block(block_id, &block_name);
+        // We already have stubs for all the basic blocks in the function thanks to the
+        // object mapping step. These are available immutably in the function context to
+        // perform lookup if needed. We start by registering all the blocks in the
+        // function into the function context.
+        let function_blocks = func_ctx
+            .module_blocks()
+            .get(func_name)
+            .unwrap_or_else(|| panic!("No blocks found for {func_name}. This is a programmer bug."))
+            .clone();
+        for (name, id) in function_blocks {
+            func_ctx.register_block(id, &name);
         }
 
-        // Then we need to generate blocks themselves, passing the basic block and the
-        // block into which to generate, as well as the data context.
+        // We then stick the function into the symbol table for future reference.
+        data.flo.symbols.code.insert(func_name.to_string(), func_entry_id);
+
+        // Finally, we proceed to generate the function body itself in the form of all
+        // the basic blocks.
         for (ix, block) in func.get_basic_blocks().iter().enumerate() {
             let block_name = block.get_name().to_str()?;
             let id = func_ctx.try_lookup_block(block_name)?;
 
-            // In the case of the _first_ block, this is special as it
-            // represents a function entry, so we need to insert the signature.
+            // In the case of the _first_ block, this is special as it represents a function
+            // entry point, so we need to insert the signature.
             let signature = if ix == 0 { Some(&sig) } else { None };
 
-            // We also stick the function into the symbol table for future reference.
-            data.flo.symbols.code.insert(func_name.to_string(), id);
-
-            // Now that we have the ID, we can actually perform the generation process.
+            // Given the id and the signature, we can perform function generation.
             data.flo.fill_block(id, signature, |bb| {
                 self.generate_block(block, bb, &mut func_ctx)
             })?;
@@ -442,7 +466,7 @@ impl ObjectGenerator {
         let global_id = data.flo.variables.insert(&global_variable);
 
         // With the identifier, we need to shove it into the module globals.
-        data.module_globals.insert(global_name.to_string(), global_id);
+        data.map.module_globals.insert(global_name.to_string(), global_id);
 
         // Next, we need to add it to the symbol table if it is something with external
         // visibility.
@@ -2457,6 +2481,8 @@ impl ObjectGenerator {
     ) -> Result<()> {
         assert_correct_opcode(&instruction, InstructionOpcode::Call);
 
+        // TODO (#100) Handle function pointers.
+
         // Let's start by grabbing the function being called, which is always the LAST
         // operand to the call instruction.
         let num_operands = instruction.get_num_operands();
@@ -2646,10 +2672,10 @@ impl ObjectGenerator {
         // Then we need to correctly process the opcode into the correct block exit.
         match &opcode {
             Br => self.generate_br(instruction, bb, func_ctx),
-            IndirectBr => unimplemented!("IndirectBr"),
-            Invoke => unimplemented!("Invoke"),
+            IndirectBr => self.generate_indirect_br(instruction, bb, func_ctx),
+            Invoke => self.generate_invoke(instruction, bb, func_ctx),
             Return => self.generate_return(instruction, bb, func_ctx),
-            Switch => unimplemented!("Switch"),
+            Switch => self.generate_switch(instruction, bb, func_ctx),
             Unreachable => self.generate_unreachable(instruction, bb),
             CallBr | CatchRet | CatchSwitch | CleanupRet | Resume => {
                 Err(Error::UnsupportedOpcode(opcode))?
@@ -2658,6 +2684,296 @@ impl ObjectGenerator {
                 "The opcode has already been checked to ensure it is a terminator instruction"
             ),
         }
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [indirectbr](https://llvm.org/docs/LangRef.html#indirectbr-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ an `indirectbr`.
+    pub fn generate_indirect_br(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::IndirectBr);
+
+        // Let us start by getting the operands to the indirectbr instruction. These
+        // include both the pointer operand, and the potential target blocks, so we
+        // cannot perform any global extractions.
+        let operands = instruction.get_operands().collect_vec();
+
+        // The first operand is the pointer that determines how to dispatch.
+        let pointer = util::extract_value_operand(
+            *operands.first().ok_or_else(|| {
+                let actual_arg_count = instruction.get_num_operands();
+                Error::MalformedLLVM(format!(
+                    "IndirectBr instruction had {actual_arg_count} operands where at least 1 was \
+                     expected"
+                ))
+            })?,
+            InstructionOpcode::IndirectBr,
+        )?;
+        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+
+        // The remaining ones are the potential block labels in the function, which we
+        // can instantly turn into variables for comparison against. From the LLVM IR
+        // [Language Reference](https://llvm.org/docs/LangRef.html#addresses-of-basic-blocks),
+        // we know that if the pointer points to a block not listed after the
+        // instruction, the behavior is undefined.
+        let potential_target_blocks = operands[1..]
+            .iter()
+            .map(|operand| util::extract_block_operand(*operand, InstructionOpcode::IndirectBr))
+            .collect::<Result<Vec<_>>>()?;
+        let potential_target_ids = potential_target_blocks
+            .into_iter()
+            .map(|block| func_ctx.try_lookup_block(block.get_name().to_str()?))
+            .collect::<Result<Vec<_>>>()?;
+        let target_id_constants = potential_target_ids
+            .iter()
+            .map(|id| {
+                let constant_val = ConstantValue {
+                    value: *id as u128,
+                    typ:   Type::Pointer,
+                };
+                let constant_variable = bb.assign_new_const(
+                    constant_val.clone(),
+                    VariableLinkage::Relocation,
+                    Vec::new(),
+                    None,
+                );
+
+                bb.simple_assign_const(constant_variable, constant_val);
+
+                constant_variable
+            })
+            .collect_vec();
+
+        // At this point, we can then generate the comparisons much as we would for a
+        // switch. To do that we start by allocating output variables.
+        let result_variables = (0..target_id_constants.len())
+            .map(|_| bb.add_variable(Type::Bool))
+            .collect_vec();
+
+        // Then we need to build the comparisons themselves.
+        let comparison_name = self.polyfills.try_get_polyfill(
+            "icmp_eq",
+            &[LLVMType::ptr, LLVMType::ptr],
+            &LLVMType::bool,
+        )?;
+        for (result, compare_to) in result_variables.iter().zip(target_id_constants) {
+            bb.simple_call_builtin(comparison_name, vec![compare_to, pointer_id], vec![*result]);
+        }
+
+        // At this point our `result_variables` are now going to select the behavior
+        // using a match, so we create our match arms.
+        let match_arms = result_variables
+            .into_iter()
+            .zip(potential_target_ids)
+            .map(|(cond, target)| bb.add_match_arm_without_metadata(cond, target))
+            .collect_vec();
+
+        // Finally we can end the block properly, and in this case we have no default
+        // block as the only way we could reach one is under undefined behavior, and in
+        // this case FLO will generate a panicking arm for us anyway.
+        bb.end_with_match(&match_arms, None, None);
+
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [invoke](https://llvm.org/docs/LangRef.html#invoke-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ an `invoke`.
+    pub fn generate_invoke(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::Invoke);
+
+        // TODO (#100) Handle function pointers.
+
+        let missing_operands_error = || {
+            Error::MalformedLLVM(format!(
+                "Invoke instruction had {} operands but 3 or more were expected",
+                instruction.get_num_operands()
+            ))
+        };
+
+        // Invoke takes a variable number of operands with 3 as a minimum. The LAST
+        // operand is the name of the function to invoke. The SECOND LAST is the label
+        // for the unwind clause. The THIRD LAST is the label for the normal return
+        // clause.
+        //
+        // All other operands are the arguments (in order) that will be passed to the
+        // function described by the LAST operand.
+        let all_operands = instruction.get_operands().collect_vec();
+
+        // First we pull out the function operand, and get a block reference for it.
+        // This can either be a foreign call or a local call, and we have to check
+        // which.
+        let function_value = util::extract_value_operand(
+            *all_operands.last().ok_or_else(missing_operands_error)?,
+            InstructionOpcode::Invoke,
+        )?;
+        let function_name = function_value.get_name().to_str()?;
+        let function_ref = func_ctx.module_functions().get_by_left(function_name).map_or_else(
+            || BlockRef::External(function_name.to_string()),
+            |id| BlockRef::Local(*id),
+        );
+
+        // While on many platforms the `invoke` instruction is used to associate a label
+        // for unwinding purposes, we cannot perform any unwinding on our platform. To
+        // that end, we ignore the error-case label and instead just translate this as a
+        // function call followed by an unconditional branch to the happy case block.
+        //
+        // To do that, we do need the happy case label, which will be the THIRD operand
+        // from the end.
+        let happy_block = util::extract_block_operand(
+            *all_operands
+                .get(all_operands.len() - 3)
+                .ok_or_else(missing_operands_error)?,
+            InstructionOpcode::Invoke,
+        )?;
+        let happy_block_id = func_ctx.try_lookup_block(happy_block.get_name().to_str()?)?;
+
+        // In order to call the function (obtained above), we also need to have the
+        // arguments to the function.
+        let function_args = all_operands[0..(all_operands.len() - 3)]
+            .iter()
+            .map(|op| {
+                let value = util::extract_value_operand(*op, InstructionOpcode::Invoke)?;
+                util::get_var_or_const(&value, bb, func_ctx)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Finally we also need the return value, which we also register in the function
+        // context.
+        let return_type = LLVMType::try_from(instruction.get_type())?;
+        let return_type_flo = ObjectContext::flo_type_of(&return_type)?;
+        let return_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
+        let return_id = bb.add_variable(return_type_flo.clone());
+        func_ctx.register_local(return_id, return_name, return_type_flo);
+
+        // Finally we issue the call and perform the jump.
+        bb.simple_call(&function_ref, function_args, vec![return_id]);
+        bb.end_with_goto(happy_block_id);
+
+        // We have nothing to return, so we are done.
+        Ok(())
+    }
+
+    /// Generates the FLO code that corresponds to an LLVM
+    /// [switch](https://llvm.org/docs/LangRef.html#switch-instruction)
+    /// instruction.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the instruction cannot
+    ///   be generated.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided instruction is _not_ a `switch`.
+    pub fn generate_switch(
+        &self,
+        instruction: InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        assert_correct_opcode(&instruction, InstructionOpcode::Switch);
+
+        // A switch in LLVM does the comparison directly. However, in FLO, our closest
+        // equivalent is a match, which expects the condition to be precomputed. Let's
+        // start by grabbing all the operands to the instruction. These vary in type, so
+        // we have to be careful pulling them out.
+        let operands = instruction.get_operands().collect_vec();
+        let missing_operands_error = || {
+            Error::MalformedLLVM(format!(
+                "Switch instruction had {} operands but an even number were expected",
+                instruction.get_num_operands()
+            ))
+        };
+
+        // The first of the operands, which MUST exist, is the value to perform the
+        // equality comparison against.
+        let compare_to = util::extract_value_operand(
+            *operands.first().ok_or_else(missing_operands_error)?,
+            InstructionOpcode::Switch,
+        )?;
+        let compare_to_type = LLVMType::try_from(compare_to.get_type())?;
+        let compare_to_id = util::get_var_or_const(&compare_to, bb, func_ctx)?;
+
+        // The second, which also MUST exist, is the destination to jump to in the
+        // default case (the fallthrough).
+        let default_dest = util::extract_block_operand(
+            *operands.get(1).ok_or_else(missing_operands_error)?,
+            InstructionOpcode::Switch,
+        )?;
+        let default_dest_id = func_ctx.try_lookup_block(default_dest.get_name().to_str()?)?;
+
+        // The subsequent operands are PAIRS, in which the first element is a value to
+        // compare for equality with `compare_to`, and the second element is a block
+        // label. These labels MUST exist within the current function.
+        let remaining_operands = &operands[2..];
+        let destination_triples = remaining_operands
+            .chunks(2)
+            .map(|pair| {
+                let &[value, block] = pair else { Err(missing_operands_error())? };
+                let value = util::extract_value_operand(value, InstructionOpcode::Switch)?;
+                let value_type = LLVMType::try_from(value.get_type())?;
+                let value_id = util::get_var_or_const(&value, bb, func_ctx)?;
+                let block = util::extract_block_operand(block, InstructionOpcode::Switch)?;
+                let block_id = func_ctx.try_lookup_block(block.get_name().to_str()?)?;
+
+                Ok((value_id, value_type, block_id))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // In order to convert this into a FLO match we have to actually add comparisons
+        // for each value explicitly. After doing that, we can turn them into match arms
+        // directly.
+        let match_arms = destination_triples
+            .into_iter()
+            .map(|(value_id, value_type, block_id)| {
+                let function_inputs = vec![compare_to_id, value_id];
+                let boolean_output = bb.add_variable(Type::Bool);
+                let eq_fn = self.polyfills.try_get_polyfill(
+                    "icmp_eq",
+                    &[compare_to_type.clone(), value_type],
+                    &LLVMType::bool,
+                )?;
+                bb.simple_call_builtin(eq_fn, function_inputs, vec![boolean_output]);
+                let match_arm_id = bb.add_match_arm_without_metadata(boolean_output, block_id);
+
+                Ok(match_arm_id)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Once we have the match arms, we can actually terminate our current block
+        // quite simply.
+        bb.end_with_match(&match_arms, Some(default_dest_id), None);
+
+        // With nothing to return, we are done.
+        Ok(())
     }
 
     /// Generates the FLO code that corresponds to an LLVM

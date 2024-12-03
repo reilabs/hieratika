@@ -65,8 +65,8 @@ pub enum Error {
 
     /// Emitted when a polyfill is requested for an LLVM-side name, but none was
     /// made available in the polyfill mapping.
-    #[error("No polyfill was available for the LLVM name {_0}")]
-    MissingPolyfill(String),
+    #[error("No polyfill was available for the operation {_0} : {_1}")]
+    MissingPolyfill(String, String),
 
     /// Emitted when a global value that is not `constant` is discovered.
     #[error("The global with name `{_0}` is non-constant, but we only support constant globals")]
@@ -122,8 +122,8 @@ impl Error {
 
     /// Generates [`Self::MissingPolyfill`] while being able to take [`&str`] as
     /// the argument for ease of use.
-    pub fn missing_polyfill(name: &str) -> Self {
-        Self::MissingPolyfill(name.to_string())
+    pub fn missing_polyfill(name: &str, type_str: &str) -> Self {
+        Self::MissingPolyfill(name.to_string(), type_str.to_string())
     }
 
     /// Generates [`Self::NonConstantGlobal`] while being able to take [`&str`]
