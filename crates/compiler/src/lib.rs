@@ -108,6 +108,7 @@
 pub mod constant;
 pub mod context;
 pub mod llvm;
+pub mod messages;
 pub mod obj_gen;
 pub mod pass;
 pub mod polyfill;

@@ -147,10 +147,7 @@ pub struct LLVMOperation {
     pub operand_types: Vec<LLVMType>,
 
     /// The return type of the operation.
-    ///
-    /// This should only be set to [`None`] if the return type cannot be
-    /// determined without program analysis.
-    pub return_type: Option<LLVMType>,
+    pub return_type: LLVMType,
 }
 
 impl LLVMOperation {
@@ -161,19 +158,7 @@ impl LLVMOperation {
         Self {
             opcode_name:   name.to_string(),
             operand_types: ops.to_vec(),
-            return_type:   Some(ret),
-        }
-    }
-
-    /// Creates an opcode representing the operation with the given `name`,
-    /// parameter types `ops`, and an unknown return type (as this may require
-    /// compilation information to determine).
-    #[must_use]
-    pub fn of_dyn_ret(name: &str, ops: &[LLVMType]) -> Self {
-        Self {
-            opcode_name:   name.to_string(),
-            operand_types: ops.to_vec(),
-            return_type:   None,
+            return_type:   ret,
         }
     }
 }
@@ -187,10 +172,7 @@ impl Display for LLVMOperation {
             .iter()
             .map(std::string::ToString::to_string)
             .join(" -> ");
-        let ret_str = self
-            .return_type
-            .as_ref()
-            .map_or("()".to_string(), std::string::ToString::to_string);
+        let ret_str = self.return_type.to_string();
         write!(f, "{} : {} -> {}", self.opcode_name, args_str, ret_str)
     }
 }
@@ -248,16 +230,16 @@ impl PolyfillMap {
     /// `name`, `param_types` and `return_type` returning it if it exists or
     /// returning [`None`] otherwise.
     #[must_use]
-    pub fn polyfill(
+    pub fn get_polyfill(
         &self,
         name: &str,
         param_types: &[LLVMType],
-        return_type: Option<&LLVMType>,
+        return_type: &LLVMType,
     ) -> Option<&String> {
         let op = LLVMOperation {
             opcode_name:   name.to_string(),
             operand_types: param_types.to_vec(),
-            return_type:   return_type.cloned(),
+            return_type:   return_type.clone(),
         };
 
         self.mapping.get(&op)
@@ -270,13 +252,13 @@ impl PolyfillMap {
     /// # Errors
     ///
     /// - [`Error::MissingPolyfill`] if the requested polyfill does not exist.
-    pub fn try_polyfill(
+    pub fn try_get_polyfill(
         &self,
         name: &str,
         param_types: &[LLVMType],
-        return_type: Option<&LLVMType>,
+        return_type: &LLVMType,
     ) -> Result<&String> {
-        self.polyfill(name, param_types, return_type)
+        self.get_polyfill(name, param_types, return_type)
             .ok_or(Error::missing_polyfill(name))
     }
 
@@ -292,9 +274,9 @@ impl PolyfillMap {
         &self,
         name: &str,
         param_types: &[LLVMType],
-        return_type: Option<&LLVMType>,
+        return_type: &LLVMType,
     ) -> &String {
-        self.polyfill(name, param_types, return_type)
+        self.get_polyfill(name, param_types, return_type)
             .unwrap_or_else(|| panic!("{name} polyfill was not present"))
     }
 }
@@ -401,22 +383,47 @@ impl PolyfillMap {
 /// The definition of the [memory access and addressing operations](https://llvm.org/docs/LangRef.html#memory-access-and-addressing-operations).
 impl PolyfillMap {
     fn alloca(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
+        // The first argument is the size, in felts, of the allocation, while the second
+        // argument is the number of instances of that size to allocate.
         self.mk("alloca", &[LLVMType::i64, LLVMType::i64], LLVMType::ptr);
     }
 
+    // TODO composites via iteration. load_* for each prim type, taking an offset
+    // from the ptr and the ptr. Need to fix insertvalue and extractvalue. Use
+    // construct and destructure to deal with these things.
+
     fn load(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
-        self.mk_dyn_ret("load", &[LLVMType::i64, LLVMType::ptr]);
+        // Due to the nature of the types available in FLO, we can only load and store
+        // PRIMITIVE types. To that end, we need a load variant for _each_ primitive
+        // type, and we have to decompose loads and stores of aggregates into loads and
+        // stores using primitive types.
+
+        // Our load function takes the pointer to load and an offset (in felts) from
+        // that pointer, and returns the result of loading from that pointer.
+        for typ in Self::numptr_types() {
+            self.mk("load", &[LLVMType::ptr, LLVMType::i64], typ);
+        }
     }
 
     fn store(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
-        self.mk("store", &[LLVMType::i64, LLVMType::ptr], LLVMType::void);
+        // Due to the nature of the types available in FLO, we can only load and store
+        // PRIMITIVE types. To that end, we need a load variant for _each_ primitive
+        // type, and we have to decompose loads and stores of aggregates into loads and
+        // stores using primitive types.
+
+        // Our store function takes the value to store, the pointer to store it at, and
+        // an offset (in felts) from that pointer at which the primitive value should be
+        // stored.
+        for typ in Self::numptr_types() {
+            self.mk(
+                "store",
+                &[typ, LLVMType::ptr, LLVMType::i64],
+                LLVMType::void,
+            );
+        }
     }
 
     fn cmpxchg(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
         for typ in Self::intptr_types() {
             self.mk(
                 "cmpxchg",
@@ -427,7 +434,6 @@ impl PolyfillMap {
     }
 
     fn atomicrmw(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
         let op_name = "atomicrmw";
 
         // Some of the ops are available to numeric types and pointers
@@ -463,8 +469,17 @@ impl PolyfillMap {
     }
 
     fn getelementptr(&mut self) {
-        // TODO (#29) Make this comply with the design for the memory model.
-        self.mk_dyn_ret("getelementptr", &[LLVMType::ptr, LLVMType::i64]);
+        // This takes a pointer to an aggregate (either an array or a struct), and the
+        // offset (in felts) within that pointer that corresponds to the target element.
+        // It then returns a pointer to that element.
+        //
+        // This can only work at a single level, and so any usage needs to decompose
+        // this.
+        self.mk(
+            "getelementptr",
+            &[LLVMType::ptr, LLVMType::i64],
+            LLVMType::ptr,
+        );
     }
 
     fn all_memory_ops(&mut self) {
@@ -1140,13 +1155,6 @@ impl PolyfillMap {
         );
     }
 
-    pub fn mk_dyn_ret(&mut self, name: &str, params: &[LLVMType]) {
-        self.mapping.insert(
-            LLVMOperation::of_dyn_ret(name, params),
-            Self::polyfill_name(name, params),
-        );
-    }
-
     /// Generates the name for a polyfill for the provided `func_name` called
     /// with the provided `types`.
     #[must_use]
@@ -1221,13 +1229,10 @@ mod test {
     #[test]
     fn polyfill_lookup_works() {
         let map = PolyfillMap::new();
-        let polyfill = map.polyfill(
+        let polyfill = map.get_polyfill(
             "llvm.uadd.with.overflow.i64",
             &[LLVMType::i64, LLVMType::i64],
-            Some(&LLVMType::make_struct(
-                false,
-                &[LLVMType::i64, LLVMType::bool],
-            )),
+            &LLVMType::make_struct(false, &[LLVMType::i64, LLVMType::bool]),
         );
 
         assert!(polyfill.is_some());
@@ -1240,6 +1245,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 952);
+        assert_eq!(count, 970);
     }
 }
