@@ -11,25 +11,25 @@ use std::collections::HashMap;
 use ethnum::U256;
 use hieratika_errors::compile::llvm::{Error, Result};
 use inkwell::{
+    GlobalVisibility,
     module::{Linkage, Module},
     values::{FunctionValue, GlobalValue},
-    GlobalVisibility,
 };
 
 use crate::{
     context::SourceContext,
     llvm::{
+        TopLevelEntryKind,
         data_layout::DataLayout,
         special_intrinsics::SpecialIntrinsics,
         typesystem::{LLVMFunction, LLVMType},
-        TopLevelEntryKind,
     },
     pass::{
-        data::{ConcretePassData, DynPassDataMap, DynPassReturnData, PassDataOps},
         ConcretePass,
         Pass,
         PassKey,
         PassOps,
+        data::{ConcretePassData, DynPassDataMap, DynPassReturnData, PassDataOps},
     },
 };
 
@@ -429,20 +429,20 @@ pub struct GlobalInfo {
 mod test {
     use std::path::Path;
 
-    use inkwell::{module::Linkage, GlobalVisibility};
+    use inkwell::{GlobalVisibility, module::Linkage};
 
     use crate::{
         context::SourceContext,
         llvm::{
+            TopLevelEntryKind,
             data_layout::DataLayout,
             typesystem::{LLVMFunction, LLVMType},
-            TopLevelEntryKind,
         },
         pass::{
-            analysis::module_map::{BuildModuleMap, ModuleMap},
-            data::DynPassDataMap,
             ConcretePass,
             PassOps,
+            analysis::module_map::{BuildModuleMap, ModuleMap},
+            data::DynPassDataMap,
         },
     };
 
@@ -558,10 +558,10 @@ mod test {
         assert_eq!(global_2.kind, TopLevelEntryKind::Definition);
         assert_eq!(
             global_2.typ,
-            LLVMType::make_struct(
-                true,
-                &[LLVMType::ptr, LLVMType::make_array(16, LLVMType::i8)]
-            )
+            LLVMType::make_struct(true, &[
+                LLVMType::ptr,
+                LLVMType::make_array(16, LLVMType::i8)
+            ])
         );
 
         Ok(())
@@ -597,10 +597,10 @@ mod test {
             rust_test_input.typ,
             LLVMFunction::new(LLVMType::i64, &[LLVMType::i64, LLVMType::i64])
         );
-        assert_eq!(
-            rust_test_input.param_names,
-            vec![Some("left".into()), Some("right".into())]
-        );
+        assert_eq!(rust_test_input.param_names, vec![
+            Some("left".into()),
+            Some("right".into())
+        ]);
 
         // llvm.dbg.declare
         let llvm_dbg_declare = functions.get(&"llvm.dbg.declare".to_string()).unwrap();
@@ -610,10 +610,11 @@ mod test {
         assert_eq!(llvm_dbg_declare.visibility, GlobalVisibility::Default);
         assert_eq!(
             llvm_dbg_declare.typ,
-            LLVMFunction::new(
-                LLVMType::void,
-                &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata]
-            )
+            LLVMFunction::new(LLVMType::void, &[
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata
+            ])
         );
         assert_eq!(llvm_dbg_declare.param_names, vec![None, None, None]);
 

@@ -3,7 +3,7 @@
 
 use std::{
     env,
-    fs::{create_dir_all, OpenOptions},
+    fs::{OpenOptions, create_dir_all},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
 };

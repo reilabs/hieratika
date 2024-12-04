@@ -9,12 +9,11 @@ members = [
   "crates/error",
   "crates/cairoc",
   "crates/flo",
-  "crates/rust-test-input",
   "crates/test-utils",
 ]
 
 # Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
-exclude = ["cairo"]
+exclude = ["cairo", "tests"]
 
 # Here we set keys that are relevant across all packages, allowing them to be inherited.
 [workspace.package]
@@ -28,7 +27,7 @@ keywords = ["compiler", "starknet", "starkware"]
 categories = ["compilers", "virtualization", "cryptography::cryptocurrencies"]
 
 edition = "2021"
-rust-version = "1.81.0"
+rust-version = "1.83.0"
 
 # Dependencies that are used by more than one crate are specified here, allowing us to ensure that
 # we match versions in all crates.

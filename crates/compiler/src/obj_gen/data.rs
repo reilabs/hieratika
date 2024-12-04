@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use bimap::BiHashMap;
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
-    types::{ArrayType, BlockId, PoisonType, StructType, Type, VariableId, VariableLinkage},
     FlatLoweredObject,
+    types::{ArrayType, BlockId, PoisonType, StructType, Type, VariableId, VariableLinkage},
 };
 use inkwell::module::Linkage;
 

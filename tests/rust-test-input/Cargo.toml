@@ -1,0 +1,13 @@
+[package]
+name = "hieratika-rust-test-input"
+version = "0.0.1"
+
+description = "Rust input files for compilation to LLVM IR for use as test inputs to the compiler."
+
+edition = "2021"
+rust-version = "1.83.0"
+
+# Make these specifically impossible to publish as they have no independent use.
+publish = false
+
+[dependencies]

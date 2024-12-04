@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 
 use hieratika_errors::compile::{llvm, llvm::Error};
 use inkwell::{
-    llvm_sys::{core::LLVMGetTypeKind, LLVMTypeKind},
+    llvm_sys::{LLVMTypeKind, core::LLVMGetTypeKind},
     types::{
         AnyTypeEnum,
         ArrayType,
@@ -213,21 +213,21 @@ impl LLVMType {
     #[must_use]
     pub fn size_of(&self) -> usize {
         use LLVMType::{
-            bool,
-            f16,
-            f32,
-            f64,
-            i128,
-            i16,
-            i32,
-            i64,
-            i8,
-            ptr,
-            void,
             Array,
             Function,
             Metadata,
             Structure,
+            bool,
+            f16,
+            f32,
+            f64,
+            i8,
+            i16,
+            i32,
+            i64,
+            i128,
+            ptr,
+            void,
         };
         match self {
             bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,

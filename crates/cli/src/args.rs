@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use clap::{command, Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum, command};
 
 #[derive(Clone, Debug, Parser)]
 #[command(

@@ -17,7 +17,7 @@ rust-version.workspace = true
 bimap.workspace = true
 chumsky = "0.9.3"
 clap.workspace = true
-derivative = "2.2.0"
+derive_more = { version = "1.0.0", features = ["full"] }
 downcast-rs = "1.2.1"
 ethnum.workspace = true
 inkwell.workspace = true

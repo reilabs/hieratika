@@ -11,11 +11,23 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     cairo.url = "github:cairo-nix/cairo-nix";
   };
 
   # The results of our flake.
-  outputs = { self, nixpkgs, flake-utils, crane, fenix, cairo }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    crane,
+    fenix,
+    naersk,
+    cairo,
+  }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         # We grab our expected rust version from the Cargo.toml.
@@ -25,16 +37,10 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
         fenixLib = fenix.packages.${system};
-        toolchainHash = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
+        toolchainHash = "sha256-s1RPtyvDGJaX/BisLT+ifVfuhDT1nZkZ1NcK8sbwELM=";
         fenixStable = fenixLib.fromToolchainName {
             name = rustVersion;
             sha256 = toolchainHash;
-        };
-
-        # A target of the same version for our temporary "source" ABI
-        fenixAarch64 = fenixLib.targets.aarch64-unknown-none-softfloat.toolchainOf {
-          channel = rustVersion;
-          sha256 = toolchainHash;
         };
 
         # As we want nightly Rustfmt, we have to build a custom toolchain.
@@ -48,20 +54,47 @@
             "rust-std"
             "rustc"
           ])
-          fenixAarch64.rust-std
+        ];
+
+        fenixToolchainUnstable = fenixLib.combine [
+          fenixLib.latest.cargo
+          fenixLib.latest.clippy
+          fenixLib.latest.rust-docs
+          fenixLib.latest.rust-src
+          fenixLib.latest.rust-std
+          fenixLib.latest.rustc
+          fenixLib.latest.rustfmt
         ];
 
         # The crane library configures the Rust toolchain, along with the components we expect it
         # to have.
         craneLib = (crane.mkLib pkgs).overrideToolchain fenixToolchain;
 
+        craneLibUnstable = (crane.mkLib pkgs).overrideToolchain fenixToolchainUnstable;
+
         # Collect our workspace packages, including our application.
         workspacePackages = pkgs.callPackage ./workspace.nix {
           inherit craneLib;
         };
 
+        workspacePackagesUnstable = pkgs.callPackage ./workspace.nix {
+          craneLib = craneLibUnstable;
+        };
+
+        naersk' = naersk.lib.${system}.override {
+          cargo = fenixToolchainUnstable;
+          rustc = fenixToolchainUnstable;
+        };
+
+        test-inputs = pkgs.callPackage ./tests/rust-test-input/package.nix {
+          naersk = naersk';
+          inherit (fenixLib.latest) rust-src;
+        };
+
         # Filter out things that aren't derivations for the `packages` output, or Nix gets mad.
         hieratika = lib.filterAttrs (lib.const lib.isDerivation) workspacePackages;
+
+        hieratikaUnstable = lib.filterAttrs (lib.const lib.isDerivation) workspacePackagesUnstable;
 
         # And for convenience, collect all the workspace members into a single derivation,
         # so we can check they all compile with one command, `nix build '.#all'`.
@@ -85,6 +118,8 @@
         packages = {
           inherit all;
           default = hieratika.hieratika-cli;
+          unstable = hieratikaUnstable.hieratika-cli;
+          inherit test-inputs;
         } // hieratika;
 
         # The default dev shell puts you in your native shell to make things feel happy.
@@ -93,8 +128,23 @@
           inputsFrom = lib.attrValues hieratika;
           packages = devshellPackages;
 
+          rustTestInputs = test-inputs;
+          rustTestInputsDest = "crates/compiler/input/compilation";
+
           shellHook = ''
-          exec $(${getUserShellCommand})
+            mkdir -p "$rustTestInputsDest"
+            cp -rv "$rustTestInputs"/* "$rustTestInputsDest"
+
+            exec $(${getUserShellCommand})
+          '';
+        };
+
+        devShells.unstable = craneLibUnstable.devShell {
+          LLVM_SYS_180_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_18.libllvm}";
+          inputsFrom = lib.attrValues hieratikaUnstable;
+          packages = devshellPackages;
+          shellHook = ''
+            exec $(${getUserShellCommand})
           '';
         };
 

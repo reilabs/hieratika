@@ -7,7 +7,6 @@ use std::{
     fmt::Debug,
 };
 
-use derivative::Derivative;
 use downcast_rs::Downcast;
 
 use crate::{
@@ -122,8 +121,7 @@ where
 pub type DynPassReturnData = PassReturnData<PassData>;
 
 /// The data returned when executing a pass.
-#[derive(Derivative)]
-#[derivative(Debug(bound = "T: Debug"))]
+#[derive(Debug)]
 pub struct PassReturnData<T> {
     /// The newly-modified source context.
     pub source_context: SourceContext,
@@ -187,12 +185,7 @@ pub type DynPassDataMap = PassDataMap<PassData>;
 ///
 /// It will always contain the latest pass data, as there is no need to re-run a
 /// pass unless it was invalidated by a subsequent pass.
-#[derive(Derivative)]
-#[derivative(
-    Clone(bound = "T: Clone"),
-    Debug(bound = "T: Debug"),
-    PartialEq(bound = "T: PartialEq")
-)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PassDataMap<T> {
     /// The mapping from pass keys to pass data.
     mapping: HashMap<PassKey, T>,

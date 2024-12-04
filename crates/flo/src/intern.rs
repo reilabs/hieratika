@@ -189,13 +189,13 @@ mod tests {
     }
 
     /// Generates our sample unit under test, with some simple initialization.
-    fn _get_uut() -> InternTable<InternIdentifier, Vec<u32>> {
+    fn get_uut() -> InternTable<InternIdentifier, Vec<u32>> {
         InternTable::new()
     }
 
     #[test]
     fn added_elements_can_be_retreived() {
-        let mut uut = _get_uut();
+        let mut uut = get_uut();
         let mut indices: Vec<InternIdentifier> = vec![];
 
         // Populate a bunch of elements.
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn swap_replaces_elements() {
-        let mut uut = _get_uut();
+        let mut uut = get_uut();
 
         // Add two sample values.
         let index_a = uut.insert(&vec![0xcccc_cccc]);
@@ -264,12 +264,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "internal consistency error: get with an unknown ID 1234!")]
     fn getting_a_nonexistent_index_should_panic() {
-        _get_uut().get(1234);
+        get_uut().get(1234);
     }
 
     #[test]
     fn special_values_should_exist_and_be_poisoned() {
-        let uut = _get_uut();
+        let uut = get_uut();
 
         assert_eq!(
             uut.get(0),

@@ -8,7 +8,7 @@ on:
 
 # Environment variables that will be set on all runners
 env:
-  DEV_SHELL_LINUX: "nix --store ~/nix_store develop '.#ci'"
+  DEV_SHELL_LINUX: "nix develop '.#ci'"
   DEV_SHELL_MACOS: "nix develop '.#ci'"
   CARGO_TERM_COLOR: always # Always colour Cargo's output.
   CARGO_INCREMENTAL: 0 # Always run without incremental builds on CI.
