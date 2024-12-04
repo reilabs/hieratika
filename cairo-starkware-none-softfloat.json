@@ -1,0 +1,23 @@
+{
+  "abi": "softfloat",
+  "arch": "cairo",
+  "crt-objects-fallback": "false",
+  "data-layout": "e-m:e-S128-p0:128:128-i1:252-i8:8:252-i16:252-i32:252-i64:252-i128:252-f32:252-f64:252-a:0-Fi128-n1:8:16:32:64:128",
+  "disable-redzone": true,
+  "features": "+softfloat",
+  "linker": null,
+  "llvm-target": "cairo-starkware-none-softfloat",
+  "singlethread": true,
+  "max-atomic-width": 252,
+  "metadata": {
+    "description": "Bare CairoVM, Softfloat",
+    "host_tools": false,
+    "std": false
+  },
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "stack-probes": {
+    "kind": "inline"
+  },
+  "target-pointer-width": "128"
+}
