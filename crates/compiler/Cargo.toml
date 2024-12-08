@@ -30,3 +30,9 @@ rand = "0.8.5"
 
 [dev-dependencies]
 anyhow.workspace = true
+cairo-lang-compiler.workspace = true
+cairo-lang-runner = { path = "../../cairo/crates/cairo-lang-runner" }
+cairo-lang-sierra = { path = "../../cairo/crates/cairo-lang-sierra" }
+cairo-lang-sierra-generator = { path = "../../cairo/crates/cairo-lang-sierra-generator" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-cairoc.workspace = true

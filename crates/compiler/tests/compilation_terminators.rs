@@ -1,7 +1,9 @@
 //! Tests compilation of the `terminators.ll` IR file to check that we generate
 //! the expected FLO output.
 
-mod common;
+// Setting module as public to avoid `dead_code` warning for unused common test
+// functions.
+pub mod common;
 
 #[test]
 fn compiles_terminator_instructions() -> anyhow::Result<()> {

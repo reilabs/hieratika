@@ -4,7 +4,9 @@
 use hieratika_flo::types::{BlockExit, Type};
 use itertools::Itertools;
 
-mod common;
+// Setting module as public to avoid `dead_code` warning for unused common test
+// functions.
+pub mod common;
 
 #[test]
 fn compiles_add() -> anyhow::Result<()> {
