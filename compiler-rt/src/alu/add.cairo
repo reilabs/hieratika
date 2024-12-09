@@ -1,8 +1,7 @@
-use core::num::traits::WrappingAdd;
 pub mod add_i8;
 
 use crate::utils::assert_fits_in_type;
-use core::num::traits::BitSize;
+use core::num::traits::{BitSize, WrappingAdd};
 
 // Perform the `add` operation.
 //
@@ -28,13 +27,9 @@ fn add<
     lhs: u128, rhs: u128
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
-    assert_fits_in_type::<T>(lhs);
-    assert_fits_in_type::<T>(rhs);
+    let lhs = assert_fits_in_type::<T>(lhs);
+    let rhs = assert_fits_in_type::<T>(rhs);
 
-    // Convert values to the concrete type to make a wrapping addition.
-    // We're sure the values can be converted so we can safely unwrap.
-    let rhs: T = rhs.try_into().unwrap();
-    let lhs: T = lhs.try_into().unwrap();
     // Do the addition. wrapping_add() guarantees the result will fit in T, so we can cast the
     // result back to u128.
     lhs.wrapping_add(rhs).into()
