@@ -1,7 +1,7 @@
-use crate::alu::add_with_overflow::add_with_overflow;
+use crate::alu::add_with_overflow::uadd_with_overflow;
 
 pub fn __llvm_uadd_with_overflow_i8_i8(lhs: u128, rhs: u128) -> (u128, bool) {
-    add_with_overflow::<u8>(lhs, rhs)
+    uadd_with_overflow::<u8>(lhs, rhs)
 }
 
 #[cfg(test)]
