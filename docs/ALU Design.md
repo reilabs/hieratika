@@ -314,9 +314,6 @@ Implementations for every supported integer lengths are specified. Their names f
 convention explained in the section above. Each instruction or intrinsic name is a link to the
 relevant part of the LLVM Language Reference Manual.
 
-Operations prepended with (\*) are the extended goal and will not be implemented in the initial
-phase. See [Data Types](#data-types) for details.
-
 #### Based on Instructions
 
 - [`add`](https://llvm.org/docs/LangRef.html#add-instruction):
@@ -324,82 +321,82 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_add_i16_i16 -> i16`
   - `__llvm_add_i32_i32 -> i32`
   - `__llvm_add_i64_i64 -> i64`
-  - (\*) `__llvm_add_i128_i128 -> i128`
+  - `__llvm_add_i128_i128 -> i128`
 - [`sub`](https://llvm.org/docs/LangRef.html#sub-instruction):
   - `__llvm_sub_i8_i8 -> i8`
   - `__llvm_sub_i16_i16 -> i16`
   - `__llvm_sub_i32_i32 -> i32`
   - `__llvm_sub_i64_i64 -> i64`
-  - (\*) `__llvm_sub_i128_i128 -> i128`
+  - `__llvm_sub_i128_i128 -> i128`
 - [`mul`](https://llvm.org/docs/LangRef.html#mul-instruction):
   - `__llvm_mul_i8_i8 -> i8`
   - `__llvm_mul_i16_i16 -> i16`
   - `__llvm_mul_i32_i32 -> i32`
   - `__llvm_mul_i64_i64 -> i64`
-  - (\*) `__llvm_mul_i128_i128 -> i128`
+  - `__llvm_mul_i128_i128 -> i128`
 - [`udiv`](https://llvm.org/docs/LangRef.html#udiv-instruction):
   - `__llvm_udiv_i8_i8 -> i8`
   - `__llvm_udiv_i16_i16 -> i16`
   - `__llvm_udiv_i32_i32 -> i32`
   - `__llvm_udiv_i64_i64 -> i64`
-  - (\*) `__llvm_udiv_i128_i128 -> i128`
+  - `__llvm_udiv_i128_i128 -> i128`
 - [`sdiv`](https://llvm.org/docs/LangRef.html#sdiv-instruction):
   - `__llvm_sdiv_i8_i8 -> i8`
   - `__llvm_sdiv_i16_i16 -> i16`
   - `__llvm_sdiv_i32_i32 -> i32`
   - `__llvm_sdiv_i64_i64 -> i64`
-  - (\*) `__llvm_sdiv_i128_i128 -> i128`
+  - `__llvm_sdiv_i128_i128 -> i128`
 - [`urem`](https://llvm.org/docs/LangRef.html#urem-instruction):
   - `__llvm_urem_i8_i8 -> i8`
   - `__llvm_urem_i16_i16 -> i16`
   - `__llvm_urem_i32_i32 -> i32`
   - `__llvm_urem_i64_i64 -> i64`
-  - (\*) `__llvm_urem_i128_i128 -> i128`
+  - `__llvm_urem_i128_i128 -> i128`
 - [`srem`](https://llvm.org/docs/LangRef.html#srem-instruction):
   - `__llvm_srem_i8_i8 -> i8`
   - `__llvm_srem_i16_i16 -> i16`
   - `__llvm_srem_i32_i32 -> i32`
   - `__llvm_srem_i64_i64 -> i64`
-  - (\*) `__llvm_srem_i128_i128 -> i128`
+  - `__llvm_srem_i128_i128 -> i128`
 - [`shl`](https://llvm.org/docs/LangRef.html#shl-instruction):
   - `__llvm_shl_i8_i8 -> i8`
   - `__llvm_shl_i16_i16 -> i16`
   - `__llvm_shl_i32_i32 -> i32`
   - `__llvm_shl_i64_i64 -> i64`
-  - (\*) `__llvm_shl_i128_i128 -> i128`
+  - `__llvm_shl_i128_i128 -> i128`
 - [`lshr`](https://llvm.org/docs/LangRef.html#lshr-instruction):
   - `__llvm_lshr_i8_i8 -> i8`
   - `__llvm_lshr_i16_i16 -> i16`
   - `__llvm_lshr_i32_i32 -> i32`
   - `__llvm_lshr_i64_i64 -> i64`
-  - (\*) `__llvm_lshr_i128_i128 -> i128`
+  - `__llvm_lshr_i128_i128 -> i128`
 - [`ashr`](https://llvm.org/docs/LangRef.html#ashr-instruction):
   - `__llvm_ashr_i8_i8 -> i8`
   - `__llvm_ashr_i16_i16 -> i16`
   - `__llvm_ashr_i32_i32 -> i32`
   - `__llvm_ashr_i64_i64 -> i64`
-  - (\*) `__llvm_ashr_i128_i128 -> i128`
+  - `__llvm_ashr_i128_i128 -> i128`
 - [`and`](https://llvm.org/docs/LangRef.html#and-instruction):
   - `__llvm_and_bool_bool -> bool`
   - `__llvm_and_i8_i8 -> i8`
   - `__llvm_and_i16_i16 -> i16`
   - `__llvm_and_i32_i32 -> i32`
   - `__llvm_and_i64_i64 -> i64`
-  - (\*) `__llvm_and_i128_i128 -> i128`
+  - `__llvm_and_i128_i128 -> i128`
 - [`or`](https://llvm.org/docs/LangRef.html#or-instruction):
   - `__llvm_or_bool_bool -> bool`
   - `__llvm_or_i8_i8 -> i8`
   - `__llvm_or_i16_i16 -> i16`
   - `__llvm_or_i32_i32 -> i32`
   - `__llvm_or_i64_i64 -> i64`
-  - (\*) `__llvm_or_i128_i128 -> i128`
+  - `__llvm_or_i128_i128 -> i128`
 - [`xor`](https://llvm.org/docs/LangRef.html#xor-instruction):
   - `__llvm_xor_bool_bool -> bool`
   - `__llvm_xor_i8_i8 -> i8`
   - `__llvm_xor_i16_i16 -> i16`
   - `__llvm_xor_i32_i32 -> i32`
   - `__llvm_xor_i64_i64 -> i64`
-  - (\*) `__llvm_xor_i128_i128 -> i128`
+  - `__llvm_xor_i128_i128 -> i128`
 - [`cmpxchg`](https://llvm.org/docs/LangRef.html#cmpxchg-instruction):
   - Unlike the previous instructions, `cmpxchg` accepts three arguments. Some of the arguments can
     be integers or pointers. Pointer arguments have the `p` prefix, e.g. `pi8` is a pointer to
@@ -415,14 +412,14 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_cmpxchg_pi32_pi32_pi32 -> (i32, bool)`
   - `__llvm_cmpxchg_pi64_i64_i64 -> (i64, bool)`
   - `__llvm_cmpxchg_pi64_pi64_pi64 -> (i64, bool)`
-  - (\*) `__llvm_cmpxchg_pi128_i128_i128 -> (i128, bool)`
-  - (\*) `__llvm_cmpxchg_pi128_pi128_pi128 -> (i128, bool)`
+  - `__llvm_cmpxchg_pi128_i128_i128 -> (i128, bool)`
+  - `__llvm_cmpxchg_pi128_pi128_pi128 -> (i128, bool)`
 - [`trunc .. to`](https://llvm.org/docs/LangRef.html#trunc-to-instruction):
-  - (\*) `__llvm_trunc_i128_i64 -> i64`
-  - (\*) `__llvm_trunc_i128_i32 -> i32`
-  - (\*) `__llvm_trunc_i128_i16 -> i16`
-  - (\*) `__llvm_trunc_i128_i8 -> i8`
-  - (\*) `__llvm_trunc_i128_bool -> bool`
+  - `__llvm_trunc_i128_i64 -> i64`
+  - `__llvm_trunc_i128_i32 -> i32`
+  - `__llvm_trunc_i128_i16 -> i16`
+  - `__llvm_trunc_i128_i8 -> i8`
+  - `__llvm_trunc_i128_bool -> bool`
   - `__llvm_trunc_i64_i32 -> i32`
   - `__llvm_trunc_i64_i16 -> i16`
   - `__llvm_trunc_i64_i8 -> i8`
@@ -434,252 +431,252 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_trunc_i16_bool -> bool`
   - `__llvm_trunc_i8_bool -> bool`
 - [`zext .. to`](https://llvm.org/docs/LangRef.html#zext-to-instruction):
-  - (\*) `__llvm_zext_bool_i128 -> i128`
+  - `__llvm_zext_bool_i128 -> i128`
   - `__llvm_zext_bool_i64 -> i64`
   - `__llvm_zext_bool_i32 -> i32`
   - `__llvm_zext_bool_i16 -> i16`
   - `__llvm_zext_bool_i8 -> i8`
-  - (\*) `__llvm_zext_i8_i128 -> i128`
+  - `__llvm_zext_i8_i128 -> i128`
   - `__llvm_zext_i8_i64 -> i64`
   - `__llvm_zext_i8_i32 -> i32`
   - `__llvm_zext_i8_i16 -> i16`
-  - (\*) `__llvm_zext_i16_i128 -> i128`
+  - `__llvm_zext_i16_i128 -> i128`
   - `__llvm_zext_i16_i64 -> i64`
   - `__llvm_zext_i16_i32 -> i32`
-  - (\*) `__llvm_zext_i32_i128 -> i128`
+  - `__llvm_zext_i32_i128 -> i128`
   - `__llvm_zext_i32_i64 -> i64`
-  - (\*) `__llvm_zext_i64_i128 -> i128`
+  - `__llvm_zext_i64_i128 -> i128`
 - [`sext .. to`](https://llvm.org/docs/LangRef.html#sext-to-instruction):
-  - (\*) `__llvm_sext_bool_i128 -> i128`
+  - `__llvm_sext_bool_i128 -> i128`
   - `__llvm_sext_bool_i64 -> i64`
   - `__llvm_sext_bool_i32 -> i32`
   - `__llvm_sext_bool_i16 -> i16`
   - `__llvm_sext_bool_i8 -> i8`
-  - (\*) `__llvm_sext_i8_i128 -> i128`
+  - `__llvm_sext_i8_i128 -> i128`
   - `__llvm_sext_i8_i64 -> i64`
   - `__llvm_sext_i8_i32 -> i32`
   - `__llvm_sext_i8_i16 -> i16`
-  - (\*) `__llvm_sext_i16_i128 -> i128`
+  - `__llvm_sext_i16_i128 -> i128`
   - `__llvm_sext_i16_i64 -> i64`
   - `__llvm_sext_i16_i32 -> i32`
-  - (\*) `__llvm_sext_i32_i128 -> i128`
+  - `__llvm_sext_i32_i128 -> i128`
   - `__llvm_sext_i32_i64 -> i64`
-  - (\*) `__llvm_sext_i64_i128 -> i128`
+  - `__llvm_sext_i64_i128 -> i128`
 - [`ptrtoint .. to`](https://llvm.org/docs/LangRef.html#ptrtoint-to-instruction):
   - `__llvm_ptrtoint_pbool_bool -> bool`
   - `__llvm_ptrtoint_pbool_i8 -> i8`
   - `__llvm_ptrtoint_pbool_i16 -> i16`
   - `__llvm_ptrtoint_pbool_i32 -> i32`
   - `__llvm_ptrtoint_pbool_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pbool_i128 -> i128`
+  - `__llvm_ptrtoint_pbool_i128 -> i128`
   - `__llvm_ptrtoint_pi8_bool -> bool`
   - `__llvm_ptrtoint_pi8_i8 -> i8`
   - `__llvm_ptrtoint_pi8_i16 -> i16`
   - `__llvm_ptrtoint_pi8_i32 -> i32`
   - `__llvm_ptrtoint_pi8_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pi8_i128 -> i128`
+  - `__llvm_ptrtoint_pi8_i128 -> i128`
   - `__llvm_ptrtoint_pi16_bool -> bool`
   - `__llvm_ptrtoint_pi16_i8 -> i8`
   - `__llvm_ptrtoint_pi16_i16 -> i16`
   - `__llvm_ptrtoint_pi16_i32 -> i32`
   - `__llvm_ptrtoint_pi16_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pi16_i128 -> i128`
+  - `__llvm_ptrtoint_pi16_i128 -> i128`
   - `__llvm_ptrtoint_pi32_bool -> bool`
   - `__llvm_ptrtoint_pi32_i8 -> i8`
   - `__llvm_ptrtoint_pi32_i16 -> i16`
   - `__llvm_ptrtoint_pi32_i32 -> i32`
   - `__llvm_ptrtoint_pi32_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pi32_i128 -> i128`
+  - `__llvm_ptrtoint_pi32_i128 -> i128`
   - `__llvm_ptrtoint_pi64_bool -> bool`
   - `__llvm_ptrtoint_pi64_i8 -> i8`
   - `__llvm_ptrtoint_pi64_i16 -> i16`
   - `__llvm_ptrtoint_pi64_i32 -> i32`
   - `__llvm_ptrtoint_pi64_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pi64_i128 -> i128`
-  - (\*) `__llvm_ptrtoint_pi128_bool -> bool`
-  - (\*) `__llvm_ptrtoint_pi128_i8 -> i8`
-  - (\*) `__llvm_ptrtoint_pi128_i16 -> i16`
-  - (\*) `__llvm_ptrtoint_pi128_i32 -> i32`
-  - (\*) `__llvm_ptrtoint_pi128_i64 -> i64`
-  - (\*) `__llvm_ptrtoint_pi128_i128 -> i128`
+  - `__llvm_ptrtoint_pi64_i128 -> i128`
+  - `__llvm_ptrtoint_pi128_bool -> bool`
+  - `__llvm_ptrtoint_pi128_i8 -> i8`
+  - `__llvm_ptrtoint_pi128_i16 -> i16`
+  - `__llvm_ptrtoint_pi128_i32 -> i32`
+  - `__llvm_ptrtoint_pi128_i64 -> i64`
+  - `__llvm_ptrtoint_pi128_i128 -> i128`
 - [`inttoptr .. to`](https://llvm.org/docs/LangRef.html#inttoptr-to-instruction):
   - `__llvm_inttoptr_bool_pbool -> pbool`
   - `__llvm_inttoptr_bool_pi8 -> pi8`
   - `__llvm_inttoptr_bool_pi16 -> pi16`
   - `__llvm_inttoptr_bool_pi32 -> pi32`
   - `__llvm_inttoptr_bool_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_bool_pi128 -> pi128`
+  - `__llvm_inttoptr_bool_pi128 -> pi128`
   - `__llvm_inttoptr_i8_pbool -> pbool`
   - `__llvm_inttoptr_i8_pi8 -> pi8`
   - `__llvm_inttoptr_i8_pi16 -> pi16`
   - `__llvm_inttoptr_i8_pi32 -> pi32`
   - `__llvm_inttoptr_i8_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_i8_pi128 -> pi128`
+  - `__llvm_inttoptr_i8_pi128 -> pi128`
   - `__llvm_inttoptr_i16_pbool -> pbool`
   - `__llvm_inttoptr_i16_pi8 -> pi8`
   - `__llvm_inttoptr_i16_pi16 -> pi16`
   - `__llvm_inttoptr_i16_pi32 -> pi32`
   - `__llvm_inttoptr_i16_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_i16_pi128 -> pi128`
+  - `__llvm_inttoptr_i16_pi128 -> pi128`
   - `__llvm_inttoptr_i32_pbool -> pbool`
   - `__llvm_inttoptr_i32_pi8 -> pi8`
   - `__llvm_inttoptr_i32_pi16 -> pi16`
   - `__llvm_inttoptr_i32_pi32 -> pi32`
   - `__llvm_inttoptr_i32_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_i32_pi128 -> pi128`
+  - `__llvm_inttoptr_i32_pi128 -> pi128`
   - `__llvm_inttoptr_i64_pbool -> pbool`
   - `__llvm_inttoptr_i64_pi8 -> pi8`
   - `__llvm_inttoptr_i64_pi16 -> pi16`
   - `__llvm_inttoptr_i64_pi32 -> pi32`
   - `__llvm_inttoptr_i64_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_i64_pi128 -> pi128`
-  - (\*) `__llvm_inttoptr_i128_pbool -> pbool`
-  - (\*) `__llvm_inttoptr_i128_pi8 -> pi8`
-  - (\*) `__llvm_inttoptr_i128_pi16 -> pi16`
-  - (\*) `__llvm_inttoptr_i128_pi32 -> pi32`
-  - (\*) `__llvm_inttoptr_i128_pi64 -> pi64`
-  - (\*) `__llvm_inttoptr_i128_pi128 -> pi128`
+  - `__llvm_inttoptr_i64_pi128 -> pi128`
+  - `__llvm_inttoptr_i128_pbool -> pbool`
+  - `__llvm_inttoptr_i128_pi8 -> pi8`
+  - `__llvm_inttoptr_i128_pi16 -> pi16`
+  - `__llvm_inttoptr_i128_pi32 -> pi32`
+  - `__llvm_inttoptr_i128_pi64 -> pi64`
+  - `__llvm_inttoptr_i128_pi128 -> pi128`
 - [`bitcast .. to`](https://llvm.org/docs/LangRef.html#bitcast-to-instruction):
   - `__llvm_bitcast_bool_bool -> bool`
   - `__llvm_bitcast_bool_i8 -> i8`
   - `__llvm_bitcast_bool_i16 -> i16`
   - `__llvm_bitcast_bool_i32 -> i32`
   - `__llvm_bitcast_bool_i64 -> i64`
-  - (\*) `__llvm_bitcast_bool_i128 -> i128`
+  - `__llvm_bitcast_bool_i128 -> i128`
   - `__llvm_bitcast_i8_bool -> bool`
   - `__llvm_bitcast_i8_i8 -> i8`
   - `__llvm_bitcast_i8_i16 -> i16`
   - `__llvm_bitcast_i8_i32 -> i32`
   - `__llvm_bitcast_i8_i64 -> i64`
-  - (\*) `__llvm_bitcast_i8_i128 -> i128`
+  - `__llvm_bitcast_i8_i128 -> i128`
   - `__llvm_bitcast_i16_bool -> bool`
   - `__llvm_bitcast_i16_i8 -> i8`
   - `__llvm_bitcast_i16_i16 -> i16`
   - `__llvm_bitcast_i16_i32 -> i32`
   - `__llvm_bitcast_i16_i64 -> i64`
-  - (\*) `__llvm_bitcast_i16_i128 -> i128`
+  - `__llvm_bitcast_i16_i128 -> i128`
   - `__llvm_bitcast_i32_bool -> bool`
   - `__llvm_bitcast_i32_i8 -> i8`
   - `__llvm_bitcast_i32_i16 -> i16`
   - `__llvm_bitcast_i32_i32 -> i32`
   - `__llvm_bitcast_i32_i64 -> i64`
-  - (\*) `__llvm_bitcast_i32_i128 -> i128`
+  - `__llvm_bitcast_i32_i128 -> i128`
   - `__llvm_bitcast_i64_bool -> bool`
   - `__llvm_bitcast_i64_i8 -> i8`
   - `__llvm_bitcast_i64_i16 -> i16`
   - `__llvm_bitcast_i64_i32 -> i32`
   - `__llvm_bitcast_i64_i64 -> i64`
-  - (\*) `__llvm_bitcast_i64_i128 -> i128`
-  - (\*) `__llvm_bitcast_i128_bool -> bool`
-  - (\*) `__llvm_bitcast_i128_i8 -> i8`
-  - (\*) `__llvm_bitcast_i128_i16 -> i16`
-  - (\*) `__llvm_bitcast_i128_i32 -> i32`
-  - (\*) `__llvm_bitcast_i128_i64 -> i64`
-  - (\*) `__llvm_bitcast_i128_i128 -> i128`
+  - `__llvm_bitcast_i64_i128 -> i128`
+  - `__llvm_bitcast_i128_bool -> bool`
+  - `__llvm_bitcast_i128_i8 -> i8`
+  - `__llvm_bitcast_i128_i16 -> i16`
+  - `__llvm_bitcast_i128_i32 -> i32`
+  - `__llvm_bitcast_i128_i64 -> i64`
+  - `__llvm_bitcast_i128_i128 -> i128`
   - `__llvm_bitcast_pbool_pbool -> pbool`
   - `__llvm_bitcast_pbool_pi8 -> pi8`
   - `__llvm_bitcast_pbool_pi16 -> pi16`
   - `__llvm_bitcast_pbool_pi32 -> pi32`
   - `__llvm_bitcast_pbool_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pbool_pi128 -> pi128`
+  - `__llvm_bitcast_pbool_pi128 -> pi128`
   - `__llvm_bitcast_pi8_pbool -> pbool`
   - `__llvm_bitcast_pi8_pi8 -> pi8`
   - `__llvm_bitcast_pi8_pi16 -> pi16`
   - `__llvm_bitcast_pi8_pi32 -> pi32`
   - `__llvm_bitcast_pi8_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pi8_pi128 -> pi128`
+  - `__llvm_bitcast_pi8_pi128 -> pi128`
   - `__llvm_bitcast_pi16_pbool -> pbool`
   - `__llvm_bitcast_pi16_pi8 -> pi8`
   - `__llvm_bitcast_pi16_pi16 -> pi16`
   - `__llvm_bitcast_pi16_pi32 -> pi32`
   - `__llvm_bitcast_pi16_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pi16_pi128 -> pi128`
+  - `__llvm_bitcast_pi16_pi128 -> pi128`
   - `__llvm_bitcast_pi32_pbool -> pbool`
   - `__llvm_bitcast_pi32_pi8 -> pi8`
   - `__llvm_bitcast_pi32_pi16 -> pi16`
   - `__llvm_bitcast_pi32_pi32 -> pi32`
   - `__llvm_bitcast_pi32_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pi32_pi128 -> pi128`
+  - `__llvm_bitcast_pi32_pi128 -> pi128`
   - `__llvm_bitcast_pi64_pbool -> pbool`
   - `__llvm_bitcast_pi64_pi8 -> pi8`
   - `__llvm_bitcast_pi64_pi16 -> pi16`
   - `__llvm_bitcast_pi64_pi32 -> pi32`
   - `__llvm_bitcast_pi64_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pi64_pi128 -> pi128`
-  - (\*) `__llvm_bitcast_pi128_pbool -> pbool`
-  - (\*) `__llvm_bitcast_pi128_pi8 -> pi8`
-  - (\*) `__llvm_bitcast_pi128_pi16 -> pi16`
-  - (\*) `__llvm_bitcast_pi128_pi32 -> pi32`
-  - (\*) `__llvm_bitcast_pi128_pi64 -> pi64`
-  - (\*) `__llvm_bitcast_pi128_pi128 -> pi128`
+  - `__llvm_bitcast_pi64_pi128 -> pi128`
+  - `__llvm_bitcast_pi128_pbool -> pbool`
+  - `__llvm_bitcast_pi128_pi8 -> pi8`
+  - `__llvm_bitcast_pi128_pi16 -> pi16`
+  - `__llvm_bitcast_pi128_pi32 -> pi32`
+  - `__llvm_bitcast_pi128_pi64 -> pi64`
+  - `__llvm_bitcast_pi128_pi128 -> pi128`
 - [`icmp`](https://llvm.org/docs/LangRef.html#icmp-instruction):
   - `__llvm_icmp_eq_bool_bool -> bool`,
   - `__llvm_icmp_eq_i8_i8 -> bool`,
   - `__llvm_icmp_eq_i16_i16 -> bool`,
   - `__llvm_icmp_eq_i32_i32 -> bool`,
   - `__llvm_icmp_eq_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_eq_i128_i128 -> bool`,
+  - `__llvm_icmp_eq_i128_i128 -> bool`,
   - `__llvm_icmp_ne_bool_bool -> bool`,
   - `__llvm_icmp_ne_i8_i8 -> bool`,
   - `__llvm_icmp_ne_i16_i16 -> bool`,
   - `__llvm_icmp_ne_i32_i32 -> bool`,
   - `__llvm_icmp_ne_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_ne_i128_i128 -> bool`,
+  - `__llvm_icmp_ne_i128_i128 -> bool`,
   - `__llvm_icmp_ugt_bool_bool -> bool`,
   - `__llvm_icmp_ugt_i8_i8 -> bool`,
   - `__llvm_icmp_ugt_i16_i16 -> bool`,
   - `__llvm_icmp_ugt_i32_i32 -> bool`,
   - `__llvm_icmp_ugt_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_ugt_i128_i128 -> bool`,
+  - `__llvm_icmp_ugt_i128_i128 -> bool`,
   - `__llvm_icmp_uge_bool_bool -> bool`,
   - `__llvm_icmp_uge_i8_i8 -> bool`,
   - `__llvm_icmp_uge_i16_i16 -> bool`,
   - `__llvm_icmp_uge_i32_i32 -> bool`,
   - `__llvm_icmp_uet_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_uge_i128_i128 -> bool`,
+  - `__llvm_icmp_uge_i128_i128 -> bool`,
   - `__llvm_icmp_ult_bool_bool -> bool`,
   - `__llvm_icmp_ult_i8_i8 -> bool`,
   - `__llvm_icmp_ult_i16_i16 -> bool`,
   - `__llvm_icmp_ult_i32_i32 -> bool`,
   - `__llvm_icmp_ult_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_ult_i128_i128 -> bool`,
+  - `__llvm_icmp_ult_i128_i128 -> bool`,
   - `__llvm_icmp_ule_bool_bool -> bool`,
   - `__llvm_icmp_ule_i8_i8 -> bool`,
   - `__llvm_icmp_ule_i16_i16 -> bool`,
   - `__llvm_icmp_ule_i32_i32 -> bool`,
   - `__llvm_icmp_ule_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_ule_i128_i128 -> bool`,
+  - `__llvm_icmp_ule_i128_i128 -> bool`,
   - `__llvm_icmp_sgt_bool_bool -> bool`,
   - `__llvm_icmp_sgt_i8_i8 -> bool`,
   - `__llvm_icmp_sgt_i16_i16 -> bool`,
   - `__llvm_icmp_sgt_i32_i32 -> bool`,
   - `__llvm_icmp_sgt_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_sgt_i128_i128 -> bool`,
+  - `__llvm_icmp_sgt_i128_i128 -> bool`,
   - `__llvm_icmp_sge_bool_bool -> bool`,
   - `__llvm_icmp_sge_i8_i8 -> bool`,
   - `__llvm_icmp_sge_i16_i16 -> bool`,
   - `__llvm_icmp_sge_i32_i32 -> bool`,
   - `__llvm_icmp_sge_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_sge_i128_i128 -> bool`,
+  - `__llvm_icmp_sge_i128_i128 -> bool`,
   - `__llvm_icmp_slt_bool_bool -> bool`,
   - `__llvm_icmp_slt_i8_i8 -> bool`,
   - `__llvm_icmp_slt_i16_i16 -> bool`,
   - `__llvm_icmp_slt_i32_i32 -> bool`,
   - `__llvm_icmp_slt_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_slt_i128_i128 -> bool`,
+  - `__llvm_icmp_slt_i128_i128 -> bool`,
   - `__llvm_icmp_sle_bool_bool -> bool`,
   - `__llvm_icmp_sle_i8_i8 -> bool`,
   - `__llvm_icmp_sle_i16_i16 -> bool`,
   - `__llvm_icmp_sle_i32_i32 -> bool`,
   - `__llvm_icmp_sle_i64_i64 -> bool`,
-  - (\*) `__llvm_icmp_sle_i128_i128 -> bool`,
+  - `__llvm_icmp_sle_i128_i128 -> bool`,
 - [`select`](https://llvm.org/docs/LangRef.html#select-instruction):
   - `__llvm_select_bool_bool_bool -> bool`,
   - `__llvm_select_bool_i8_i8 -> bool`,
   - `__llvm_select_bool_i16_i16 -> bool`,
   - `__llvm_select_bool_i32_i32 -> bool`,
   - `__llvm_select_bool_i64_i64 -> bool`,
-  - (\*) `__llvm_select_bool_i128_i128 -> bool`,
+  - `__llvm_select_bool_i128_i128 -> bool`,
 
 #### Based on Intrinsics
 
@@ -688,35 +685,35 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_abs_i16 -> i16`,
   - `__llvm_abs_i32 -> i32`,
   - `__llvm_abs_i64 -> i64`,
-  - (\*) `__llvm_abs_i128 -> i128`,
+  - `__llvm_abs_i128 -> i128`,
 - [`llvm.smax.*`](https://llvm.org/docs/LangRef.html#llvm-smax-intrinsic):
   - `__llvm_smax_bool_bool -> bool`,
   - `__llvm_smax_i8_i8 -> i8`,
   - `__llvm_smax_i16_i16 -> i16`,
   - `__llvm_smax_i32_i32 -> i32`,
   - `__llvm_smax_i64_i64 -> i64`,
-  - (\*) `__llvm_smax_i128_i128 -> i128`,
+  - `__llvm_smax_i128_i128 -> i128`,
 - [`llvm.smin.*`](https://llvm.org/docs/LangRef.html#llvm-smin-intrinsic):
   - `__llvm_smin_bool_bool -> bool`,
   - `__llvm_smin_i8_i8 -> i8`,
   - `__llvm_smin_i16_i16 -> i16`,
   - `__llvm_smin_i32_i32 -> i32`,
   - `__llvm_smin_i64_i64 -> i64`,
-  - (\*) `__llvm_smin_i128_i128 -> i128`,
+  - `__llvm_smin_i128_i128 -> i128`,
 - [`llvm_umax.*`](https://llvm.org/docs/LangRef.html#llvm-umax-intrinsic):
   - `__llvm_umax_bool_bool -> bool`,
   - `__llvm_umax_i8_i8 -> i8`,
   - `__llvm_umax_i16_i16 -> i16`,
   - `__llvm_umax_i32_i32 -> i32`,
   - `__llvm_umax_i64_i64 -> i64`,
-  - (\*) `__llvm_umax_i128_i8 -> i128`,
+  - `__llvm_umax_i128_i8 -> i128`,
 - [`llvm.umin.*`](https://llvm.org/docs/LangRef.html#llvm-umin-intrinsic):
   - `__llvm_umin_bool_bool -> bool`,
   - `__llvm_umin_i8_i8 -> i8`,
   - `__llvm_umin_i16_i16 -> i16`,
   - `__llvm_umin_i32_i32 -> i32`,
   - `__llvm_umin_i64_i64 -> i64`,
-  - (\*) `__llvm_umin_i128_i128 -> i128`,
+  - `__llvm_umin_i128_i128 -> i128`,
 - [`llvm.scmp.*`](https://llvm.org/docs/LangRef.html#llvm-scmp-intrinsic):
   - As per the LLVM Language Reference Manual, `scmp` returns needs to return at least `i2`. Since
     ALU does not operate on such type, the closest possible type is `i8`. Luckily,
@@ -727,7 +724,7 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_scmp_i16_i16 -> i8`,
   - `__llvm_scmp_i32_i32 -> i8`,
   - `__llvm_scmp_i64_i64 -> i8`,
-  - (\*) `__llvm_scmp_i128_i128 -> i8`,
+  - `__llvm_scmp_i128_i128 -> i8`,
 - [`llvm.ucmp.*`](https://llvm.org/docs/LangRef.html#llvm-ucmp-intrinsic):
   - As per the LLVM Language Reference Manual, `ucmp` returns needs to return at least `i2`. Since
     ALU does not operate on such type, the closest possible type is `i8`. Luckily,
@@ -738,27 +735,27 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_ucmp_i16_i16 -> i8`,
   - `__llvm_ucmp_i32_i32 -> i8`,
   - `__llvm_ucmp_i64_i64 -> i8`,
-  - (\*) `__llvm_ucmp_i128_i128 -> i8`,
+  - `__llvm_ucmp_i128_i128 -> i8`,
 - [`llvm.bitreverse.*`](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics):
   - `__llvm_bitreverse_bool -> bool`,
   - `__llvm_bitreverse_i8 -> i8`,
   - `__llvm_bitreverse_i16 -> i16`,
   - `__llvm_bitreverse_i32 -> i32`,
   - `__llvm_bitreverse_i64 -> i64`,
-  - (\*) `__llvm_bitreverse_i128 -> i128`,
+  - `__llvm_bitreverse_i128 -> i128`,
 - [`llvm.bswap.*`](https://llvm.org/docs/LangRef.html#llvm-bswap-intrinsics):
   - `__llvm_bswap_i8 -> i8`,
   - `__llvm_bswap_i16 -> i16`,
   - `__llvm_bswap_i32 -> i32`,
   - `__llvm_bswap_i64 -> i64`,
-  - (\*) `__llvm_bswap_i128 -> i128`,
+  - `__llvm_bswap_i128 -> i128`,
 - [`llvm.ctpop.*`](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsics):
   - `__llvm_ctpop_bool -> bool`,
   - `__llvm_ctpop_i8 -> i8`,
   - `__llvm_ctpop_i16 -> i16`,
   - `__llvm_ctpop_i32 -> i32`,
   - `__llvm_ctpop_i64 -> i64`,
-  - (\*) `__llvm_ctpop_i128 -> i128`,
+  - `__llvm_ctpop_i128 -> i128`,
 - [`llvm.ctlz.*`](https://llvm.org/docs/LangRef.html#llvm-ctlz-intrinsics):
   - `__llvm_ctlz_bool -> bool`,
   - `__llvm_ctlz_i8 -> i8`,
@@ -772,88 +769,88 @@ phase. See [Data Types](#data-types) for details.
   - `__llvm_cttz_i16 -> i16`,
   - `__llvm_cttz_i32 -> i32`,
   - `__llvm_cttz_i64 -> i64`,
-  - (\*) `__llvm_cttz_i128 -> i128`,
+  - `__llvm_cttz_i128 -> i128`,
 - [`llvm.fshl.*`](https://llvm.org/docs/LangRef.html#llvm-fshl-intrinsics):
   - `__llvm_fshl_i8_i8_i8 -> i8`,
   - `__llvm_fshl_i16_i16_i16 -> i16`,
   - `__llvm_fshl_i32_i32_i32 -> i32`,
   - `__llvm_fshl_i64_i64_i64 -> i64`,
-  - (\*) `__llvm_fshl_i128_i128_i128 -> i128`,
+  - `__llvm_fshl_i128_i128_i128 -> i128`,
 - [`llvm.fshr.*`](https://llvm.org/docs/LangRef.html#llvm-fshr-intrinsics):
   - `__llvm_fshr_i8_i8_i8 -> i8`,
   - `__llvm_fshr_i16_i16_i16 -> i16`,
   - `__llvm_fshr_i32_i32_i32 -> i32`,
   - `__llvm_fshr_i64_i64_i64 -> i64`,
-  - (\*) `__llvm_fshr_i128_i128_i128 -> i128`,
+  - `__llvm_fshr_i128_i128_i128 -> i128`,
 - [`llvm.sadd.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-sadd-with-overflow-intrinsics):
   - `__llvm_sadd_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_sadd_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_sadd_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_sadd_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_sadd_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_sadd_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.uadd.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-uadd-with-overflow-intrinsics):
   - `__llvm_uadd_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_uadd_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_uadd_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_uadd_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_uadd_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_uadd_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.ssub.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-ssub-with-overflow-intrinsics):
   - `__llvm_ssub_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_ssub_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_ssub_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_ssub_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_ssub_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_ssub_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.usub.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-usub-with-overflow-intrinsics):
   - `__llvm_usub_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_usub_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_usub_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_usub_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_usub_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_usub_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.smul.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-smul-with-overflow-intrinsics):
   - `__llvm_smul_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_smul_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_smul_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_smul_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_smul_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_smul_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.umul.with.overflow.*`](https://llvm.org/docs/LangRef.html#llvm-umul-with-overflow-intrinsics):
   - `__llvm_umul_with_overflow_i8_i8 -> (i8, bool)`,
   - `__llvm_umul_with_overflow_i16_i16 -> (i16, bool)`,
   - `__llvm_umul_with_overflow_i32_i32 -> (i32, bool)`,
   - `__llvm_umul_with_overflow_i64_i64 -> (i64, bool)`,
-  - (\*) `__llvm_umul_with_overflow_i128_i128 -> (i128, bool)`,
+  - `__llvm_umul_with_overflow_i128_i128 -> (i128, bool)`,
 - [`llvm.sadd.sat.*`](https://llvm.org/docs/LangRef.html#llvm-sadd-sat-intrinsics):
   - `__llvm_sadd_sat_i8_i8 -> i8`,
   - `__llvm_sadd_sat_i16_i16 -> i16`,
   - `__llvm_sadd_sat_i32_i32 -> i32`,
   - `__llvm_sadd_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_sadd_sat_i128_i128 -> i128`,
+  - `__llvm_sadd_sat_i128_i128 -> i128`,
 - [`llvm.uadd.sat.*`](https://llvm.org/docs/LangRef.html#llvm-uadd-sat-intrinsics):
   - `__llvm_uadd_sat_i8_i8 -> i8`,
   - `__llvm_uadd_sat_i16_i16 -> i16`,
   - `__llvm_uadd_sat_i32_i32 -> i32`,
   - `__llvm_uadd_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_uadd_sat_i128_i128 -> i128`,
+  - `__llvm_uadd_sat_i128_i128 -> i128`,
 - [`llvm.ssub.sat.*`](https://llvm.org/docs/LangRef.html#llvm-ssub-sat-intrinsics):
   - `__llvm_ssub_sat_i8_i8 -> i8`,
   - `__llvm_ssub_sat_i16_i16 -> i16`,
   - `__llvm_ssub_sat_i32_i32 -> i32`,
   - `__llvm_ssub_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_ssub_sat_i128_i128 -> i128`,
+  - `__llvm_ssub_sat_i128_i128 -> i128`,
 - [`llvm.usub.sat.*`](https://llvm.org/docs/LangRef.html#llvm-usub-sat-intrinsics):
   - `__llvm_usub_sat_i8_i8 -> i8`,
   - `__llvm_usub_sat_i16_i16 -> i16`,
   - `__llvm_usub_sat_i32_i32 -> i32`,
   - `__llvm_usub_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_usub_sat_i128_i128 -> i128`,
+  - `__llvm_usub_sat_i128_i128 -> i128`,
 - [`llvm.sshl.sat.*`](https://llvm.org/docs/LangRef.html#llvm-sshl-sat-intrinsics):
   - `__llvm_sshl_sat_i8_i8 -> i8`,
   - `__llvm_sshl_sat_i16_i16 -> i16`,
   - `__llvm_sshl_sat_i32_i32 -> i32`,
   - `__llvm_sshl_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_sshl_sat_i128_i128 -> i128`,
+  - `__llvm_sshl_sat_i128_i128 -> i128`,
 - [`llvm.ushl.sat.*`](https://llvm.org/docs/LangRef.html#llvm-ushl-sat-intrinsics):
   - `__llvm_ushl_sat_i8_i8 -> i8`,
   - `__llvm_ushl_sat_i16_i16 -> i16`,
   - `__llvm_ushl_sat_i32_i32 -> i32`,
   - `__llvm_ushl_sat_i64_i64 -> i64`,
-  - (\*) `__llvm_ushl_sat_i128_i128 -> i128`.
+  - `__llvm_ushl_sat_i128_i128 -> i128`.
