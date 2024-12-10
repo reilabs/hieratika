@@ -152,8 +152,8 @@ each possible pointer type:
 Some of the implementations may be omitted if they do not reflect LLVM IR semantics for a given
 instruction.
 
-When the input IR will is parsed and a generic pointer is found, its concrete type must be inferred
-from the context, to allow matching with the proper implementation. For example this IR snippet:
+When the input IR is parsed and a generic pointer is found, its concrete type must be inferred from
+the context, to allow matching with the proper implementation. For example this IR snippet:
 
 ```llvm
 %num = alloca [4 x i8], align 4
