@@ -9,5 +9,6 @@ pub mod bitreverse;
 pub mod bswap;
 pub mod ctpop;
 pub mod ctlz;
+pub mod add;
 
 mod test_case;
