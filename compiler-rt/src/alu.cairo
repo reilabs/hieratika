@@ -12,5 +12,7 @@ pub mod ctlz;
 pub mod add;
 pub mod uadd_with_overflow;
 pub mod sadd_with_overflow;
+pub mod uadd_sat;
+pub mod sadd_sat;
 
 mod test_case;
