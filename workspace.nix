@@ -7,6 +7,7 @@
   stdenv,
   craneLib,
   libffi,
+  bzip2,
   libiconv,
   libxml2,
   llvmPackages_18,
@@ -45,6 +46,7 @@
       libxml2
       llvmPackages_18.llvm
     ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
+      bzip2
       libiconv
     ];
   };

@@ -60,7 +60,7 @@ fn get_all_funcs(
 
 /// Initialises a Salsa database to compile Cairo programs. It also checks for
 /// the presence of `corelib`.
-fn build_db() -> RootDatabase {
+pub fn build_db() -> RootDatabase {
     let auto_withdraw_gas = false;
     let mut db = RootDatabase::default();
 
