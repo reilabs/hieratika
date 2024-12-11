@@ -9,7 +9,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingAdd};
 //
 // This is a generic implementation for every data type. Its specialized version
 // is defined and tested in the uadd_with_overflow/uadd_with_overflow_<type>.cairo file.
-fn uadd_with_overflow<
+pub fn uadd_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //
@@ -39,7 +39,7 @@ fn uadd_with_overflow<
 //
 // This is a generic implementation for every data type. Its specialized version
 // is defined and tested in the sadd_with_overflow/sadd_with_overflow_<type>.cairo file.
-fn sadd_with_overflow<
+pub fn sadd_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //
