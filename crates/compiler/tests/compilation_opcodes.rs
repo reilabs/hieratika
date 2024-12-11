@@ -1,9 +1,7 @@
 //! Tests compilation of the `opcodes.ll` IR file to check that we generate the
 //! expected FLO output.
 
-// Setting module as public to avoid `dead_code` warning for unused common test
-// functions.
-pub mod common;
+mod common;
 
 #[test]
 fn compiles_basic_opcodes() -> anyhow::Result<()> {

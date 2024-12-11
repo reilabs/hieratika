@@ -106,6 +106,9 @@ exceptions = [
   { allow = ["MPL-2.0"], crate = "indent" },
   { allow = ["BSD-3-Clause"], crate = "subtle" },
   { allow = ["MIT"], crate = "unescaper" },
+  { allow = ["Zlib"], crate = "const_format" },
+  { allow = ["Zlib"], crate = "const_format_proc_macros" },
+  { allow = ["CC0-1.0"], crate = "constant_time_eq" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

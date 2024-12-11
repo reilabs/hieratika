@@ -1,0 +1,28 @@
+[package]
+name = "hieratika-test-utils"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+authors.workspace = true
+description = "The utilities to test Hieratika."
+keywords.workspace = true
+categories.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+# Make these specifically impossible to publish as they have no independent use.
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+cairo-lang-compiler.workspace = true
+cairo-lang-runner = { path = "../../cairo/crates/cairo-lang-runner" }
+cairo-lang-sierra = { path = "../../cairo/crates/cairo-lang-sierra" }
+cairo-lang-sierra-generator = { path = "../../cairo/crates/cairo-lang-sierra-generator" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-cairoc.workspace = true
+hieratika-errors.workspace = true
+inkwell.workspace = true

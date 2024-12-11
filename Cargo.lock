@@ -1404,17 +1404,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bimap",
- "cairo-lang-compiler",
- "cairo-lang-runner",
- "cairo-lang-sierra",
- "cairo-lang-sierra-generator",
- "cairo-lang-utils",
  "chumsky",
  "clap",
  "derivative",
  "downcast-rs",
  "ethnum",
- "hieratika-cairoc",
  "hieratika-errors",
  "hieratika-flo",
  "inkwell",
@@ -1459,6 +1453,21 @@ dependencies = [
 [[package]]
 name = "hieratika-rust-test-input"
 version = "0.1.0"
+
+[[package]]
+name = "hieratika-test-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cairo-lang-compiler",
+ "cairo-lang-runner",
+ "cairo-lang-sierra",
+ "cairo-lang-sierra-generator",
+ "cairo-lang-utils",
+ "hieratika-cairoc",
+ "hieratika-errors",
+ "inkwell",
+]
 
 [[package]]
 name = "hmac"
