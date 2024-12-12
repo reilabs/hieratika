@@ -11,7 +11,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the bitwise `bswap` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in bswap/bswap_<type>.cairo files.
+// are defined and tested in the bswap/bswap_<type>.cairo files.
 fn bswap<
     T,
     // The trait bounds are chosen so that:

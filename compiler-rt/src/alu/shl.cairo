@@ -11,7 +11,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the bitwise left shift operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in shl/shl_<type>.cairo files.
+// are defined and tested in the shl/shl_<type>.cairo files.
 //
 // Please note that this implementation is valid up to 64-bit values due to extra bits
 // needed to accommodate overflows that happen during computation. A 128-bit implementation

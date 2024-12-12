@@ -13,7 +13,7 @@ extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise)
 // Perform the bitwise `and` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in and/and_<type>.cairo files.
+// are defined and tested in the and/and_<type>.cairo files.
 fn and<
     T,
     // The trait bounds are chosen so that:

@@ -13,7 +13,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the bitwise `bitreverse` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in bitreverse/bitreverse_<type>.cairo files.
+// are defined and tested in the bitreverse/bitreverse_<type>.cairo files.
 fn bitreverse<
     T,
     // The trait bounds are chosen so that:

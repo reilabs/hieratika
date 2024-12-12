@@ -11,7 +11,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the logical right shift operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in lshr/lshr_<type>.cairo files.
+// are defined and tested in the lshr/lshr_<type>.cairo files.
 pub fn lshr<
     T,
     // The trait bounds are chosen so that:
