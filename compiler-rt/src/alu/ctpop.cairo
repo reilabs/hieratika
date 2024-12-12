@@ -11,7 +11,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the bitwise `ctpop` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in ctpop/ctpop_<type>.cairo files.
+// are defined and tested in the ctpop/ctpop_<type>.cairo files.
 fn ctpop<
     T,
     // The trait bounds are chosen so that:

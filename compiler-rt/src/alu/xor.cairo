@@ -13,7 +13,7 @@ extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise)
 // Perform the bitwise `xor` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in xor/xor_<type>.cairo files.
+// are defined and tested in the xor/xor_<type>.cairo files.
 fn xor<
     T,
     // The trait bounds are chosen so that:

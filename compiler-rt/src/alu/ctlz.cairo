@@ -13,7 +13,7 @@ use core::num::traits::{BitSize, Bounded};
 // Perform the bitwise `ctlz` operation.
 //
 // This is a generic implementation for every data type. Its specialized versions
-// are defined and tested in ctlz/ctlz_<type>.cairo files.
+// are defined and tested in the ctlz/ctlz_<type>.cairo files.
 fn ctlz<
     T,
     // The trait bounds are chosen so that:
