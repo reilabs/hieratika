@@ -4,9 +4,9 @@ The following software libraries require a dedicated copyright notice for distri
 
 #### MPL-2.0
 
-- &lt;<http://crates.io/crates/colored>&gt;
-- &lt;<http://crates.io/crates/indent>&gt;
+- [colored](http://crates.io/crates/colored)
+- [indent](http://crates.io/crates/indent)
 
 #### BSD-3-Clause
 
-- &lt;<http://crates.io/crates/subtle>&gt;
+- [subtle](http://crates.io/crates/subtle)
