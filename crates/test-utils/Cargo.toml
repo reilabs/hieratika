@@ -26,4 +26,4 @@ cairo-lang-utils.workspace = true
 hieratika-cairoc.workspace = true
 hieratika-errors.workspace = true
 inkwell.workspace = true
-starknet-types-core = "0.1.7"
+starknet-types-core.workspace = true

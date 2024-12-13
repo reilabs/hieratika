@@ -54,6 +54,7 @@ hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
 hieratika-test-utils = { path = "crates/test-utils" }
+starknet-types-core = "0.1.7"
 thiserror = "1.0.63"
 tracing = "0.1.40"
 
