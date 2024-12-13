@@ -1,9 +1,10 @@
 //! Common utilities for the integration tests, these are intended to make it
 //! easier to write complex tests of the compiler's functionality.
 
-use std::{fmt::Write, path::Path};
+use std::{fmt::Write, path::Path, sync::Arc};
 
 use anyhow::bail;
+use cairo_lang_compiler::project::setup_project;
 use cairo_lang_runner::{
     casm_run::format_next_item,
     Arg,
@@ -12,21 +13,23 @@ use cairo_lang_runner::{
     StarknetState,
 };
 use cairo_lang_sierra::program::Program;
-use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
-use hieratika_errors::compile::llvm::Error;
-use inkwell::{
-    context::Context,
-    memory_buffer::MemoryBuffer,
-    values::GenericValue,
-    OptimizationLevel,
+use cairo_lang_sierra_generator::{
+    db::SierraGenGroup,
+    program_generator::SierraProgramWithDebug,
+    replace_ids::{DebugReplacer, SierraIdReplacer},
 };
+use cairo_lang_utils::ordered_hash_map::OrderedHashMap;
+use hieratika_cairoc::build_db;
+use hieratika_errors::compile::{cairo::Error as CairoError, llvm::Error as LLVMError};
+use inkwell::{context::Context, memory_buffer::MemoryBuffer, values::GenericValue};
+use starknet_types_core::felt::Felt;
 
 /// Executes the LLVM-IR program and returns the exit code as unsigned integer.
 ///
 /// # Arguments
 ///
-/// - `path` - The path of the LLVM-IR file to execute
-/// - `function_name` - The name of the function to execute
+/// - `path` - The path of the LLVM-IR file to execute.
+/// - `function_name` - The name of the function to execute.
 /// - `args` - The arguments to call the function.
 ///
 /// # Errors
@@ -42,33 +45,26 @@ pub fn execute_llvm_ir(
     args: &[&GenericValue],
 ) -> anyhow::Result<u64> {
     let context = Context::create();
-    let memory_buffer = MemoryBuffer::create_from_file(path).map_err(Error::from)?;
-    let module = context.create_module_from_ir(memory_buffer).map_err(Error::from)?;
-    let execution_engine = module
-        .create_jit_execution_engine(OptimizationLevel::None)
-        .map_err(Error::from)?;
+    let memory_buffer = MemoryBuffer::create_from_file(path).map_err(LLVMError::from)?;
+    let module = context
+        .create_module_from_ir(memory_buffer)
+        .map_err(LLVMError::from)?;
+    let execution_engine = module.create_execution_engine().map_err(LLVMError::from)?;
     let function = module
         .get_function(function_name)
         .unwrap_or_else(|| panic!("Function {function_name} not present in {path:?}"));
 
-    unsafe {
-        let output = execution_engine.run_function(function, args);
-        let output = output.as_int(false);
-        Ok(output)
-    }
+    let output = unsafe { execution_engine.run_function(function, args) };
+    let output = output.as_int(false);
+    Ok(output)
 }
 
-/// Executes the Cairo program and returns the exit code as unsigned integer.
-///
-/// It is assumed the Cairo function returns a single `felt252` which can be
-/// casted to `u64` without overflow. The reason is that this function is used
-/// to verify that the equivalent LLVM-IR code returns the same exit code and
-/// standard exit codes are single integers.
+/// Executes the Cairo program and returns the output values.
 ///
 /// # Arguments
 ///
-/// - `sierra_program` - The Sierra program to execute
-/// - `function_name` - The name of the function to execute
+/// - `sierra_program` - The Sierra program to execute.
+/// - `function_name` - The name of the function to execute.
 /// - `args` - The arguments to call the function.
 ///
 /// # Errors
@@ -83,7 +79,7 @@ pub fn execute_cairo(
     sierra_program: Program,
     function_name: &str,
     args: &[Arg],
-) -> anyhow::Result<u64> {
+) -> anyhow::Result<Vec<Felt>> {
     let contracts_info = OrderedHashMap::default();
 
     let runner = SierraCasmRunner::new(sierra_program, None, contracts_info, None)?;
@@ -95,12 +91,7 @@ pub fn execute_cairo(
     )?;
 
     match result.value {
-        RunResultValue::Success(values) => {
-            assert_eq!(values.len(), 1);
-            let exit_code = values.first().unwrap();
-            assert!(exit_code.bits() <= 64);
-            return Ok(exit_code.to_le_digits().first().cloned().unwrap());
-        }
+        RunResultValue::Success(values) => Ok(values),
         RunResultValue::Panic(values) => {
             let mut error_message = String::new();
             write!(
@@ -125,6 +116,11 @@ pub fn execute_cairo(
 /// This function verifies that the execution of an LLVM-IR program and a Sierra
 /// program return the same exit code.
 ///
+/// It is assumed the Cairo function returns a single `felt252` which can be
+/// casted to `u64` without overflow. The reason is that this function is used
+/// to verify that the equivalent LLVM-IR code returns the same exit code and
+/// standard exit codes are single integers.
+///
 /// # Arguments
 ///
 /// - `llvm_ir_filename` - The path of the LLVM-IR file to execute.
@@ -135,9 +131,9 @@ pub fn execute_cairo(
 ///
 /// # Panics
 ///
-/// - It panics if the Cairo code execution fails
-/// - It panics if the LLVM-IR code execution fails
-/// - It panics if the exit codes don't match
+/// - It panics if the Cairo code execution fails.
+/// - It panics if the LLVM-IR code execution fails.
+/// - It panics if the exit codes don't match.
 pub fn assert_eq_llvm_cairo(
     llvm_ir_filename: &Path,
     function_name: &str,
@@ -147,64 +143,37 @@ pub fn assert_eq_llvm_cairo(
 ) {
     let llvm_ir_exit_code = execute_llvm_ir(llvm_ir_filename, function_name, llvm_ir_args).unwrap();
 
-    let cairo_exit_code = execute_cairo(sierra_program, function_name, cairo_args).unwrap();
+    let cairo_returned_value = execute_cairo(sierra_program, function_name, cairo_args).unwrap();
+    assert_eq!(cairo_returned_value.len(), 1);
+    let cairo_exit_code = cairo_returned_value.first().unwrap();
+    assert!(cairo_exit_code.bits() <= 64);
+    let cairo_exit_code = cairo_exit_code.to_le_digits().first().cloned().unwrap();
     assert_eq!(llvm_ir_exit_code, cairo_exit_code);
 }
 
-#[cfg(test)]
-mod test {
-    use std::{path::Path, sync::Arc};
+/// This function compiles the Cairo program to Sierra.
+///
+/// # Arguments
+///
+/// - `path` - The location of the Cairo program to compile.
+///
+/// # Errors
+///
+/// - [`anyhow::Error`] if `path` does not exist or there is a compilation
+///   error.
+pub fn compile_cairo(path: &Path) -> anyhow::Result<Program> {
+    let db = &mut build_db();
 
-    use cairo_lang_compiler::project::setup_project;
-    use cairo_lang_sierra::program::Program;
-    use cairo_lang_sierra_generator::{
-        db::SierraGenGroup,
-        program_generator::SierraProgramWithDebug,
-        replace_ids::{DebugReplacer, SierraIdReplacer},
-    };
-    use hieratika_cairoc::build_db;
-    use hieratika_errors::compile::cairo::Error;
+    let main_crate_ids = setup_project(db, path)?;
 
-    use crate::{assert_eq_llvm_cairo, execute_cairo, execute_llvm_ir};
-
-    fn compile_cairo(path: &Path) -> anyhow::Result<Program> {
-        let db = &mut build_db();
-
-        let main_crate_ids = setup_project(db, path)?;
-
-        let SierraProgramWithDebug {
-            program: mut sierra_program,
-            debug_info: _debug_info,
-        } = Arc::unwrap_or_clone(
-            db.get_sierra_program(main_crate_ids).map_err(Error::SalsaDbError)?,
-        );
-        let replacer = DebugReplacer { db };
-        replacer.enrich_function_names(&mut sierra_program);
-        Ok(replacer.apply(&sierra_program))
-    }
-
-    #[test]
-    fn executes_llvm_ir() -> anyhow::Result<()> {
-        let llvm_ir_filename = Path::new("input/square.ll");
-        let function_name = "main";
-        let llvm_ir_args = [];
-        let ir_exit_code = execute_llvm_ir(llvm_ir_filename, function_name, &llvm_ir_args)?;
-        assert_eq!(ir_exit_code, 9);
-
-        let cairo_filename = Path::new("input/square.cairo");
-        let function_name = "main";
-        let cairo_args = [];
-        let sierra_program = compile_cairo(cairo_filename).unwrap();
-        let cairo_exit_code = execute_cairo(sierra_program.clone(), function_name, &cairo_args)?;
-        assert_eq!(ir_exit_code, cairo_exit_code);
-
-        assert_eq_llvm_cairo(
-            llvm_ir_filename,
-            function_name,
-            &llvm_ir_args,
-            sierra_program,
-            &cairo_args,
-        );
-        Ok(())
-    }
+    let SierraProgramWithDebug {
+        program: mut sierra_program,
+        debug_info: _debug_info,
+    } = Arc::unwrap_or_clone(
+        db.get_sierra_program(main_crate_ids)
+            .map_err(CairoError::SalsaDbError)?,
+    );
+    let replacer = DebugReplacer { db };
+    replacer.enrich_function_names(&mut sierra_program);
+    Ok(replacer.apply(&sierra_program))
 }
