@@ -14,5 +14,7 @@ pub mod uadd_with_overflow;
 pub mod sadd_with_overflow;
 pub mod uadd_sat;
 pub mod sadd_sat;
+pub mod sub;
 
 mod test_case;
+
