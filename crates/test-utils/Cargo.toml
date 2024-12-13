@@ -1,28 +1,29 @@
 [package]
-name = "hieratika-cairoc"
+name = "hieratika-test-utils"
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "Generates FLO objects from Cairo projects."
+description = "Utilities for E2E testing of the hieratika pipeline."
 keywords.workspace = true
 categories.workspace = true
 
 edition.workspace = true
 rust-version.workspace = true
 
+# Make these specifically impossible to publish as they have no independent use.
+publish = false
+
 [dependencies]
+anyhow.workspace = true
 cairo-lang-compiler.workspace = true
-cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
-cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
-cairo-lang-lowering.workspace = true
-cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
+cairo-lang-runner.workspace = true
+cairo-lang-sierra.workspace = true
 cairo-lang-sierra-generator.workspace = true
 cairo-lang-utils.workspace = true
+hieratika-cairoc.workspace = true
 hieratika-errors.workspace = true
-
-[dev-dependencies]
-itertools.workspace = true
-rayon = "1.10.0"
+inkwell.workspace = true
+starknet-types-core.workspace = true

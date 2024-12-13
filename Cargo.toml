@@ -10,6 +10,7 @@ members = [
   "crates/cairoc",
   "crates/flo",
   "crates/rust-test-input",
+  "crates/test-utils",
 ]
 
 # Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
@@ -38,6 +39,10 @@ bimap = { version = "0.6.3", features = ["serde"] }
 cairo-lang-compiler = { path = "cairo/crates/cairo-lang-compiler" }
 cairo-lang-diagnostics = { path = "cairo/crates/cairo-lang-diagnostics" }
 cairo-lang-lowering = { path = "cairo/crates/cairo-lang-lowering" }
+cairo-lang-runner = { path = "cairo/crates/cairo-lang-runner" }
+cairo-lang-sierra = { path = "cairo/crates/cairo-lang-sierra" }
+cairo-lang-sierra-generator = { path = "cairo/crates/cairo-lang-sierra-generator" }
+cairo-lang-utils = { path = "cairo/crates/cairo-lang-utils" }
 clap = { version = "4.5.16", features = ["derive", "cargo", "env"] }
 ethnum = "1.5.0"
 inkwell = { version = "0.5.0", features = ["llvm18-0"] }
@@ -48,6 +53,8 @@ hieratika-compiler = { path = "crates/compiler" }
 hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
+hieratika-test-utils = { path = "crates/test-utils" }
+starknet-types-core = "0.1.7"
 thiserror = "1.0.63"
 tracing = "0.1.40"
 
