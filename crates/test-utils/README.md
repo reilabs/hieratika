@@ -1,3 +1,3 @@
 # Hieratika Test Utils
 
-Handy functions to simplify testing of Hiratika.
+This crate contains useful functions that simplify E2E testing of the hieratika compiler.

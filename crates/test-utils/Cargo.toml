@@ -6,7 +6,7 @@ repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "The utilities to test Hieratika."
+description = "Utilities for E2E testing of the hieratika pipeline."
 keywords.workspace = true
 categories.workspace = true
 
