@@ -4,7 +4,7 @@ use hieratika_test_utils::{assert_eq_llvm_cairo, compile_cairo, execute_cairo, e
 use starknet_types_core::felt::Felt;
 
 #[test]
-fn executes_llvm_ir() -> anyhow::Result<()> {
+fn compare_llvm_ir_cairo_output() -> anyhow::Result<()> {
     let llvm_ir_filename = Path::new("test_data/square.ll");
     let function_name = "main";
     let llvm_ir_args = [];
@@ -16,7 +16,7 @@ fn executes_llvm_ir() -> anyhow::Result<()> {
     let cairo_args = [];
     let sierra_program = compile_cairo(cairo_filename).unwrap();
     let cairo_returned_values = execute_cairo(sierra_program.clone(), function_name, &cairo_args)?;
-    let expected_cairo_returned_values = vec![Felt::THREE.square()];
+    let expected_cairo_returned_values = vec![Felt::from_hex_unchecked("9")];
     assert_eq!(expected_cairo_returned_values, cairo_returned_values);
 
     assert_eq_llvm_cairo(
