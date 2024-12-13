@@ -318,7 +318,7 @@ impl ObjectGenerator {
         // The function signature gives us our inputs, which are necessary to be
         // referenced later. To that end, we generate it first, as it does not depend on
         // the availability of any blocks.
-        let sig = self.generate_signature(func_name, func_info, data, &mut func_ctx)?;
+        let sig = self.generate_signature(func, func_info, data, &mut func_ctx)?;
 
         // We already have stubs for all the basic blocks in the function thanks to the
         // object mapping step. These are available immutably in the function context to
@@ -368,25 +368,34 @@ impl ObjectGenerator {
     ///   function type.
     pub fn generate_signature(
         &self,
-        func_name: &str,
+        func: &FunctionValue,
         func_info: &FunctionInfo,
         data: &mut ObjectContext,
         func_ctx: &mut FunctionContext,
     ) -> Result<Signature> {
         let func_type = &func_info.typ;
 
-        // Convert the parameter types
+        // Create the function parameters as variables in FLO, handling their types and
+        // also registering them in the function context for later reference. If the
+        // name is anonymous, we allocate one and replace all occurrences.
         let params = func_type
             .parameter_types
             .iter()
-            .zip(&func_info.param_names)
-            .map(|(t, name)| {
-                let typ = ObjectContext::flo_type_of(t)?;
+            .zip(func.get_param_iter())
+            .map(|(typ, param)| {
+                let typ = ObjectContext::flo_type_of(typ)?;
                 let var_id = data.flo.add_variable(typ.clone());
-                let name = name.as_ref().ok_or(Error::MalformedLLVM(format!(
-                    "The function definition for {func_name} did not have names for all arguments"
-                )))?;
-                func_ctx.register_local(var_id, name, typ);
+
+                let llvm_name = param.get_name().to_str()?;
+                let name = if llvm_name.is_empty() {
+                    let name = self.name_supply.borrow_mut().allocate();
+                    param.set_name(&name);
+                    name
+                } else {
+                    llvm_name.to_string()
+                };
+
+                func_ctx.register_local(var_id, &name, typ);
 
                 Ok(var_id)
             })
@@ -3159,7 +3168,7 @@ mod test {
 
     #[test]
     fn errors_on_invalid_name() -> anyhow::Result<()> {
-        let source_module = Path::new("input/add.ll");
+        let source_module = Path::new("input/compilation/add.ll");
         let cg = ObjectGenerator::new(
             "",
             DynPassDataMap::new(),

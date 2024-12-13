@@ -448,8 +448,8 @@ mod test {
 
     /// A utility function to make it easy to load the testing context in all
     /// the tests.
-    fn get_text_context() -> SourceContext {
-        SourceContext::create(Path::new(r"input/add.ll"))
+    fn get_test_context() -> SourceContext {
+        SourceContext::create(Path::new(r"input/compilation/add.ll"))
             .expect("Unable to construct testing source context")
     }
 
@@ -464,7 +464,7 @@ mod test {
     #[test]
     fn returns_correct_data_type() -> anyhow::Result<()> {
         // Setup
-        let ctx = get_text_context();
+        let ctx = get_test_context();
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
         let dyn_return_data = pass.run(ctx, &data)?;
@@ -483,7 +483,7 @@ mod test {
     #[test]
     fn discovers_correct_data_layout() -> anyhow::Result<()> {
         // Setup
-        let ctx = get_text_context();
+        let ctx = get_test_context();
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
@@ -505,7 +505,7 @@ mod test {
 
     #[test]
     fn discovers_correct_globals() -> anyhow::Result<()> {
-        let ctx = get_text_context();
+        let ctx = get_test_context();
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
@@ -569,7 +569,7 @@ mod test {
 
     #[test]
     fn discovers_correct_functions() -> anyhow::Result<()> {
-        let ctx = get_text_context();
+        let ctx = get_test_context();
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
