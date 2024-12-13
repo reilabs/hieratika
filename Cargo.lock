@@ -1422,10 +1422,9 @@ dependencies = [
 name = "hieratika-driver"
 version = "0.1.0"
 dependencies = [
- "ariadne",
- "itertools 0.13.0",
- "thiserror",
- "tracing",
+ "anyhow",
+ "hieratika-test-utils",
+ "starknet-types-core",
 ]
 
 [[package]]
@@ -1467,6 +1466,7 @@ dependencies = [
  "hieratika-cairoc",
  "hieratika-errors",
  "inkwell",
+ "starknet-types-core",
 ]
 
 [[package]]

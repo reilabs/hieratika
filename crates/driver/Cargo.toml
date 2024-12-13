@@ -13,8 +13,7 @@ categories.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
-[dependencies]
-ariadne.workspace = true
-itertools.workspace = true
-thiserror.workspace = true
-tracing.workspace = true
+[dev-dependencies]
+anyhow.workspace = true
+hieratika-test-utils.workspace = true
+starknet-types-core = "0.1.7"

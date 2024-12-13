@@ -19,10 +19,11 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 cairo-lang-compiler.workspace = true
-cairo-lang-runner = { path = "../../cairo/crates/cairo-lang-runner" }
-cairo-lang-sierra = { path = "../../cairo/crates/cairo-lang-sierra" }
-cairo-lang-sierra-generator = { path = "../../cairo/crates/cairo-lang-sierra-generator" }
-cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+cairo-lang-runner.workspace = true
+cairo-lang-sierra.workspace = true
+cairo-lang-sierra-generator.workspace = true
+cairo-lang-utils.workspace = true
 hieratika-cairoc.workspace = true
 hieratika-errors.workspace = true
 inkwell.workspace = true
+starknet-types-core = "0.1.7"
