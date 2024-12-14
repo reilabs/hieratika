@@ -24,21 +24,15 @@ fn test_hieratika_cli_error_output() {
 
     let error_2 = formatdoc! {"
     error: Unexpected return type. Expected: \"core::felt252\", found: \"()\".
-     --> {cairo_filename_path}:8:22
+     --> {cairo_filename_path}:8:14
     fn main() -> felt252 {{
-                         ^
+                 ^*****^
     "};
 
     let assert_output = cmd.assert();
     let output = assert_output.get_output();
-    assert!(
-        String::from_utf8(output.stderr.clone())
-            .unwrap()
-            .contains(error_2.as_str())
-    );
-    assert!(
-        String::from_utf8(output.stderr.clone())
-            .unwrap()
-            .contains(error_1.as_str())
-    );
+    let stderr_output = String::from_utf8(output.stderr.clone()).unwrap();
+    println!("stderr output {stderr_output}");
+    assert!(stderr_output.contains(error_2.as_str()));
+    assert!(stderr_output.contains(error_1.as_str()));
 }
