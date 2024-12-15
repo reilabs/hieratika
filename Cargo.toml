@@ -28,7 +28,7 @@ keywords = ["compiler", "starknet", "starkware"]
 categories = ["compilers", "virtualization", "cryptography::cryptocurrencies"]
 
 edition = "2021"
-rust-version = "1.81.0"
+rust-version = "1.83.0"
 
 # Dependencies that are used by more than one crate are specified here, allowing us to ensure that
 # we match versions in all crates.

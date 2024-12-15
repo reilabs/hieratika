@@ -25,7 +25,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
         fenixLib = fenix.packages.${system};
-        toolchainHash = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
+        toolchainHash = "sha256-s1RPtyvDGJaX/BisLT+ifVfuhDT1nZkZ1NcK8sbwELM=";
         fenixStable = fenixLib.fromToolchainName {
             name = rustVersion;
             sha256 = toolchainHash;
