@@ -4,6 +4,7 @@
 use std::path::Path;
 
 use hieratika_compiler::{context::SourceContext, Compiler, CompilerBuilder};
+use hieratika_flo::FlatLoweredObject;
 
 /// Creates a compiler—with default settings for passes and polyfills—wrapping
 /// the module at the provided `path`.
@@ -18,4 +19,9 @@ pub fn default_compiler_from_path(path: &str) -> anyhow::Result<Compiler> {
     let ctx = SourceContext::create(path)?;
 
     Ok(CompilerBuilder::new(ctx).build())
+}
+
+/// Counts the number of functions found in the provided `flo`.
+pub fn count_functions(flo: &FlatLoweredObject) -> usize {
+    flo.blocks.iter().filter(|(_, b)| b.signature.is_some()).count()
 }

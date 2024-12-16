@@ -9,7 +9,7 @@ mod common;
 #[test]
 fn compiles_add() -> anyhow::Result<()> {
     // We start by constructing and running the compiler
-    let compiler = common::default_compiler_from_path("input/add.ll")?;
+    let compiler = common::default_compiler_from_path("input/compilation/add.ll")?;
     let flo = compiler.run()?;
 
     // The number of blocks should be three at minimum, as this is how many explicit
@@ -21,7 +21,7 @@ fn compiles_add() -> anyhow::Result<()> {
 
     // We should only see one function in this generation, even if there are lots of
     // blocks.
-    let num_functions = flo.blocks.iter().filter(|(_, b)| b.signature.is_some()).count();
+    let num_functions = common::count_functions(&flo);
     assert_eq!(num_functions, 1);
 
     // Let's grab that one function and poke at it a bit.

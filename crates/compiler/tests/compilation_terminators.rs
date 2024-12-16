@@ -6,7 +6,7 @@ mod common;
 #[test]
 fn compiles_terminator_instructions() -> anyhow::Result<()> {
     // We start by constructing and running the compiler
-    let compiler = common::default_compiler_from_path("input/terminators.ll")?;
+    let compiler = common::default_compiler_from_path("input/compilation/terminators.ll")?;
     let flo = compiler.run()?;
 
     // The number of blocks should be 19 at a _minimum_, as that is the number that
@@ -18,7 +18,7 @@ fn compiles_terminator_instructions() -> anyhow::Result<()> {
 
     // We should see exactly 7 functions, as that is how many appears in the source
     // file and none of these opcodes generate additional ones during compilation.
-    let num_functions = flo.blocks.iter().filter(|(_, b)| b.signature.is_some()).count();
+    let num_functions = common::count_functions(&flo);
     assert_eq!(num_functions, 7);
 
     // Unfortunately this file is sufficiently cluttered that there is little sense
