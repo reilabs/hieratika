@@ -48,7 +48,7 @@ fn fshl<
     impl TInto: Into<T, u128>,
     impl TDestruct: Destruct<T>,
 >(
-    a: u128, b: u128, shift: u128
+    a: u128, b: u128, shift: u128,
 ) -> u128 {
     // Make sure the value passed as u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(a);
@@ -100,11 +100,7 @@ fn fshl<
             // This is the bit mask to extract LSBs from the high word.
             // Cairo does not have << and >> operators so we need to use our implementation.
             let mask = shl::<u128>(1, low_word_right_shift) - 1;
-            #[cairofmt::skip]
-            let concatenated = u256 {
-                high: a & mask,
-                low: lshr::<u128>(b, low_word_right_shift)
-            };
+            let concatenated = u256 { high: a & mask, low: lshr::<u128>(b, low_word_right_shift) };
             let result = shl::<u128>(concatenated.high, shift % bit_size) | concatenated.low;
             result
         },

@@ -531,9 +531,8 @@ mod tests {
 
     #[test]
     fn test_i64() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_fshl_i64_i64_i64(*case.a, *case.b, *case.c), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_fshl_i64_i64_i64(*case.a, *case.b, *case.c), *case.expected);
+        }
     }
 }

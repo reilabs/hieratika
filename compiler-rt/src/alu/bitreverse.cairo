@@ -28,9 +28,9 @@ fn bitreverse<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
-    impl TDestruct: Destruct<T>
+    impl TDestruct: Destruct<T>,
 >(
-    value: u128
+    value: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(value);
@@ -38,13 +38,12 @@ fn bitreverse<
     let bit_size: u128 = BitSize::<T>::bits().into();
 
     let mut reversed: u128 = 0;
-    #[cairofmt::skip]
     for current_bit in 0..bit_size {
-            // Make room for the new LSB.
-            reversed = shl::<T>(reversed, 1);
-            // Copy LSB from the input variable to the output variable.
-            reversed = reversed | (lshr::<T>(value, current_bit) & 1);
-        };
+        // Make room for the new LSB.
+        reversed = shl::<T>(reversed, 1);
+        // Copy LSB from the input variable to the output variable.
+        reversed = reversed | (lshr::<T>(value, current_bit) & 1);
+    };
 
     // Make sure the result is limited only to the bit width of the concrete type.
     reversed & Bounded::<T>::MAX.into()

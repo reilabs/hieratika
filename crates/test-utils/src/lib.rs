@@ -78,7 +78,7 @@ pub fn execute_llvm_ir(
 pub fn execute_cairo(
     sierra_program: Program,
     function_name: &str,
-    args: &[Arg],
+    args: Vec<Arg>,
 ) -> anyhow::Result<Vec<Felt>> {
     let contracts_info = OrderedHashMap::default();
 
@@ -139,7 +139,7 @@ pub fn assert_eq_llvm_cairo(
     function_name: &str,
     llvm_ir_args: &[&GenericValue],
     sierra_program: Program,
-    cairo_args: &[Arg],
+    cairo_args: Vec<Arg>,
 ) {
     let llvm_ir_exit_code = execute_llvm_ir(llvm_ir_filename, function_name, llvm_ir_args).unwrap();
 

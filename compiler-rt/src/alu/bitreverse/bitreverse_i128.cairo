@@ -79,9 +79,8 @@ mod tests {
 
     #[test]
     fn test_i128() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_bitreverse_i128(*case.arg), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_bitreverse_i128(*case.arg), *case.expected);
+        }
     }
 }

@@ -1043,9 +1043,8 @@ mod tests {
 
     #[test]
     fn test_i128() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_fshl_i128_i128_i128(*case.a, *case.b, *case.c), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_fshl_i128_i128_i128(*case.a, *case.b, *case.c), *case.expected);
+        }
     }
 }

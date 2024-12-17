@@ -24,9 +24,9 @@ pub fn sadd_with_overflow<
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
     impl TDestruct: Destruct<T>,
-    impl TOverflowingAdd: OverflowingAdd<T>
+    impl TOverflowingAdd: OverflowingAdd<T>,
 >(
-    lhs: u128, rhs: u128
+    lhs: u128, rhs: u128,
 ) -> (u128, bool) {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(lhs);

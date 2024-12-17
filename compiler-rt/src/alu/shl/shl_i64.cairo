@@ -158,9 +158,8 @@ mod tests {
 
     #[test]
     fn test_i64() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_shl_i64_i64(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_shl_i64_i64(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 }

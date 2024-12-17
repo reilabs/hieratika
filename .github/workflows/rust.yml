@@ -142,8 +142,11 @@ jobs:
           ${{ env.DEV_SHELL_LINUX }}
       - name: Check Formatting
         shell: bash
+        # Not using `cargo fmt --all` because it includes cairo submodules.
+        # Check this issue https://github.com/rust-lang/cargo/issues/13962#issue-2315478020
+        # Check this code https://github.com/rust-lang/cargo/issues/13962#issue-2315478020
         run: |
-          ${{ env.DEV_SHELL_LINUX }} --command cargo fmt --all -- --check
+          ${{ env.DEV_SHELL_LINUX }} --command cargo fmt -- --check
 
   documentation:
     name: "Check Rust Documentation"

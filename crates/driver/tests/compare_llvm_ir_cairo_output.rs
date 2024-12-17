@@ -13,18 +13,21 @@ fn compare_llvm_ir_cairo_output() -> anyhow::Result<()> {
 
     let cairo_filename = Path::new("test_data/square.cairo");
     let function_name = "main";
-    let cairo_args = [];
+    let cairo_args = Vec::default();
     let sierra_program = compile_cairo(cairo_filename).unwrap();
-    let cairo_returned_values = execute_cairo(sierra_program.clone(), function_name, &cairo_args)?;
+    let cairo_returned_values = execute_cairo(sierra_program.clone(), function_name, cairo_args)?;
     let expected_cairo_returned_values = vec![Felt::from_hex_unchecked("9")];
     assert_eq!(expected_cairo_returned_values, cairo_returned_values);
 
+    // Repeated declaration of `cairo_args` because [`cairo_lang_runner::Arg`]
+    // doesn't support cloning.
+    let cairo_args = Vec::default();
     assert_eq_llvm_cairo(
         llvm_ir_filename,
         function_name,
         &llvm_ir_args,
         sierra_program,
-        &cairo_args,
+        cairo_args,
     );
     Ok(())
 }

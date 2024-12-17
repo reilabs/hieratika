@@ -1039,9 +1039,8 @@ mod tests {
 
     #[test]
     fn test_i128() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_ctlz_i128(*case.arg, 0), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_ctlz_i128(*case.arg, 0), *case.expected);
+        }
     }
 }

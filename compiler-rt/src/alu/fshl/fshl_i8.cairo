@@ -88,10 +88,9 @@ mod tests {
 
     #[test]
     fn test_i8() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_fshl_i8_i8_i8(*case.a, *case.b, *case.c), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_fshl_i8_i8_i8(*case.a, *case.b, *case.c), *case.expected);
+        }
     }
 }
 

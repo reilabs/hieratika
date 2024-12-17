@@ -94,10 +94,9 @@ mod tests {
 
     #[test]
     fn test_i32() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_lshr_i32_i32(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_lshr_i32_i32(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 }
 

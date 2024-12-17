@@ -21,9 +21,9 @@ fn add<
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
     impl TDestruct: Destruct<T>,
-    impl TWrappingAdd: WrappingAdd<T>
+    impl TWrappingAdd: WrappingAdd<T>,
 >(
-    lhs: u128, rhs: u128
+    lhs: u128, rhs: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     let lhs = expect_into::<T>(lhs);

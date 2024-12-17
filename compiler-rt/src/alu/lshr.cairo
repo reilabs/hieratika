@@ -26,9 +26,9 @@ pub fn lshr<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
-    impl TDestruct: Destruct<T>
+    impl TDestruct: Destruct<T>,
 >(
-    n: u128, shift: u128
+    n: u128, shift: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(n);

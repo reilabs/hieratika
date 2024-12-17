@@ -30,9 +30,9 @@ pub fn shl<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
-    impl TDestruct: Destruct<T>
+    impl TDestruct: Destruct<T>,
 >(
-    n: u128, shift: u128
+    n: u128, shift: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(n);
@@ -40,10 +40,9 @@ pub fn shl<
 
     // Cairo does not have << or >> operators so we must implement the shift manually.
     let mut result = n;
-    #[cairofmt::skip]
     // Perform the shift `shift`` number of times.
     for _ in 0..shift {
-        result = result *2;
+        result = result * 2;
         // Make sure the result is limited only to the bit width of the concrete type.
         result = result & Bounded::<T>::MAX.into();
     };

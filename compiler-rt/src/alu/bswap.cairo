@@ -26,9 +26,9 @@ fn bswap<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
-    impl TDestruct: Destruct<T>
+    impl TDestruct: Destruct<T>,
 >(
-    value: u128
+    value: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(value);
@@ -38,13 +38,12 @@ fn bswap<
     let byte_mask: u128 = Bounded::<u8>::MAX.into();
 
     let mut swapped: u128 = 0;
-    #[cairofmt::skip]
     for byte in 0..bytes_in_type {
-            // Make room for the new LSBs.
-            swapped = shl::<T>(swapped, bits_in_byte);
-            // Copy LSBs from the input variable to the output variable.
-            swapped = swapped | (lshr::<T>(value, byte*bits_in_byte) & byte_mask);
-        };
+        // Make room for the new LSBs.
+        swapped = shl::<T>(swapped, bits_in_byte);
+        // Copy LSBs from the input variable to the output variable.
+        swapped = swapped | (lshr::<T>(value, byte * bits_in_byte) & byte_mask);
+    };
 
     // Make sure the result is limited only to the bit width of the concrete type.
     swapped & Bounded::<T>::MAX.into()

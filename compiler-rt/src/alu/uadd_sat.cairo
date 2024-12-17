@@ -23,9 +23,9 @@ fn uadd_sat<
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
     impl TDestruct: Destruct<T>,
-    impl TOverflowingAdd: OverflowingAdd<T>
+    impl TOverflowingAdd: OverflowingAdd<T>,
 >(
-    lhs: u128, rhs: u128
+    lhs: u128, rhs: u128,
 ) -> u128 {
     let (result, is_overflow) = uadd_with_overflow::<T>(lhs, rhs);
     if is_overflow {
