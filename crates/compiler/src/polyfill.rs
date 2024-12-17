@@ -216,6 +216,7 @@ impl PolyfillMap {
         polyfills.all_specialized_arith_intrinsics();
         polyfills.all_hp_float_intrinsics();
         polyfills.all_sat_fptoi_conversions();
+        polyfills.program_io();
 
         polyfills
     }
@@ -1154,6 +1155,26 @@ impl PolyfillMap {
     }
 }
 
+impl PolyfillMap {
+    fn program_io(&mut self) {
+        // Reads bytes from the program input.
+        let name = "get_input";
+        let params = [LLVMType::i64];
+        // An array with zero length can be used to indicate an array of undetermined
+        // length.
+        let ret = LLVMType::make_array(0, LLVMType::i8);
+        self.mk(name, &params, ret);
+
+        // Writes bytes in the output segment.
+        let name = "set_output";
+        // An array with zero length can be used to indicate an array of undetermined
+        // length.
+        let params = [LLVMType::make_array(0, LLVMType::i8)];
+        let ret = LLVMType::void;
+        self.mk(name, &params, ret);
+    }
+}
+
 /// Useful static functions for dealing with polyfills.
 impl PolyfillMap {
     pub fn mk(&mut self, name: &str, params: &[LLVMType], ret: LLVMType) {
@@ -1254,6 +1275,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1104);
+        assert_eq!(count, 1106);
     }
 }
