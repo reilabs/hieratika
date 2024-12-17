@@ -38,13 +38,12 @@ fn bitreverse<
     let bit_size: u128 = BitSize::<T>::bits().into();
 
     let mut reversed: u128 = 0;
-    #[cairofmt::skip]
     for current_bit in 0..bit_size {
-            // Make room for the new LSB.
-            reversed = shl::<T>(reversed, 1);
-            // Copy LSB from the input variable to the output variable.
-            reversed = reversed | (lshr::<T>(value, current_bit) & 1);
-        };
+        // Make room for the new LSB.
+        reversed = shl::<T>(reversed, 1);
+        // Copy LSB from the input variable to the output variable.
+        reversed = reversed | (lshr::<T>(value, current_bit) & 1);
+    };
 
     // Make sure the result is limited only to the bit width of the concrete type.
     reversed & Bounded::<T>::MAX.into()

@@ -11,7 +11,6 @@ pub fn __llvm_shl_i128_i128(n: u128, shift: u128) -> u128 {
 
     // Cairo does not have << or >> operators so we must implement the shift manually.
     let mut result = n;
-    #[cairofmt::skip]
     // Perform the shift `shift`` number of times.
     for _ in 0..shift {
         // Initialize new_result to 0 for the current shift.

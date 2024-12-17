@@ -40,10 +40,9 @@ pub fn shl<
 
     // Cairo does not have << or >> operators so we must implement the shift manually.
     let mut result = n;
-    #[cairofmt::skip]
     // Perform the shift `shift`` number of times.
     for _ in 0..shift {
-        result = result *2;
+        result = result * 2;
         // Make sure the result is limited only to the bit width of the concrete type.
         result = result & Bounded::<T>::MAX.into();
     };
