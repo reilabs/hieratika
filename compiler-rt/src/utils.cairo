@@ -8,9 +8,9 @@ use core::num::traits::BitSize;
 // insert its body directly into the caller.
 #[inline]
 pub fn expect_into<
-    T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>
+    T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>,
 >(
-    v: u128
+    v: u128,
 ) -> T {
     let bit_size = BitSize::<T>::bits();
     let res: T = match v.try_into() {
@@ -29,9 +29,9 @@ pub fn expect_into<
 // insert its body directly into the caller.
 #[inline]
 pub fn assert_fits_in_type<
-    T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>
+    T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>,
 >(
-    v: u128
+    v: u128,
 ) {
     expect_into::<T>(v);
 }

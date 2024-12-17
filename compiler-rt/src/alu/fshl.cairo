@@ -48,7 +48,7 @@ fn fshl<
     impl TInto: Into<T, u128>,
     impl TDestruct: Destruct<T>,
 >(
-    a: u128, b: u128, shift: u128
+    a: u128, b: u128, shift: u128,
 ) -> u128 {
     // Make sure the value passed as u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(a);

@@ -143,9 +143,8 @@ mod tests {
 
     #[test]
     fn test_i16() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_bitreverse_i16(*case.arg), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_bitreverse_i16(*case.arg), *case.expected);
+        }
     }
 }

@@ -31,10 +31,9 @@ mod tests {
 
     #[test]
     fn test_i1() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_shl_i1_i1(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_shl_i1_i1(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 }
 

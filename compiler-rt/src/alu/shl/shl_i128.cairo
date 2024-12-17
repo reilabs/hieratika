@@ -331,41 +331,36 @@ mod tests {
 
     #[test]
     fn test_i128_shifts_ones_1() {
-        for case in test_cases_shifts_ones_1
-            .span() {
-                assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases_shifts_ones_1.span() {
+            assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 
     #[test]
     fn test_i128_shifts_ones_2() {
-        for case in test_cases_shifts_ones_2
-            .span() {
-                assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases_shifts_ones_2.span() {
+            assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 
     #[test]
     fn test_i128_shifts_zeros_1() {
-        for case in test_cases_shifts_zeros_1
-            .span() {
-                assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases_shifts_zeros_1.span() {
+            assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 
     #[test]
     fn test_i128_shifts_zeros_2() {
-        for case in test_cases_shifts_zeros_2
-            .span() {
-                assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases_shifts_zeros_2.span() {
+            assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 
     #[test]
     fn test_i128_shift_mixed() {
-        for case in test_cases_shift_mixed
-            .span() {
-                assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases_shift_mixed.span() {
+            assert_eq!(__llvm_shl_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 }

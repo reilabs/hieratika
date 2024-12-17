@@ -60,9 +60,8 @@ mod tests {
 
     #[test]
     fn test_i128() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_and_i128_i128(*case.lhs, *case.rhs), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_and_i128_i128(*case.lhs, *case.rhs), *case.expected);
+        }
     }
 }

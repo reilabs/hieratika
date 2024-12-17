@@ -28,9 +28,9 @@ fn bitreverse<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
-    impl TDestruct: Destruct<T>
+    impl TDestruct: Destruct<T>,
 >(
-    value: u128
+    value: u128,
 ) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     assert_fits_in_type::<T>(value);

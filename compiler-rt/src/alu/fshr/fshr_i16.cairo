@@ -147,9 +147,8 @@ mod tests {
 
     #[test]
     fn test_i16() {
-        for case in test_cases
-            .span() {
-                assert_eq!(__llvm_fshr_i16_i16_i16(*case.a, *case.b, *case.c), *case.expected);
-            }
+        for case in test_cases.span() {
+            assert_eq!(__llvm_fshr_i16_i16_i16(*case.a, *case.b, *case.c), *case.expected);
+        }
     }
 }
