@@ -1,7 +1,7 @@
 ; ModuleID = '9ox3ykpp0gbrqxqlz7ajwa9w6'
 source_filename = "9ox3ykpp0gbrqxqlz7ajwa9w6"
-target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
-target triple = "aarch64-unknown-none"
+target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128"
+target triple = "riscv64"
 
 @alloc_4190527422e5cc48a15bd1cb4f38f425 = private unnamed_addr constant <{ [33 x i8] }> <{ [33 x i8] c"crates/rust-test-input/src/lib.rs" }>, align 1
 @alloc_5b4544c775a23c08ca70c48dd7be27fc = private unnamed_addr constant <{ ptr, [16 x i8] }> <{ ptr @alloc_4190527422e5cc48a15bd1cb4f38f425, [16 x i8] c"!\00\00\00\00\00\00\00\05\00\00\00\05\00\00\00" }>, align 8

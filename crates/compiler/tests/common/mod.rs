@@ -1,6 +1,10 @@
 //! Common utilities for the integration tests, these are intended to make it
 //! easier to write complex tests of the compiler's functionality.
 
+// Ensures that we can import this common module into tests without getting warnings for every
+// function we do not use.
+#![allow(dead_code)]
+
 use std::path::Path;
 
 use hieratika_compiler::{Compiler, CompilerBuilder, context::SourceContext};
