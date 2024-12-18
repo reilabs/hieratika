@@ -169,6 +169,7 @@ impl ObjectContext {
             LLVMType::bool => Type::Bool,
             LLVMType::i8 => Type::Signed8,
             LLVMType::i16 => Type::Signed16,
+            LLVMType::i24 => Type::Signed24,
             LLVMType::i32 => Type::Signed32,
             LLVMType::i64 => Type::Signed64,
             LLVMType::i128 => Type::Signed128,

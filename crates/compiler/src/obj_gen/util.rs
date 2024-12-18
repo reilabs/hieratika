@@ -1,7 +1,7 @@
 //! This module contains miscellaneous utilities that are useful aids in
 //! generating a `FlatLoweredObject`.
 
-use std::ffi::CStr;
+use std::ffi::{CStr, c_uint};
 
 use chumsky::{
     Parser,
@@ -18,7 +18,12 @@ use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::{
         LLVMAtomicOrdering,
-        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMPrintValueToString},
+        core::{
+            LLVMGetAggregateElement,
+            LLVMGetIndices,
+            LLVMGetNumIndices,
+            LLVMPrintValueToString,
+        },
     },
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
@@ -51,6 +56,7 @@ pub type OptionalInkwellOperand<'ctx> = Option<InkwellOperand<'ctx>>;
 ///   unsupported.
 /// - If a struct value constant is encountered, as these are currently
 ///   unsupported.
+#[expect(clippy::too_many_lines)] // It does not make sense to split this one up.
 pub fn get_var_or_const(
     value: &BasicValueEnum,
     bb: &mut BlockBuilder,
@@ -159,11 +165,39 @@ pub fn get_var_or_const(
                 // This case is not part of the normal flow, so we do a direct return.
                 return Ok(result_variable);
             }
-            BasicValueEnum::ArrayValue(_) => {
-                unimplemented!("Array value constants are not implemented (#91)")
+            BasicValueEnum::ArrayValue(array_val) => {
+                assert!(
+                    array_val.is_const(),
+                    "Unnamed array value was not a constant {array_val:?}"
+                );
+
+                let constant_arguments = extract_constant_aggregate_values(value)?;
+                let constant_ids = constant_arguments
+                    .iter()
+                    .map(|c| get_var_or_const(c, bb, func_ctx))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let flo_type = ObjectContext::flo_type_of(&value_type)?;
+                let array_const_id = bb.simple_construct_into_new_variable(flo_type, constant_ids);
+
+                return Ok(array_const_id);
             }
-            BasicValueEnum::StructValue(_) => {
-                unimplemented!("Struct value constants are not implemented (#91)")
+            BasicValueEnum::StructValue(struct_val) => {
+                assert!(
+                    struct_val.is_const(),
+                    "Unnamed structure value was not a constant {struct_val:?}"
+                );
+
+                let constant_arguments = extract_constant_aggregate_values(value)?;
+                let constant_ids = constant_arguments
+                    .iter()
+                    .map(|c| get_var_or_const(c, bb, func_ctx))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let flo_type = ObjectContext::flo_type_of(&value_type)?;
+                let struct_const_id = bb.simple_construct_into_new_variable(flo_type, constant_ids);
+
+                return Ok(struct_const_id);
             }
             BasicValueEnum::VectorValue(_) | BasicValueEnum::ScalableVectorValue(_) => Err(
                 Error::unsupported_type("LLVM vector types are not supported"),
@@ -455,6 +489,64 @@ pub fn int_from_bv(value: BasicValueEnum) -> Option<u64> {
 #[must_use]
 pub fn expect_int_from_bv(value: BasicValueEnum) -> u64 {
     int_from_bv(value).expect("The provided value was not an integer")
+}
+
+/// Extracts constant elements from an aggregate type.
+///
+/// # Errors
+///
+/// - [`Error::MalformedLLVM`] if the elements of the constant value are
+///   non-constant.
+/// - [`Error::UnsupportedType`] if the type of the provided `value` cannot be
+///   expressed in the compiler's type language.
+///
+/// # Panics
+///
+/// If the provided `value` is not a constant aggregate type.
+pub fn extract_constant_aggregate_values<'ctx>(
+    value: &BasicValueEnum<'ctx>,
+) -> Result<Vec<BasicValueEnum<'ctx>>> {
+    let val_type = LLVMType::try_from(value.get_type())?;
+    let val_ref = match value {
+        BasicValueEnum::ArrayValue(val) if val.is_const() => val.as_value_ref(),
+        BasicValueEnum::StructValue(val) if val.is_const() => val.as_value_ref(),
+        _ => panic!(
+            "Attempted to extract constant elements from non-aggregate or non-constant type \
+             {value:?}"
+        ),
+    };
+
+    // We need the number of elements in the value that would be const, and the
+    // easiest way to do this is to pull the information out of the type.
+    let num_elements = match &val_type {
+        LLVMType::Array(arr) => arr.count,
+        LLVMType::Structure(structure) => structure.elements.len(),
+        _ => panic!(
+            "Attempted to extract constant elements from non-aggregate or non-constant type \
+             {val_type}"
+        ),
+    };
+
+    // This operation is safe as we ensure that we are only accessing within the
+    // already-known bounds of the type of the value.
+    //
+    // Furthermore, the only values that can exist in this place as elements _are_
+    // ones that can exist as basic values, so we satisfy the condition to construct
+    // a new BasicValueEnum safely.
+    let const_values = (0..num_elements)
+        .map(|i| {
+            let i = c_uint::try_from(i).map_err(|_| {
+                Error::MalformedLLVM(format!(
+                    "Could not convert {i} into a valid index in an aggregate with type {}",
+                    &val_type
+                ))
+            })?;
+            let value_ref = unsafe { LLVMGetAggregateElement(val_ref, i) };
+            Ok(unsafe { BasicValueEnum::new(value_ref) })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(const_values)
 }
 
 /// Extracts a name from the provided basic `value`, or returns [`None`] if

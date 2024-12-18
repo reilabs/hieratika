@@ -487,7 +487,9 @@ impl ObjectGenerator {
         // variable is inherently uninitialized. FLO provides an "initializers"
         // mechanism that provides blocks that are executed by the CRT0.
         if let Some(_initializer_code) = global.get_initializer() {
-            // TODO (#36) Actually implement this.
+            // TODO (#36) Actually implement this using the initializers
+            // mechanism. This is a simple non-function block that runs code and
+            // assigns to the constant variable.
         }
 
         Ok(())
@@ -973,12 +975,11 @@ impl ObjectGenerator {
 
         // In order to have some idea of how to generate this, we need to know the
         // source type of the element at the pointer into which the GEP is indexing.
+        //
+        // While GEP is meant to operate purely over aggregates (array or struct types),
+        // it can be used in its first argument to offset over pointers themselves. In
+        // other words, it performs simple pointer arithmetic.
         let source_type = LLVMType::try_from(instruction.get_gep_source_element_type()?)?;
-
-        // This source type has to be of either an array or struct type.
-        if !matches!(source_type, LLVMType::Structure(_) | LLVMType::Array(_)) {
-            Err(only_on_aggregates_error(&instruction, &source_type))?;
-        }
 
         // The GEP instruction has an arbitrary number of operands. The first is the
         // pointer from which the extraction is performed, while the subsequent operands
@@ -1167,7 +1168,7 @@ impl ObjectGenerator {
         // the store differently based on the type being stored.
         let stored_type = LLVMType::try_from(stored_val.get_type())?;
         match &stored_type {
-            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                 // In the case of directly storing a primitive, the offset is _always_ going to
                 // be zero.
                 self.store_primitive(&stored_type, stored_val_var, pointer_var, 0, bb)?;
@@ -1224,10 +1225,7 @@ impl ObjectGenerator {
         #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
         assert!(
-            matches!(
-                typ,
-                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr
-            ),
+            typ.is_primitive(),
             "Primitive type expected, but {typ} found instead"
         );
 
@@ -1242,7 +1240,7 @@ impl ObjectGenerator {
         // Next, we need to look up the polyfill to call.
         let polyfill_name =
             self.polyfills
-                .try_get_polyfill("store", &[typ.clone(), ptr, i64], &LLVMType::void)?;
+                .try_get_polyfill("store", &[typ.clone(), ptr, i64], &void)?;
 
         // The store opcode has no return value, so we can simply generate the call
         // here, passing the value to store, the pointer to store to, and the offset
@@ -1292,7 +1290,7 @@ impl ObjectGenerator {
 
         for (elem_ty, elem_val) in struct_elements.iter().zip(element_variables.into_iter()) {
             match elem_ty {
-                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.store_primitive(elem_ty, elem_val, pointer, accumulated_offset, bb)?;
                 }
                 Array(array_type) => {
@@ -1353,7 +1351,7 @@ impl ObjectGenerator {
 
         for array_element in array_elements {
             match &array_elem_type {
-                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.store_primitive(
                         array_elem_type,
                         array_element,
@@ -1428,7 +1426,7 @@ impl ObjectGenerator {
         // handle the type being loaded differently.
         let output_type = LLVMType::try_from(instruction.get_type())?;
         let output_var = match &output_type {
-            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                 // In the case of directly loading a primitive, the offset is _always_ going to
                 // be zero.
                 self.load_primitive(&output_type, pointer_var, 0, bb)?
@@ -1491,10 +1489,7 @@ impl ObjectGenerator {
         #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
         assert!(
-            matches!(
-                typ,
-                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr
-            ),
+            typ.is_primitive(),
             "Primitive type expected, but {typ} found instead"
         );
 
@@ -1549,7 +1544,7 @@ impl ObjectGenerator {
             .map(|elem_ty| {
                 // We have to start by dispatching based on the child type
                 let loaded_var = match elem_ty {
-                    bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                    bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                         self.load_primitive(elem_ty, pointer, accumulated_offset, bb)?
                     }
                     Array(array_type) => {
@@ -1610,7 +1605,7 @@ impl ObjectGenerator {
         let mut component_variables: Vec<VariableId> = Vec::new();
         for _ in 0..array_elem_count {
             component_variables.push(match array_elem_type {
-                bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.load_primitive(array_elem_type, pointer, accumulated_offset, bb)?
                 }
                 Array(array_type) => {

@@ -58,6 +58,9 @@ pub enum LLVMType {
     /// The 16-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
     i16,
 
+    /// The 24-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
+    i24,
+
     /// The 32-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
     i32,
 
@@ -156,6 +159,8 @@ impl LLVMType {
             self,
             Self::bool
                 | Self::i8
+                | Self::i16
+                | Self::i24
                 | Self::i32
                 | Self::i64
                 | Self::i128
@@ -224,6 +229,7 @@ impl LLVMType {
             f64,
             i8,
             i16,
+            i24,
             i32,
             i64,
             i128,
@@ -231,7 +237,7 @@ impl LLVMType {
             void,
         };
         match self {
-            bool | i8 | i16 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,
+            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,
             void | Metadata => 0,
             Array(array_ty) => array_ty.size_of(),
             Structure(struct_ty) => struct_ty.size_of(),
@@ -258,6 +264,7 @@ impl Display for LLVMType {
             LLVMType::bool => "i1".to_string(),
             LLVMType::i8 => "i8".to_string(),
             LLVMType::i16 => "i16".to_string(),
+            LLVMType::i24 => "i24".to_string(),
             LLVMType::i32 => "i32".to_string(),
             LLVMType::i64 => "i64".to_string(),
             LLVMType::i128 => "i128".to_string(),
@@ -412,6 +419,7 @@ impl<'ctx> TryFrom<&IntType<'ctx>> for LLVMType {
             1 => Self::bool,
             8 => Self::i8,
             16 => Self::i16,
+            24 => Self::i24,
             32 => Self::i32,
             64 => Self::i64,
             128 => Self::i128,

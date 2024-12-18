@@ -496,8 +496,7 @@ mod test {
         // The data layout should have been picked up correctly from the module, and we
         // know that parsing works, so we check equality
         let data_layout = &map.data_layout;
-        let expected_data_layout =
-            DataLayout::new("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128")?;
+        let expected_data_layout = DataLayout::new("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128")?;
         assert_eq!(data_layout, &expected_data_layout);
 
         Ok(())
