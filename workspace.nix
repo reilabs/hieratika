@@ -10,7 +10,7 @@
   bzip2,
   libiconv,
   libxml2,
-  llvmPackages_18,
+  llvmPackages_19,
 }:
  let
   workspaceToml = lib.importTOML ./Cargo.toml;
@@ -37,14 +37,14 @@
 
     # Things that are needed at build time on the system doing building.
     nativeBuildInputs = [
-      llvmPackages_18.llvm
+      llvmPackages_19.llvm
     ];
 
     # The things that we need available at build and runtime on the target system.
     buildInputs = [
       libffi
       libxml2
-      llvmPackages_18.llvm
+      llvmPackages_19.llvm
     ] ++ lib.optionals stdenv.hostPlatform.isDarwin [
       bzip2
       libiconv
