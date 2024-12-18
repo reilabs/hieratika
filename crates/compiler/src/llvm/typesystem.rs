@@ -15,6 +15,7 @@ use inkwell::{
         FunctionType,
         IntType,
         PointerType,
+        ScalableVectorType,
         StructType,
         VectorType,
         VoidType,
@@ -317,6 +318,7 @@ impl<'ctx> TryFrom<&AnyTypeEnum<'ctx>> for LLVMType {
             AnyTypeEnum::StructType(struct_type) => Self::try_from(struct_type),
             AnyTypeEnum::VoidType(void_type) => Self::try_from(void_type),
             AnyTypeEnum::VectorType(vector_type) => Self::try_from(vector_type),
+            AnyTypeEnum::ScalableVectorType(vector_type) => Self::try_from(vector_type),
         }
     }
 }
@@ -342,6 +344,7 @@ impl<'ctx> TryFrom<&BasicTypeEnum<'ctx>> for LLVMType {
             BasicTypeEnum::PointerType(ptr_type) => Self::try_from(ptr_type),
             BasicTypeEnum::StructType(struct_type) => Self::try_from(struct_type),
             BasicTypeEnum::VectorType(vector_type) => Self::try_from(vector_type),
+            BasicTypeEnum::ScalableVectorType(vector_type) => Self::try_from(vector_type),
         }
     }
 }
@@ -490,6 +493,34 @@ impl<'ctx> TryFrom<&VectorType<'ctx>> for LLVMType {
 
     fn try_from(value: &VectorType<'ctx>) -> Result<Self, Self::Error> {
         Err(Error::UnsupportedType(value.to_string()))?
+    }
+}
+
+/// Conversion from Inkwell's scalable vector type to our type language.
+///
+/// Currently, our type language **cannot represent** the scalable vector types,
+/// so this operation will error. It exists to ensure that in the future we can
+/// seamlessly add support without having to change multiple conversion sites
+/// that would currently need to produce errors.
+impl<'ctx> TryFrom<ScalableVectorType<'ctx>> for LLVMType {
+    type Error = llvm::Error;
+
+    fn try_from(value: ScalableVectorType<'ctx>) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+/// Conversion from Inkwell's scalable vector type to our type language.
+///
+/// Currently, our type language **cannot represent** the scalable vector types,
+/// so this operation will error. It exists to ensure that in the future we can
+/// seamlessly add support without having to change multiple conversion sites
+/// that would currently need to produce errors.
+impl<'ctx> TryFrom<&ScalableVectorType<'ctx>> for LLVMType {
+    type Error = llvm::Error;
+
+    fn try_from(value: &ScalableVectorType<'ctx>) -> Result<Self, Self::Error> {
+        Err(Error::UnsupportedType(value.to_string()))
     }
 }
 

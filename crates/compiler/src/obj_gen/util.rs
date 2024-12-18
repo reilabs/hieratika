@@ -165,9 +165,9 @@ pub fn get_var_or_const(
             BasicValueEnum::StructValue(_) => {
                 unimplemented!("Struct value constants are not implemented (#91)")
             }
-            BasicValueEnum::VectorValue(_) => Err(Error::unsupported_type(
-                "LLVM vector types are not supported",
-            ))?,
+            BasicValueEnum::VectorValue(_) | BasicValueEnum::ScalableVectorValue(_) => Err(
+                Error::unsupported_type("LLVM vector types are not supported"),
+            )?,
         };
 
         // With the constant value obtained, we can shove it into the actual constant,
@@ -430,6 +430,9 @@ pub fn name_type_pairs_from_value_operands(
             BasicValueEnum::VectorValue(vector_val) => {
                 Err(Error::UnsupportedType(vector_val.to_string()))?
             }
+            BasicValueEnum::ScalableVectorValue(vector_val) => {
+                Err(Error::UnsupportedType(vector_val.to_string()))?
+            }
         })
         .collect()
 }
@@ -471,6 +474,7 @@ pub fn name_from_bv(value: BasicValueEnum) -> Result<Option<String>> {
         BasicValueEnum::FloatValue(float_val) => float_val.get_name().to_str()?.to_string(),
         BasicValueEnum::StructValue(struct_val) => struct_val.get_name().to_str()?.to_string(),
         BasicValueEnum::VectorValue(vec_val) => vec_val.get_name().to_str()?.to_string(),
+        BasicValueEnum::ScalableVectorValue(vec_val) => vec_val.get_name().to_str()?.to_string(),
     };
 
     Ok(if name.is_empty() { None } else { Some(name) })
