@@ -1,7 +1,7 @@
 //! This module contains miscellaneous utilities that are useful aids in
 //! generating a `FlatLoweredObject`.
 
-use std::ffi::CStr;
+use std::ffi::{CStr, c_uint};
 
 use chumsky::{
     Parser,
@@ -18,7 +18,12 @@ use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::{
         LLVMAtomicOrdering,
-        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMPrintValueToString},
+        core::{
+            LLVMGetAggregateElement,
+            LLVMGetIndices,
+            LLVMGetNumIndices,
+            LLVMPrintValueToString,
+        },
     },
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
@@ -43,14 +48,11 @@ pub type OptionalInkwellOperand<'ctx> = Option<InkwellOperand<'ctx>>;
 ///
 /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
 ///   defined before its usage.
+/// - [`Error::UnsupportedType`] if an LLVM vector type is encountered.
 ///
 /// # Panics
 ///
 /// - If any value is both non-constant and lacking a name.
-/// - If an array value constant is encountered, as these are currently
-///   unsupported.
-/// - If a struct value constant is encountered, as these are currently
-///   unsupported.
 pub fn get_var_or_const(
     value: &BasicValueEnum,
     bb: &mut BlockBuilder,
@@ -61,91 +63,145 @@ pub fn get_var_or_const(
     let value_name = value.get_name().to_str()?;
     let value_type = LLVMType::try_from(value.get_type())?;
 
-    let id: VariableId = if value_name.is_empty() {
+    let variable_id = if value_name.is_empty() {
         // Here, it is truly anonymous, which means we have run into the case where it
         // is simply an inline constant.
-        let const_value = match value {
-            BasicValueEnum::IntValue(int_val) => {
-                assert!(
-                    int_val.is_const(),
-                    "Unnamed integer value was not a constant: {int_val:?}"
-                );
-                let constant_value = int_val
-                    .get_zero_extended_constant()
-                    .expect("Integer already known to be a constant had no constant value");
+        let variable = bb.add_variable(ObjectContext::flo_type_of(&value_type)?);
+        build_const_into(variable, value, bb, func_ctx)?;
 
-                // Unfortunately, our constants from LLVM are not in the same format as we need
-                // in FLO, so we have to convert it while maintaining the correct bytes. Here,
-                // we take advantage of Rust's casting behavior: casting between signed and
-                // unsigned of the same size is a no-op, and casting from a smaller unsigned
-                // number to a larger unsigned number causes zero-extension.
-                //
-                // See: https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics
-                u128::from(constant_value)
-            }
-            BasicValueEnum::FloatValue(float_val) => {
-                assert!(
-                    float_val.is_const(),
-                    "Unnamed floating-point value was not a constant: {float_val:?}"
-                );
-                let (const_float, _) = float_val.get_constant().expect(
-                    "Floating-point value already known to be a constant had no constant value",
-                );
+        variable
+    } else {
+        func_ctx.try_lookup_variable(value_name)?
+    };
 
-                // Unfortunately, we do not natively support FP constants in FLO, so we have to
-                // represent the _bits_ of the float inside our constant value. This behavior
-                // is safe as we construct the value with the same bytes as the float, and then
-                // use the above-mentioned zero-extension to fit it into the u128.
-                u128::from(u64::from_le_bytes(const_float.to_le_bytes()))
-            }
-            BasicValueEnum::PointerValue(ptr_val) => {
-                assert!(
-                    ptr_val.is_const(),
-                    "Unnamed pointer value was not a constant: {ptr_val:?}"
-                );
+    Ok(variable_id)
+}
 
-                // We cannot have direct pointer constants written out, but instead they take
-                // the form of a constant expression such as the `blockaddress` function. To
-                // make matters more complex, neither Inkwell nor llvm-sys provide ways to get
-                // at the arguments to the constant, so we are forced to parse it out manually.
-                //
-                // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
-                // hence we are safe to convert it to the similarly non-owning str here for
-                // processing. When our `str` gets dropped, so does the `CStr` but the
-                // underlying allocation is left in the control of llvm-sys via Inkwell.
-                let pointer_const_text_c =
-                    unsafe { CStr::from_ptr(LLVMPrintValueToString(ptr_val.as_value_ref())) };
-                let pointer_const_text_str = pointer_const_text_c.to_str()?;
+/// Builds the constant `value` into the provided `variable` inside the block
+/// described by `bb` and the function described by `func_ctx`.
+///
+/// # Errors
+///
+/// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+///   defined before its usage.
+/// - [`Error::UnsupportedType`] if an LLVM vector type is encountered.
+///
+/// # Panics
+///
+/// - If the provided `value` is not a valid constant.
+/// - If the provided variable type does not match that expected for the value.
+#[expect(clippy::too_many_lines)]
+pub fn build_const_into(
+    variable: VariableId,
+    value: &BasicValueEnum,
+    bb: &mut BlockBuilder,
+    func_ctx: &mut FunctionContext,
+) -> Result<()> {
+    // We can always _get_ the name of a value, but in the case where it is an
+    // inline constant this is the empty string.
+    let value_type = LLVMType::try_from(value.get_type())?;
+    let value_type_flo = ObjectContext::flo_type_of(&value_type)?;
+    assert_eq!(
+        bb.context.variables.get(variable).typ,
+        value_type_flo,
+        "The type of variable {variable} did not match the type of the provided value but is \
+         required to."
+    );
 
-                // Next we can parse the blockaddr representation out of the string.
-                let block_addr =
-                    BlockAddress::parser().parse(pointer_const_text_str).map_err(|e| {
-                        Error::MalformedLLVM(format!(
-                            "Expected a valid blockaddress expression but found \
-                             {pointer_const_text_str} instead: {e:?}",
-                        ))
-                    })?;
+    match value {
+        BasicValueEnum::IntValue(int_val) => {
+            assert!(
+                int_val.is_const(),
+                "Unnamed integer value was not a constant: {int_val:?}"
+            );
+            let constant_value = int_val
+                .get_zero_extended_constant()
+                .expect("Integer already known to be a constant had no constant value");
 
-                // If this is a valid parse, we now have both the name of the function in which
-                // the block occurs, and the name of the block in that function from which the
-                // address is generated. We assume that:
-                //
-                // 1. The function exists in the current translation unit.
-                // 2. The block is valid in the specified function.
-                //
-                // All other conditions are a malformed LLVM error.
-                let target_function_blocks = func_ctx
-                    .module_blocks()
-                    .get(&block_addr.function_name)
-                    .ok_or_else(|| {
-                        Error::MalformedLLVM(format!(
-                            "blockaddress constant attempted to look up a block in non-local \
-                             function {}",
-                            &block_addr.function_name
-                        ))
-                    })?;
+            // Unfortunately, our constants from LLVM are not in the same format as we need
+            // in FLO, so we have to convert it while maintaining the correct bytes. Here,
+            // we take advantage of Rust's casting behavior: casting between signed and
+            // unsigned of the same size is a no-op, and casting from a smaller unsigned
+            // number to a larger unsigned number causes zero-extension.
+            //
+            // See: https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics
+            let const_value = u128::from(constant_value);
+            let flo_const = ConstantValue {
+                value: const_value,
+                typ:   value_type_flo.clone(),
+            };
 
-                let block_id = target_function_blocks
+            bb.assign_const(variable, flo_const, Vec::new(), None);
+        }
+        BasicValueEnum::FloatValue(float_val) => {
+            assert!(
+                float_val.is_const(),
+                "Unnamed floating-point value was not a constant: {float_val:?}"
+            );
+            let (const_float, _) = float_val.get_constant().expect(
+                "Floating-point value already known to be a constant had no constant value",
+            );
+
+            // Unfortunately, we do not natively support FP constants in FLO, so we have to
+            // represent the _bits_ of the float inside our constant value. This behavior
+            // is safe as we construct the value with the same bytes as the float, and then
+            // use the above-mentioned zero-extension to fit it into the u128.
+            let const_value = u128::from(u64::from_le_bytes(const_float.to_le_bytes()));
+            let flo_const = ConstantValue {
+                value: const_value,
+                typ:   value_type_flo.clone(),
+            };
+
+            bb.assign_const(variable, flo_const, Vec::new(), None);
+        }
+        BasicValueEnum::PointerValue(ptr_val) => {
+            assert!(
+                ptr_val.is_const(),
+                "Unnamed pointer value was not a constant: {ptr_val:?}"
+            );
+
+            // We cannot have direct pointer constants written out, but instead they take
+            // the form of a constant expression such as the `blockaddress` function. To
+            // make matters more complex, neither Inkwell nor llvm-sys provide ways to get
+            // at the arguments to the constant, so we are forced to parse it out manually.
+            //
+            // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
+            // hence we are safe to convert it to the similarly non-owning str here for
+            // processing. When our `str` gets dropped, so does the `CStr` but the
+            // underlying allocation is left in the control of llvm-sys via Inkwell.
+            let pointer_const_text_c =
+                unsafe { CStr::from_ptr(LLVMPrintValueToString(ptr_val.as_value_ref())) };
+            let pointer_const_text_str = pointer_const_text_c.to_str()?;
+
+            // Next we can parse the blockaddr representation out of the string.
+            let block_addr = BlockAddress::parser().parse(pointer_const_text_str).map_err(|e| {
+                Error::MalformedLLVM(format!(
+                    "Expected a valid blockaddress expression but found {pointer_const_text_str} \
+                     instead: {e:?}",
+                ))
+            })?;
+
+            // If this is a valid parse, we now have both the name of the function in which
+            // the block occurs, and the name of the block in that function from which the
+            // address is generated. We assume that:
+            //
+            // 1. The function exists in the current translation unit.
+            // 2. The block is valid in the specified function.
+            //
+            // All other conditions are a malformed LLVM error.
+            let target_function_blocks = func_ctx
+                .module_blocks()
+                .get(&block_addr.function_name)
+                .ok_or_else(|| {
+                    Error::MalformedLLVM(format!(
+                        "blockaddress constant attempted to look up a block in non-local function \
+                         {}",
+                        &block_addr.function_name
+                    ))
+                })?;
+
+            let block_id =
+                target_function_blocks
                     .get_by_left(&block_addr.block_ref)
                     .ok_or_else(|| {
                         Error::MalformedLLVM(format!(
@@ -154,38 +210,42 @@ pub fn get_var_or_const(
                         ))
                     })?;
 
-                let result_variable = bb.simple_get_new_block_address(*block_id);
+            bb.get_block_address(variable, *block_id, Vec::new(), None);
+        }
+        BasicValueEnum::ArrayValue(array_val) => {
+            assert!(
+                array_val.is_const(),
+                "Unnamed array value was not a constant {array_val:?}"
+            );
 
-                // This case is not part of the normal flow, so we do a direct return.
-                return Ok(result_variable);
-            }
-            BasicValueEnum::ArrayValue(_) => {
-                unimplemented!("Array value constants are not implemented (#91)")
-            }
-            BasicValueEnum::StructValue(_) => {
-                unimplemented!("Struct value constants are not implemented (#91)")
-            }
-            BasicValueEnum::VectorValue(_) | BasicValueEnum::ScalableVectorValue(_) => Err(
-                Error::unsupported_type("LLVM vector types are not supported"),
-            )?,
-        };
+            let constant_arguments = extract_constant_aggregate_values(value)?;
+            let constant_ids = constant_arguments
+                .iter()
+                .map(|c| get_var_or_const(c, bb, func_ctx))
+                .collect::<Result<Vec<_>>>()?;
 
-        // With the constant value obtained, we can shove it into the actual constant,
-        // and stick that in the context.
-        let flo_const = ConstantValue {
-            value: const_value,
-            typ:   ObjectContext::flo_type_of(&value_type)?,
-        };
+            bb.construct(variable, constant_ids, Vec::new(), None);
+        }
+        BasicValueEnum::StructValue(struct_val) => {
+            assert!(
+                struct_val.is_const(),
+                "Unnamed structure value was not a constant {struct_val:?}"
+            );
 
-        // With that done, we can create the constant variable.
-        bb.simple_assign_new_const(flo_const)
-    } else {
-        // If the value name was _not_ empty, then it is a reference to what
-        // should be an existing variable.
-        func_ctx.try_lookup_variable(value_name)?
-    };
+            let constant_arguments = extract_constant_aggregate_values(value)?;
+            let constant_ids = constant_arguments
+                .iter()
+                .map(|c| get_var_or_const(c, bb, func_ctx))
+                .collect::<Result<Vec<_>>>()?;
 
-    Ok(id)
+            bb.construct(variable, constant_ids, Vec::new(), None);
+        }
+        BasicValueEnum::VectorValue(_) | BasicValueEnum::ScalableVectorValue(_) => Err(
+            Error::unsupported_type("LLVM vector types are not supported"),
+        )?,
+    }
+
+    Ok(())
 }
 
 /// A representation of a [`blockaddress`](https://llvm.org/docs/LangRef.html#addresses-of-basic-blocks)
@@ -455,6 +515,64 @@ pub fn int_from_bv(value: BasicValueEnum) -> Option<u64> {
 #[must_use]
 pub fn expect_int_from_bv(value: BasicValueEnum) -> u64 {
     int_from_bv(value).expect("The provided value was not an integer")
+}
+
+/// Extracts constant elements from an aggregate type.
+///
+/// # Errors
+///
+/// - [`Error::MalformedLLVM`] if the elements of the constant value are
+///   non-constant.
+/// - [`Error::UnsupportedType`] if the type of the provided `value` cannot be
+///   expressed in the compiler's type language.
+///
+/// # Panics
+///
+/// If the provided `value` is not a constant aggregate type.
+pub fn extract_constant_aggregate_values<'ctx>(
+    value: &BasicValueEnum<'ctx>,
+) -> Result<Vec<BasicValueEnum<'ctx>>> {
+    let val_type = LLVMType::try_from(value.get_type())?;
+    let val_ref = match value {
+        BasicValueEnum::ArrayValue(val) if val.is_const() => val.as_value_ref(),
+        BasicValueEnum::StructValue(val) if val.is_const() => val.as_value_ref(),
+        _ => panic!(
+            "Attempted to extract constant elements from non-aggregate or non-constant type \
+             {value:?}"
+        ),
+    };
+
+    // We need the number of elements in the value that would be const, and the
+    // easiest way to do this is to pull the information out of the type.
+    let num_elements = match &val_type {
+        LLVMType::Array(arr) => arr.count,
+        LLVMType::Structure(structure) => structure.elements.len(),
+        _ => panic!(
+            "Attempted to extract constant elements from non-aggregate or non-constant type \
+             {val_type}"
+        ),
+    };
+
+    // This operation is safe as we ensure that we are only accessing within the
+    // already-known bounds of the type of the value.
+    //
+    // Furthermore, the only values that can exist in this place as elements _are_
+    // ones that can exist as basic values, so we satisfy the condition to construct
+    // a new BasicValueEnum safely.
+    let const_values = (0..num_elements)
+        .map(|i| {
+            let i = c_uint::try_from(i).map_err(|_| {
+                Error::MalformedLLVM(format!(
+                    "Could not convert {i} into a valid index in an aggregate with type {}",
+                    &val_type
+                ))
+            })?;
+            let value_ref = unsafe { LLVMGetAggregateElement(val_ref, i) };
+            Ok(unsafe { BasicValueEnum::new(value_ref) })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(const_values)
 }
 
 /// Extracts a name from the provided basic `value`, or returns [`None`] if

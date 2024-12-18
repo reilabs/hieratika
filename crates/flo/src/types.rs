@@ -512,6 +512,7 @@ pub enum Type {
     Unsigned128,
     Signed8,
     Signed16,
+    Signed24,
     Signed32,
     Signed64,
     Signed128,

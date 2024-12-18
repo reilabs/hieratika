@@ -1,5 +1,13 @@
 //! Useful constants for use within the compiler.
 
+/// The expected target triple for our platform, intended to be used for
+/// validation during compilation.
+pub const TARGET_TRIPLE: &str = "riscv64";
+
+/// The expected data layout for our platform, intended to be used for
+/// validation during compilation.
+pub const TARGET_DATA_LAYOUT: &str = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128";
+
 /// The size of a byte on our architecture.
 pub const BYTE_SIZE_BITS: usize = 8;
 

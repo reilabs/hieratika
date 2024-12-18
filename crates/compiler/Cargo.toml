@@ -16,16 +16,14 @@ rust-version.workspace = true
 [dependencies]
 bimap.workspace = true
 chumsky = "0.9.3"
-clap.workspace = true
-derive_more = { version = "1.0.0", features = ["full"] }
 downcast-rs = "1.2.1"
 ethnum.workspace = true
 inkwell.workspace = true
 itertools.workspace = true
 hieratika-errors.workspace = true
 hieratika-flo.workspace = true
+miette.workspace = true
 ouroboros = "0.18.4"
-tracing.workspace = true
 rand = "0.8.5"
 
 [dev-dependencies]

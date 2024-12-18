@@ -4,8 +4,9 @@
 mod common;
 
 #[test]
-fn compiles_terminator_instructions() -> anyhow::Result<()> {
+fn compiles_terminator_instructions() -> miette::Result<()> {
     // We start by constructing and running the compiler
+    common::set_miette_reporting()?;
     let compiler = common::default_compiler_from_path("input/compilation/terminators.ll")?;
     let flo = compiler.run()?;
 

@@ -29,6 +29,16 @@ pub enum Error {
     #[error("Could not create Rust string from C string: {_0}")]
     CStrConversionError(#[from] Utf8Error),
 
+    /// Emitted when the compilation process encounters an incompatible data
+    /// layout specification in the module being compiled.
+    #[error("The provided data layout {_0} is not compatible with {_1}")]
+    IncompatibleDataLayout(String, String),
+
+    /// Emitted when the compilation process encounters an incompatible target
+    /// machine specification in the module being compiled.
+    #[error("The provided target specification {_0} is not compatible with {_1}")]
+    IncompatibleTargetSpecification(String, String),
+
     #[error("`{_0}` with invalid segment `{_1}` could not be parsed as an LLVM data layout")]
     InvalidDataLayoutSpecification(String, String),
 

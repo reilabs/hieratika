@@ -113,11 +113,13 @@ pub mod obj_gen;
 pub mod pass;
 pub mod polyfill;
 
-use hieratika_errors::compile::llvm::Result;
+use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::FlatLoweredObject;
 
 use crate::{
+    constant::{TARGET_DATA_LAYOUT, TARGET_TRIPLE},
     context::SourceContext,
+    llvm::data_layout::DataLayout,
     obj_gen::ObjectGenerator,
     pass::{PassManager, PassManagerReturnData, analysis::module_map::BuildModuleMap},
     polyfill::PolyfillMap,
@@ -194,6 +196,10 @@ impl Compiler {
     ///
     /// - If the module mapping pass has not been run.
     pub fn run(mut self) -> Result<FlatLoweredObject> {
+        // Before we do anything, we need to validate that the input is compatible with
+        // our target.
+        self.is_compatible_target()?;
+
         // First we have to run all the passes and collect their data.
         let PassManagerReturnData { context, data } = self.passes.run(self.context)?;
 
@@ -207,6 +213,63 @@ impl Compiler {
         // Then we can put our builder together and start the code generation process.
         let builder = ObjectGenerator::new(&mod_name, data, context, self.polyfill_map)?;
         builder.run()
+    }
+
+    /// Validates that the context for the compilation contains an LLVM module
+    /// that has been compiled for a platform that is compatible with our target
+    /// platform, returning `true` if it is compatible and `false` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::IncompatibleDataLayout`] if the module being compiled has a
+    ///   data layout not compatible with the expected one.
+    /// - [`Error::IncompatibleTargetSpecification`] if the module being
+    ///   compiled has a target triple not compatible with the expected one.
+    /// - [`Error::InvalidDataLayoutSpecification`] if the module being compiled
+    ///   has a data layout string that cannot be parsed as a data layout
+    ///   specification.
+    ///
+    /// # Panics
+    ///
+    /// - If the compiler's statically-known data layout string cannot be parsed
+    ///   into a valid data layout.
+    pub fn is_compatible_target(&self) -> Result<()> {
+        // We start by grabbing the actual data layout and comparing it to the one we
+        // know is correct.
+        let (actual_layout_str, actual_target) = self.context.analyze_module(|module| {
+            let layout = module.get_data_layout().as_str().to_str()?.to_string();
+            let target = module.get_triple().as_str().to_str()?.to_string();
+
+            Ok((layout, target))
+        })?;
+        let actual_layout = DataLayout::new(&actual_layout_str)?;
+        let expected_data_layout = DataLayout::new(TARGET_DATA_LAYOUT)
+            .expect("Statically known data layout could not be parsed");
+
+        // The target being compatible currently means that it has the same target
+        // triple and the same data layout. This notion MAY be relaxed in the future.
+        //
+        // If the module does not specify a target or a data layout, this means that it
+        // has likely not been compiled with any assumptions about such things, and so
+        // we can process it normally under OUR data layout.
+        let targets_valid = actual_target == TARGET_TRIPLE || actual_target.is_empty();
+        let layouts_valid = actual_layout_str.is_empty() || actual_layout == expected_data_layout;
+
+        if !targets_valid {
+            Err(Error::IncompatibleTargetSpecification(
+                actual_target,
+                TARGET_TRIPLE.to_string(),
+            ))?;
+        }
+
+        if !layouts_valid {
+            Err(Error::IncompatibleDataLayout(
+                actual_layout_str,
+                TARGET_DATA_LAYOUT.to_string(),
+            ))?;
+        }
+
+        Ok(())
     }
 }
 
