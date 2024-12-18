@@ -8,8 +8,7 @@ on:
 
 # Environment variables that will be set on all runners
 env:
-  DEV_SHELL_LINUX: "nix develop '.#ci'"
-  DEV_SHELL_MACOS: "nix develop '.#ci'"
+  DEV_SHELL: "nix develop '.#ci'"
   CARGO_TERM_COLOR: always # Always colour Cargo's output.
   CARGO_INCREMENTAL: 0 # Always run without incremental builds on CI.
   CARGO_PROFILE_DEV_DEBUG: 0 # Don't embed debug info even though the build is a dev build.
@@ -35,24 +34,6 @@ jobs:
         shell: "bash"
         run: |
           curl -sSf -L https://install.lix.systems/lix | sh -s -- install --no-confirm
-      - name: Setup Devshell Command
-        shell: "bash"
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-              echo "DEV_SHELL=${{ env.DEV_SHELL_LINUX }}" >> $GITHUB_ENV
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-              echo "DEV_SHELL=${{ env.DEV_SHELL_MACOS }}" >> $GITHUB_ENV
-          else
-              exit 1
-          fi
-      - name: Restore Nix Cache
-        uses: actions/cache@v3
-        if: runner.os != 'macOS'
-        continue-on-error: true
-        with:
-          path: |
-            ~/nix_store
-          key: nix-${{ hashFiles('**/flake.lock') }}-${{ matrix.os }}
       - name: Restore Rust Cache
         uses: actions/cache@v3
         continue-on-error: true
@@ -63,15 +44,15 @@ jobs:
       - name: Build Lix Dependencies
         shell: "bash"
         run: |
-          eval "$DEV_SHELL"
+          eval ${{ env.DEV_SHELL }}
       - name: Build Tests
         shell: "bash"
         run: |
-          eval "$DEV_SHELL --command cargo test --all-targets --no-run"
+          eval "${{ env.DEV_SHELL }} --command cargo test --all-targets --no-run"
       - name: Run Tests
         shell: "bash"
         run: |
-          eval "$DEV_SHELL --command cargo test --all-targets -- --nocapture"
+          eval "${{ env.DEV_SHELL }} --command cargo test --all-targets -- --nocapture"
 
   # This job runs the linter.
   lint:
@@ -103,11 +84,11 @@ jobs:
       - name: Build Lix Dependencies
         shell: bash
         run: |
-          ${{ env.DEV_SHELL_LINUX }}
+          ${{ env.DEV_SHELL }}
       - name: Lint Code
         shell: bash
         run: |
-          ${{ env.DEV_SHELL_LINUX }} --command cargo clippy --all-targets --all-features
+          ${{ env.DEV_SHELL }} --command cargo clippy --all-targets --all-features
 
   # This job checks the formatting of the code and other artifacts.
   formatting:
@@ -139,14 +120,14 @@ jobs:
       - name: Build Lix Dependencies
         shell: bash
         run: |
-          ${{ env.DEV_SHELL_LINUX }}
+          ${{ env.DEV_SHELL }}
       - name: Check Formatting
         shell: bash
         # Not using `cargo fmt --all` because it includes cairo submodules.
         # Check this issue https://github.com/rust-lang/cargo/issues/13962#issue-2315478020
         # Check this code https://github.com/rust-lang/cargo/issues/13962#issue-2315478020
         run: |
-          ${{ env.DEV_SHELL_LINUX }} --command cargo fmt -- --check
+          ${{ env.DEV_SHELL }} --command cargo fmt -- --check
 
   documentation:
     name: "Check Rust Documentation"
@@ -177,8 +158,8 @@ jobs:
       - name: Build Lix Dependencies
         shell: bash
         run: |
-          ${{ env.DEV_SHELL_LINUX }}
+          ${{ env.DEV_SHELL }}
       - name: Check Documentation
         shell: bash
         run: |
-          ${{ env.DEV_SHELL_LINUX }} --command cargo doc --document-private-items
+          ${{ env.DEV_SHELL }} --command cargo doc --document-private-items
