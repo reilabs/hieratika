@@ -124,7 +124,7 @@
 
         # The default dev shell puts you in your native shell to make things feel happy.
         devShells.default = craneLib.devShell {
-          LLVM_SYS_180_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_18.libllvm}";
+          LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratika;
           packages = devshellPackages;
 
@@ -133,14 +133,14 @@
 
           shellHook = ''
             mkdir -p "$rustTestInputsDest"
-            cp -rv "$rustTestInputs"/* "$rustTestInputsDest"
+            cp -r "$rustTestInputs"/* "$rustTestInputsDest"
 
             exec $(${getUserShellCommand})
           '';
         };
 
         devShells.unstable = craneLibUnstable.devShell {
-          LLVM_SYS_180_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_18.libllvm}";
+          LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratikaUnstable;
           packages = devshellPackages;
           shellHook = ''
@@ -150,7 +150,7 @@
 
         # The dev shell for CI allows it to interpret commands properly.
         devShells.ci = craneLib.devShell {
-          LLVM_SYS_180_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_18.libllvm}";
+          LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratika;
           packages = devshellPackages;
         };

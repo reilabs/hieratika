@@ -1758,21 +1758,23 @@ impl ObjectGenerator {
 
         // We need to start by finding out which of the possible operations this is.
         let atomic_op = match unsafe { LLVMGetAtomicRMWBinOp(instruction.as_value_ref()) } {
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXchg => "xchg",
             LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpAdd => "add",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpSub => "sub",
             LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpAnd => "and",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpNand => "nand",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpOr => "or",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXor => "xor",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMax => "max",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMin => "min",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMax => "umax",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMin => "umin",
             LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFAdd => "fadd",
-            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFSub => "fsub",
             LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFMax => "fmax",
             LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFMin => "fmin",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpFSub => "fsub",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMax => "max",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpMin => "min",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpNand => "nand",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpOr => "or",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpSub => "sub",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUDecWrap => "udec_wrap",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUIncWrap => "uinc_wrap",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMax => "umax",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpUMin => "umin",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXchg => "xchg",
+            LLVMAtomicRMWBinOp::LLVMAtomicRMWBinOpXor => "xor",
         };
         let name_header = format!("atomicrmw_{atomic_op}");
 
