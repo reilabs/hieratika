@@ -104,7 +104,7 @@ pub fn clean_crate(crate_name: &str) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use std::path::{absolute, PathBuf};
+    use std::path::{PathBuf, absolute};
 
     use super::path_to_delete;
     use crate::export::{
@@ -115,7 +115,6 @@ mod test {
     #[test]
     fn test_get_flo_folder() {
         let flo_folder = get_flo_folder();
-        println!("{flo_folder:?}");
         assert!(flo_folder.ends_with("cairo/flo"));
     }
 
@@ -123,7 +122,6 @@ mod test {
     fn test_get_flo_filename() {
         let full_function_name = "core::poseidon::poseidon_hash_span".to_string();
         let flo_filename = get_flo_filename(&full_function_name);
-        println!("{flo_filename:?}");
         assert_eq!(
             flo_filename,
             PathBuf::from("core/poseidon/poseidon_hash_span.lowered")
@@ -134,7 +132,6 @@ mod test {
     fn test_path_to_delete() {
         let crate_name = "/home/examples";
         let path_to_delete = path_to_delete(crate_name);
-        println!("{path_to_delete:?}");
         assert!(path_to_delete.ends_with("target/cairo/flo/home/examples"));
     }
 
@@ -142,10 +139,8 @@ mod test {
     fn test_get_flo_path() {
         let full_function_name = "core::poseidon::poseidon_hash_span".to_string();
         let flo_filename = absolute(get_flo_path(&full_function_name)).unwrap();
-        println!("{flo_filename:?}");
         let output_path = target_dir().join("cairo/flo/core/poseidon/poseidon_hash_span.lowered");
         let output_path = absolute(output_path).unwrap();
-        println!("{output_path:?}");
         assert_eq!(flo_filename, output_path);
     }
 }

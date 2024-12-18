@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use hieratika_compiler::{context::SourceContext, Compiler, CompilerBuilder};
+use hieratika_compiler::{Compiler, CompilerBuilder, context::SourceContext};
 use hieratika_flo::FlatLoweredObject;
 
 /// Creates a compiler—with default settings for passes and polyfills—wrapping

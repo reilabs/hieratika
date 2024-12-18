@@ -3,6 +3,7 @@
 use std::num::NonZeroU32;
 
 use crate::{
+    FlatLoweredObject,
     poison::Poisonable,
     types::{
         AssignConstStatement,
@@ -34,7 +35,6 @@ use crate::{
         VariableId,
         VariableLinkage,
     },
-    FlatLoweredObject,
 };
 
 /// Helper object that builds a new block.
@@ -229,7 +229,7 @@ impl<'a> BlockBuilder<'a> {
 }
 
 /// Helper functions that add Statements to the block.
-impl<'a> BlockBuilder<'a> {
+impl BlockBuilder<'_> {
     /// Adds a simple constant assignment to the block.
     ///
     /// # Arguments
@@ -941,7 +941,7 @@ impl<'a> BlockBuilder<'a> {
 
 /// Simple passthrough helpers for the FLO modifications allowed while the block
 /// is being constructed.
-impl<'a> BlockBuilder<'a> {
+impl BlockBuilder<'_> {
     /// Helper that adds a trivial variable of type `Type` and returns its ID.
     ///
     /// # Arguments

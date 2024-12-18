@@ -109,18 +109,12 @@ feature of the architecture. We have evaluated the following choices:
 - 256 bit is the next power-of-2 after 252. Having `usize` and `isize` 256 bit long leaves 4 extra
   bits that may be used to keep some metadata.
 
-Ultimately the size of `usize` and `isize` has been decided to be 64 bits, which is neither of the
-above possibilities. This length is a consequence of using the `aarch64-unknown-none-softfloat`
-target triple. The choice of the triple determines the length of the pointer which in turn
-determines the length of `usize`. This specific triple has been chosen for its soft float support
-and no host operating system. The pointer length is just one of its parameters we accept at this
-stage of the project. This target triple is a temporary choice before a custom target triple is
-proposed. When designing our custom triple, it is possible that the choice of `usize` and `isize`
-width will be reevaluated and possibly changed to match the width of the field element.
+While we have a custom target (`cairo-starkware-none`), restrictions imposed by `rustc` mean that we
+cannot arbitrarily choose our pointer size, and hence the length of our `usize` and `isize`. As we
+have based our target on top of `riscv64`, we are forced into having both be 64 bits long.
 
 Summing up, we expect to see in the IR integers of the following lengths: 1, 8, 16, 32, 64 and 128
-bits. We do not intend to support operations over arbitrary-width integers. We also decided to add
-support for 128 bit integers in later phase of the project.
+bits. We do not intend to support operations over arbitrary-width integers.
 
 #### Pointers
 

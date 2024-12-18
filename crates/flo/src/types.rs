@@ -709,7 +709,7 @@ pub fn untyped_const(value: u128) -> ConstantValue {
 #[must_use]
 pub fn const_u8(value: u8) -> ConstantValue {
     ConstantValue {
-        value: value as u128,
+        value: u128::from(value),
         typ:   Type::Unsigned8,
     }
 }
@@ -718,7 +718,7 @@ pub fn const_u8(value: u8) -> ConstantValue {
 #[must_use]
 pub fn const_u16(value: u16) -> ConstantValue {
     ConstantValue {
-        value: value as u128,
+        value: u128::from(value),
         typ:   Type::Unsigned16,
     }
 }
@@ -727,7 +727,7 @@ pub fn const_u16(value: u16) -> ConstantValue {
 #[must_use]
 pub fn const_u32(value: u32) -> ConstantValue {
     ConstantValue {
-        value: value as u128,
+        value: u128::from(value),
         typ:   Type::Unsigned32,
     }
 }
@@ -736,7 +736,7 @@ pub fn const_u32(value: u32) -> ConstantValue {
 #[must_use]
 pub fn const_u64(value: u64) -> ConstantValue {
     ConstantValue {
-        value: value as u128,
+        value: u128::from(value),
         typ:   Type::Unsigned64,
     }
 }

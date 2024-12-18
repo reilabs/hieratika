@@ -17,12 +17,12 @@
 //! ```rust
 //! use std::path::Path;
 //!
-//! use hieratika_compiler::{context::SourceContext, CompilerBuilder};
+//! use hieratika_compiler::{CompilerBuilder, context::SourceContext};
 //! use hieratika_flo::FlatLoweredObject;
 //!
 //! fn main() -> anyhow::Result<()> {
 //!     // We start by prepping the source, and the source context to hold it.
-//!     let llvm_ir_path = "input/add.ll";
+//!     let llvm_ir_path = "input/compilation/add.ll";
 //!     let source_path = Path::new(llvm_ir_path);
 //!     let ctx = SourceContext::create(source_path)?;
 //!
@@ -119,7 +119,7 @@ use hieratika_flo::FlatLoweredObject;
 use crate::{
     context::SourceContext,
     obj_gen::ObjectGenerator,
-    pass::{analysis::module_map::BuildModuleMap, PassManager, PassManagerReturnData},
+    pass::{PassManager, PassManagerReturnData, analysis::module_map::BuildModuleMap},
     polyfill::PolyfillMap,
 };
 

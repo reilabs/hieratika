@@ -8,12 +8,12 @@
 
 use std::collections::HashMap;
 
-use inkwell::{module::Linkage, GlobalVisibility};
+use inkwell::{GlobalVisibility, module::Linkage};
 
 use crate::{
     llvm::{
-        typesystem::{LLVMFunction, LLVMType},
         TopLevelEntryKind,
+        typesystem::{LLVMFunction, LLVMType},
     },
     pass::analysis::module_map::FunctionInfo,
 };
@@ -31,54 +31,44 @@ impl SpecialIntrinsics {
     #[must_use]
     pub fn new() -> Self {
         let mut intrinsics = HashMap::new();
-        intrinsics.insert(
-            "llvm.dbg.declare".to_string(),
-            FunctionInfo {
-                kind:        TopLevelEntryKind::Declaration,
-                intrinsic:   true,
-                typ:         LLVMFunction::new(
-                    LLVMType::void,
-                    &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata],
-                ),
-                param_names: vec![None, None, None],
-                linkage:     Linkage::External,
-                visibility:  GlobalVisibility::Default,
-            },
-        );
-        intrinsics.insert(
-            "llvm.dbg.value".to_string(),
-            FunctionInfo {
-                kind:        TopLevelEntryKind::Declaration,
-                intrinsic:   true,
-                typ:         LLVMFunction::new(
-                    LLVMType::void,
-                    &[LLVMType::Metadata, LLVMType::Metadata, LLVMType::Metadata],
-                ),
-                param_names: vec![None, None, None],
-                linkage:     Linkage::External,
-                visibility:  GlobalVisibility::Default,
-            },
-        );
-        intrinsics.insert(
-            "llvm.dbg.assign".to_string(),
-            FunctionInfo {
-                kind:        TopLevelEntryKind::Declaration,
-                intrinsic:   true,
-                typ:         LLVMFunction::new(
-                    LLVMType::void,
-                    &[
-                        LLVMType::Metadata,
-                        LLVMType::Metadata,
-                        LLVMType::Metadata,
-                        LLVMType::Metadata,
-                        LLVMType::Metadata,
-                    ],
-                ),
-                param_names: vec![None, None, None, None, None],
-                linkage:     Linkage::External,
-                visibility:  GlobalVisibility::Default,
-            },
-        );
+        intrinsics.insert("llvm.dbg.declare".to_string(), FunctionInfo {
+            kind:        TopLevelEntryKind::Declaration,
+            intrinsic:   true,
+            typ:         LLVMFunction::new(LLVMType::void, &[
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+            ]),
+            param_names: vec![None, None, None],
+            linkage:     Linkage::External,
+            visibility:  GlobalVisibility::Default,
+        });
+        intrinsics.insert("llvm.dbg.value".to_string(), FunctionInfo {
+            kind:        TopLevelEntryKind::Declaration,
+            intrinsic:   true,
+            typ:         LLVMFunction::new(LLVMType::void, &[
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+            ]),
+            param_names: vec![None, None, None],
+            linkage:     Linkage::External,
+            visibility:  GlobalVisibility::Default,
+        });
+        intrinsics.insert("llvm.dbg.assign".to_string(), FunctionInfo {
+            kind:        TopLevelEntryKind::Declaration,
+            intrinsic:   true,
+            typ:         LLVMFunction::new(LLVMType::void, &[
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+                LLVMType::Metadata,
+            ]),
+            param_names: vec![None, None, None, None, None],
+            linkage:     Linkage::External,
+            visibility:  GlobalVisibility::Default,
+        });
 
         Self { intrinsics }
     }

@@ -4,10 +4,10 @@
 use std::ffi::CStr;
 
 use chumsky::{
+    Parser,
     error::Simple,
     prelude::{just, none_of},
     text::TextParser,
-    Parser,
 };
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
@@ -17,15 +17,15 @@ use hieratika_flo::{
 use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::{
-        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMPrintValueToString},
         LLVMAtomicOrdering,
+        core::{LLVMGetIndices, LLVMGetNumIndices, LLVMPrintValueToString},
     },
     values::{AsValueRef, BasicValueEnum, InstructionOpcode, InstructionValue},
 };
 use itertools::Either;
 
 use crate::{
-    llvm::{typesystem::LLVMType, TopLevelEntryKind},
+    llvm::{TopLevelEntryKind, typesystem::LLVMType},
     obj_gen::data::{FunctionContext, ObjectContext},
     pass::analysis::module_map::ModuleMap,
 };
@@ -81,7 +81,7 @@ pub fn get_var_or_const(
                 // number to a larger unsigned number causes zero-extension.
                 //
                 // See: https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics
-                constant_value as u128
+                u128::from(constant_value)
             }
             BasicValueEnum::FloatValue(float_val) => {
                 assert!(
@@ -96,7 +96,7 @@ pub fn get_var_or_const(
                 // represent the _bits_ of the float inside our constant value. This behavior
                 // is safe as we construct the value with the same bytes as the float, and then
                 // use the above-mentioned zero-extension to fit it into the u128.
-                u64::from_le_bytes(const_float.to_le_bytes()) as u128
+                u128::from(u64::from_le_bytes(const_float.to_le_bytes()))
             }
             BasicValueEnum::PointerValue(ptr_val) => {
                 assert!(
@@ -583,22 +583,16 @@ mod test {
     fn can_parse_arguments_of_block_ref_in_blockaddr() {
         let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr,%bb1");
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            BlockAddress {
-                function_name: "hieratika_test_indirectbr".to_string(),
-                block_ref:     "bb1".to_string(),
-            }
-        );
+        assert_eq!(result.unwrap(), BlockAddress {
+            function_name: "hieratika_test_indirectbr".to_string(),
+            block_ref:     "bb1".to_string(),
+        });
         let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr, %bb1");
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            BlockAddress {
-                function_name: "hieratika_test_indirectbr".to_string(),
-                block_ref:     "bb1".to_string(),
-            }
-        );
+        assert_eq!(result.unwrap(), BlockAddress {
+            function_name: "hieratika_test_indirectbr".to_string(),
+            block_ref:     "bb1".to_string(),
+        });
     }
 
     #[test]
@@ -606,12 +600,9 @@ mod test {
         let result =
             BlockAddress::parser().parse("ptr blockaddress(@hieratika_test_input, %exit_safe)");
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            BlockAddress {
-                function_name: "hieratika_test_input".to_string(),
-                block_ref:     "exit_safe".to_string(),
-            }
-        );
+        assert_eq!(result.unwrap(), BlockAddress {
+            function_name: "hieratika_test_input".to_string(),
+            block_ref:     "exit_safe".to_string(),
+        });
     }
 }

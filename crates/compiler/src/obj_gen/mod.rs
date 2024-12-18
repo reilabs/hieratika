@@ -13,6 +13,7 @@ use std::{cell::RefCell, collections::VecDeque};
 
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
+    FlatLoweredObject,
     builders::BlockBuilder,
     types::{
         BlockExit,
@@ -26,9 +27,11 @@ use hieratika_flo::{
         VariableId,
         VariableLinkage,
     },
-    FlatLoweredObject,
 };
 use inkwell::{
+    FloatPredicate,
+    GlobalVisibility,
+    IntPredicate,
     basic_block::BasicBlock,
     llvm_sys,
     module::Module,
@@ -41,9 +44,6 @@ use inkwell::{
         InstructionValue,
         PhiValue,
     },
-    FloatPredicate,
-    GlobalVisibility,
-    IntPredicate,
 };
 use itertools::Itertools;
 
@@ -54,12 +54,12 @@ use crate::{
         typesystem::{LLVMArray, LLVMStruct, LLVMType},
     },
     messages::{
+        INSTRUCTION_NAMED,
         assert_correct_opcode,
         missing_indices_error,
         non_constant_constant_error,
         only_on_aggregates_error,
         operand_count_error,
-        INSTRUCTION_NAMED,
     },
     obj_gen::data::{FreshNameSupply, FunctionContext, ObjectContext},
     pass::{
@@ -1074,11 +1074,9 @@ impl ObjectGenerator {
                         let output_var = bb.add_variable(Type::Pointer);
 
                         // We then call the GEP polyfill...
-                        bb.simple_call_builtin(
-                            gep,
-                            vec![current_ptr_var, const_offset],
-                            vec![output_var],
-                        );
+                        bb.simple_call_builtin(gep, vec![current_ptr_var, const_offset], vec![
+                            output_var,
+                        ]);
 
                         // ...and update our state variables.
                         current_ptr_var = output_var;
@@ -1096,11 +1094,9 @@ impl ObjectGenerator {
                         // Then we can issue the call to the first offset within the GEP
                         // instruction.
                         let result_id = bb.add_variable(Type::Pointer);
-                        bb.simple_call_builtin(
-                            gep,
-                            vec![current_ptr_var, actual_offset],
-                            vec![result_id],
-                        );
+                        bb.simple_call_builtin(gep, vec![current_ptr_var, actual_offset], vec![
+                            result_id,
+                        ]);
 
                         // Then we update our state variables, assigning the source type to our
                         // current type and the output of the top-level gep
@@ -1757,7 +1753,7 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        use llvm_sys::{core::LLVMGetAtomicRMWBinOp, LLVMAtomicRMWBinOp};
+        use llvm_sys::{LLVMAtomicRMWBinOp, core::LLVMGetAtomicRMWBinOp};
         assert_correct_opcode(&instruction, InstructionOpcode::AtomicRMW);
 
         // We need to start by finding out which of the possible operations this is.
@@ -1816,11 +1812,9 @@ impl ObjectGenerator {
         bb.add_fence(ordering);
 
         // Finally, we can generate the call to the appropriate polyfill.
-        bb.simple_call_builtin(
-            polyfill_name,
-            vec![pointer_op_id, numeric_op_id],
-            vec![return_var],
-        );
+        bb.simple_call_builtin(polyfill_name, vec![pointer_op_id, numeric_op_id], vec![
+            return_var,
+        ]);
 
         // And we have to fence after it as well.
         bb.add_fence(ordering);
@@ -2626,7 +2620,7 @@ impl ObjectGenerator {
             typ:   Type::Unsigned64,
         });
         let alloc_count = bb.simple_assign_new_const(ConstantValue {
-            value: alloc_count as u128,
+            value: u128::from(alloc_count),
             typ:   Type::Unsigned64,
         });
         let return_val = bb.add_variable(Type::Pointer);

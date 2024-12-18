@@ -4,8 +4,8 @@
 use std::str::FromStr;
 
 use hieratika_flo::{
-    types::{const_u32, Signature, Type},
     FlatLoweredObject,
+    types::{Signature, Type, const_u32},
 };
 
 #[test]
@@ -69,19 +69,15 @@ fn flos_are_the_same_after_round_trip() -> anyhow::Result<()> {
 
         // ... and perform the subtraction to compute i - 1.
         let i_minus_one = b.add_variable(Type::Unsigned32);
-        b.simple_call_builtin(
-            "sub_u32_u32",
-            vec![fact_input, const_one],
-            vec![i_minus_one],
-        );
+        b.simple_call_builtin("sub_u32_u32", vec![fact_input, const_one], vec![
+            i_minus_one,
+        ]);
 
         // Finally, we'll multiply i and i - 1...
         let final_value = b.add_variable(Type::Unsigned32);
-        b.simple_call_builtin(
-            "mul_u32_u32",
-            vec![fact_input, i_minus_one],
-            vec![final_value],
-        );
+        b.simple_call_builtin("mul_u32_u32", vec![fact_input, i_minus_one], vec![
+            final_value,
+        ]);
 
         // ... and return the result.
         b.end_with_return(vec![final_value]);

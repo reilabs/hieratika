@@ -1,0 +1,24 @@
+{
+  "arch": "riscv64",
+  "data-layout": "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128",
+  "disable-redzone": true,
+  "eh-frame-header": false,
+  "features": "+m,+a,+f,+d",
+  "linker": "rust-lld",
+  "linker-flavor": "gnu-lld",
+  "llvm-abiname": "lp64",
+  "llvm-target": "riscv64",
+  "max-atomic-width": 252,
+  "metadata": {
+    "description": "Bare CairoVM, RISCV64MA",
+    "host_tools": false,
+    "std": false
+  },
+  "panic-strategy": "abort",
+  "relocation-model": "static",
+  "singlethread": true,
+  "stack-probes": {
+    "kind": "inline"
+  },
+  "target-pointer-width": "64"
+}

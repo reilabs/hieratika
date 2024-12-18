@@ -4,12 +4,12 @@
 use std::{collections::HashMap, env, path::Path, sync::Arc};
 
 use cairo_lang_compiler::{
-    db::{validate_corelib, RootDatabase},
+    db::{RootDatabase, validate_corelib},
     project::setup_project,
 };
 use cairo_lang_defs::ids::{FunctionWithBodyId, TopLevelLanguageElementId};
 use cairo_lang_filesystem::{
-    db::{init_dev_corelib, FilesGroup, FilesGroupEx},
+    db::{FilesGroup, FilesGroupEx, init_dev_corelib},
     flag::Flag,
     ids::{CrateId, FlagId},
 };
@@ -127,7 +127,6 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatab
     let crate_ids = setup_project(&mut db, filename)?;
     for crate_id in crate_ids.iter() {
         let crate_name = crate_id.name(&db);
-        println!("crate_name {crate_name}");
         clean_crate(&crate_name)?;
     }
     let mut lowered_functions = HashMap::new();
@@ -182,9 +181,9 @@ mod test {
     use std::{fs::read_dir, path::Path};
 
     use cairo_lang_compiler::{
+        CompilerConfig,
         compile_prepared_db_program,
         project::setup_project,
-        CompilerConfig,
     };
     use itertools::Itertools;
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -204,7 +203,6 @@ mod test {
                     .extension()
                     .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
                 {
-                    println!("Filepath {:?}", file.path());
                     generate_flat_lowered(&file.path()).unwrap();
                 }
             });

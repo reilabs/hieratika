@@ -2,26 +2,26 @@
 //! utilities for querying and reasoning about said layouts.
 
 use chumsky::{
+    Parser,
     error::Simple,
     prelude::{choice, just},
-    Parser,
 };
 use hieratika_errors::compile::llvm::{Error, Result};
 
 use crate::constant::{
     BYTE_SIZE_BITS,
-    DEFAULT_FLOAT_128_LAYOUT,
     DEFAULT_FLOAT_16_LAYOUT,
     DEFAULT_FLOAT_32_LAYOUT,
     DEFAULT_FLOAT_64_LAYOUT,
-    DEFAULT_INTEGER_16_LAYOUT,
+    DEFAULT_FLOAT_128_LAYOUT,
     DEFAULT_INTEGER_1_LAYOUT,
+    DEFAULT_INTEGER_8_LAYOUT,
+    DEFAULT_INTEGER_16_LAYOUT,
     DEFAULT_INTEGER_32_LAYOUT,
     DEFAULT_INTEGER_64_LAYOUT,
-    DEFAULT_INTEGER_8_LAYOUT,
     DEFAULT_POINTER_0_LAYOUT,
-    DEFAULT_VECTOR_128_LAYOUT,
     DEFAULT_VECTOR_64_LAYOUT,
+    DEFAULT_VECTOR_128_LAYOUT,
 };
 
 /// Information about the expected data-layout for this module.
@@ -727,7 +727,7 @@ impl NonIntegralPointerAddressSpaces {
 /// Utility parsing functions to aid in the parsing of data-layouts but that are
 /// not associated directly with any type.
 pub mod parsing {
-    use chumsky::{error::Simple, prelude::just, text::int, Parser};
+    use chumsky::{Parser, error::Simple, prelude::just, text::int};
 
     use crate::{constant::BYTE_SIZE_BITS, llvm::data_layout::parsing};
 
@@ -806,7 +806,6 @@ mod test {
     use chumsky::Parser;
 
     use crate::llvm::data_layout::{
-        parsing,
         AggregateLayout,
         DataLayout,
         Endianness,
@@ -819,10 +818,10 @@ mod test {
         NonIntegralPointerAddressSpaces,
         PointerLayout,
         VectorLayout,
+        parsing,
     };
 
     #[test]
-    #[expect(clippy::too_many_lines)] // We don't care as it's a test
     fn can_parse_data_layout() {
         let dl_string = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
 
@@ -844,16 +843,13 @@ mod test {
         assert_eq!(layout.alloc_address_space, 0);
 
         // Pointers in address space zero are aligned to 64 bits.
-        assert_eq!(
-            layout.pointer_layouts,
-            vec![PointerLayout {
-                address_space:       0,
-                size:                64,
-                abi_alignment:       64,
-                preferred_alignment: 64,
-                index_size:          64,
-            }]
-        );
+        assert_eq!(layout.pointer_layouts, vec![PointerLayout {
+            address_space:       0,
+            size:                64,
+            abi_alignment:       64,
+            preferred_alignment: 64,
+            index_size:          64,
+        }]);
 
         // Integers are semi-customized, with 8, 16, 64, and 128 using layouts specified
         // in the string
@@ -923,30 +919,21 @@ mod test {
         }));
 
         // For the aggregate layout we have the default
-        assert_eq!(
-            layout.aggregate_layout,
-            AggregateLayout {
-                abi_alignment:       0,
-                preferred_alignment: 64,
-            }
-        );
+        assert_eq!(layout.aggregate_layout, AggregateLayout {
+            abi_alignment:       0,
+            preferred_alignment: 64,
+        });
 
         // For the function pointer layout we also have our default
-        assert_eq!(
-            layout.function_pointer_layout,
-            FunctionPointerLayout {
-                ptr_type:      FunctionPointerType::Independent,
-                abi_alignment: 64,
-            }
-        );
+        assert_eq!(layout.function_pointer_layout, FunctionPointerLayout {
+            ptr_type:      FunctionPointerType::Independent,
+            abi_alignment: 64,
+        });
 
         // For native integer widths this string specifies 32, 64
-        assert_eq!(
-            layout.native_integer_widths,
-            NativeIntegerWidths {
-                widths: vec![32, 64],
-            }
-        );
+        assert_eq!(layout.native_integer_widths, NativeIntegerWidths {
+            widths: vec![32, 64],
+        });
 
         // And no address spaces should be using non-integral pointers
         assert_eq!(
@@ -958,7 +945,6 @@ mod test {
     }
 
     #[test]
-    #[expect(clippy::too_many_lines)] // We don't care as it's a test
     fn can_parse_data_layout_to_default() {
         let dl_string = "";
 
@@ -980,16 +966,13 @@ mod test {
         assert_eq!(layout.alloc_address_space, 0);
 
         // Pointers in address space zero are aligned to 64 bits.
-        assert_eq!(
-            layout.pointer_layouts,
-            vec![PointerLayout {
-                address_space:       0,
-                size:                64,
-                abi_alignment:       64,
-                preferred_alignment: 64,
-                index_size:          64,
-            }]
-        );
+        assert_eq!(layout.pointer_layouts, vec![PointerLayout {
+            address_space:       0,
+            size:                64,
+            abi_alignment:       64,
+            preferred_alignment: 64,
+            index_size:          64,
+        }]);
 
         // All the integer layouts should be default
         assert!(layout.integer_layouts.contains(&IntegerLayout {
@@ -1053,30 +1036,21 @@ mod test {
         }));
 
         // For the aggregate layout we have the default
-        assert_eq!(
-            layout.aggregate_layout,
-            AggregateLayout {
-                abi_alignment:       0,
-                preferred_alignment: 64,
-            }
-        );
+        assert_eq!(layout.aggregate_layout, AggregateLayout {
+            abi_alignment:       0,
+            preferred_alignment: 64,
+        });
 
         // For the function pointer layout we also have our default
-        assert_eq!(
-            layout.function_pointer_layout,
-            FunctionPointerLayout {
-                ptr_type:      FunctionPointerType::Independent,
-                abi_alignment: 64,
-            }
-        );
+        assert_eq!(layout.function_pointer_layout, FunctionPointerLayout {
+            ptr_type:      FunctionPointerType::Independent,
+            abi_alignment: 64,
+        });
 
         // For native integer widths we should have the default
-        assert_eq!(
-            layout.native_integer_widths,
-            NativeIntegerWidths {
-                widths: vec![32, 64],
-            }
-        );
+        assert_eq!(layout.native_integer_widths, NativeIntegerWidths {
+            widths: vec![32, 64],
+        });
 
         // And no address spaces should be using non-integral pointers
         assert_eq!(

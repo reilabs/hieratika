@@ -6,11 +6,11 @@ use std::{fmt::Write, path::Path, sync::Arc};
 use anyhow::bail;
 use cairo_lang_compiler::project::setup_project;
 use cairo_lang_runner::{
-    casm_run::format_next_item,
     Arg,
     RunResultValue,
     SierraCasmRunner,
     StarknetState,
+    casm_run::format_next_item,
 };
 use cairo_lang_sierra::program::Program;
 use cairo_lang_sierra_generator::{
