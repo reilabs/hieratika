@@ -1,5 +1,13 @@
 use core::num::traits::BitSize;
 
+// Indicated the direction of overflow in polyfills implementing arithmetic operations that can
+// overflow.
+#[derive(Drop)]
+pub enum OverflowDirection {
+    Overflow,
+    Underflow,
+}
+
 // Wrapper over .try_into() for types that don't implement Into. Panics if try_into() returns
 // Option::None.
 //

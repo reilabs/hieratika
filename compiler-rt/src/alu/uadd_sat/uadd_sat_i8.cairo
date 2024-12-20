@@ -267,7 +267,7 @@ mod tests {
         TestCaseTwoArgs{lhs: 152, rhs: 173, expected: 255},
         TestCaseTwoArgs{lhs: 251, rhs: 183, expected: 255},
         TestCaseTwoArgs{lhs: 249, rhs: 231, expected: 255},
-       
+
         // Edge cases
         TestCaseTwoArgs{lhs: 0, rhs: 0, expected: 0},
         TestCaseTwoArgs{lhs: 0, rhs: 255, expected: 255},

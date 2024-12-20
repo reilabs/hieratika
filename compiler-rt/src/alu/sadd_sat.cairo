@@ -1,7 +1,8 @@
 pub mod sadd_sat_i8;
 
-use crate::alu::sadd_with_overflow::sadd_with_overflow;
+use crate::alu::sadd_with_overflow::signed_addition_with_overflow;
 use crate::alu::shl::shl;
+use crate::utils::OverflowDirection;
 use core::num::traits::{BitSize, Bounded, OverflowingAdd};
 
 // Perform the `sadd_sat` operation.
@@ -28,16 +29,22 @@ fn sadd_sat<
 >(
     lhs: u128, rhs: u128,
 ) -> u128 {
-    let (result, is_overflow) = sadd_with_overflow::<T>(lhs, rhs);
-    if is_overflow {
-        // The maximum value this operation can clamp to is the largest signed value representable
-        // by the bit width of the arguments.
-        // Since we're working with unsigned types, T is most likely uN. Make sure MSB is zero to
-        // make it the largest positive sign value.
-        let bit_size: u128 = BitSize::<T>::bits().into();
-        let sign_bit_mask: u128 = shl::<u128>(1, bit_size - 1);
-        return Bounded::<T>::MAX.into() & ~sign_bit_mask;
+    let (result, overflow) = signed_addition_with_overflow::<T>(lhs, rhs);
+    match overflow {
+        Option::None => result,
+        Option::Some(x) => match x {
+            OverflowDirection::Overflow => {
+                // Clamp to the maximum positive value
+                let bit_size: u128 = BitSize::<T>::bits().into();
+                let sign_bit_mask: u128 = shl::<u128>(1, bit_size - 1);
+                return sign_bit_mask - 1;
+            },
+            OverflowDirection::Underflow => {
+                // Clamp to the minimum negative value
+                let bit_size: u128 = BitSize::<T>::bits().into();
+                let sign_bit_mask: u128 = shl::<u128>(1, bit_size - 1);
+                return sign_bit_mask;
+            },
+        },
     }
-
-    result
 }
