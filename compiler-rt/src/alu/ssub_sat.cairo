@@ -1,7 +1,8 @@
 pub mod ssub_sat_i8;
 
-use crate::alu::ssub_with_overflow::{signed_subtract_with_overflow, OverflowDirection};
+use crate::alu::ssub_with_overflow::signed_subtract_with_overflow;
 use crate::alu::shl::shl;
+use crate::utils::OverflowDirection;
 use core::num::traits::{BitSize, Bounded, OverflowingSub};
 
 

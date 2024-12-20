@@ -1,14 +1,8 @@
 pub mod ssub_with_overflow_i8;
 
-use crate::utils::assert_fits_in_type;
+use crate::utils::{assert_fits_in_type, OverflowDirection};
 use crate::alu::shl::shl;
 use core::num::traits::{BitSize, Bounded, OverflowingSub};
-
-#[derive(Drop)]
-pub enum OverflowDirection {
-    Overflow,
-    Underflow,
-}
 
 // Perform signed subtraction with overflow.
 //
