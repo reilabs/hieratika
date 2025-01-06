@@ -22,5 +22,7 @@ pub mod ssub_sat;
 pub mod mul;
 pub mod umul_with_overflow;
 pub mod smul_with_overflow;
+pub mod udiv;
+pub mod sdiv;
 
 mod test_case;
