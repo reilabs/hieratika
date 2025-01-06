@@ -10,12 +10,15 @@
 //! specific errors in library code. To that end, we make sure that our errors
 //! are kept strongly typed within the library as much as is possible.
 
+pub mod backtrace;
 pub mod compile;
 
 use thiserror::Error;
 
+use crate::backtrace::WithBacktrace;
+
 /// The result type to be used at the boundaries of the project.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = miette::Result<T, WithBacktrace<Error>>;
 
 /// The root of the error hierarchy for this crate.
 ///

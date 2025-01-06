@@ -315,7 +315,7 @@ impl PassManager {
         } else {
             Err(Error::InvalidPassOrdering(
                 "Passes had dependencies where they should not".to_string(),
-            ))
+            ))?
         }
     }
 }

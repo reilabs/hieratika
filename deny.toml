@@ -96,16 +96,17 @@ confidence-threshold = 0.95
 exceptions = [
   # Each entry is the crate and version constraint, and its specific allow
   # list
-  { allow = ["Unicode-3.0"], crate = "unicode-ident" },
-  { allow = ["CC0-1.0"], crate = "tiny-keccak" },
-  { allow = ["MPL-2.0"], crate = "colored" },
-  { allow = ["Zlib"], crate = "foldhash" },
-  { allow = ["MPL-2.0"], crate = "indent" },
-  { allow = ["BSD-3-Clause"], crate = "subtle" },
-  { allow = ["MIT"], crate = "unescaper" },
-  { allow = ["Zlib"], crate = "const_format" },
-  { allow = ["Zlib"], crate = "const_format_proc_macros" },
-  { allow = ["CC0-1.0"], crate = "constant_time_eq" },
+  { crate = "colored", allow = ["MPL-2.0"] },
+  { crate = "const_format", allow = ["Zlib"] },
+  { crate = "const_format_proc_macros", allow = ["Zlib"] },
+  { crate = "constant_time_eq", allow = ["CC0-1.0"] },
+  { crate = "foldhash", allow = ["Zlib"] },
+  { crate = "indent", allow = ["MPL-2.0"] },
+  { crate = "is_ci", allow = ["ISC"] },
+  { crate = "subtle", allow = ["BSD-3-Clause"] },
+  { crate = "tiny-keccak", allow = ["CC0-1.0"] },
+  { crate = "unescaper", allow = ["MIT"] },
+  { crate = "unicode-ident", allow = ["Unicode-3.0"] },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

@@ -142,7 +142,7 @@ pub fn generate_flat_lowered(filename: &Path) -> Result<(CrateLowered, RootDatab
         lowered_functions.insert(function_name, lowered_function);
     }
     if errors_found {
-        return Err(Error::DiagnosticsError);
+        return Err(Error::DiagnosticsError.into());
     }
     Ok((lowered_functions, db))
 }

@@ -6,7 +6,10 @@ use chumsky::{
     error::Simple,
     prelude::{choice, just},
 };
-use hieratika_errors::compile::llvm::{Error, Result};
+use hieratika_errors::{
+    backtrace::WithBacktrace,
+    compile::llvm::{Error, Result},
+};
 
 use crate::constant::{
     BYTE_SIZE_BITS,
@@ -334,7 +337,7 @@ impl Default for DataLayout {
 }
 
 impl TryFrom<&str> for DataLayout {
-    type Error = Error;
+    type Error = WithBacktrace<Error>;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         Self::new(value)
@@ -342,7 +345,7 @@ impl TryFrom<&str> for DataLayout {
 }
 
 impl TryFrom<String> for DataLayout {
-    type Error = Error;
+    type Error = WithBacktrace<Error>;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::new(&value)

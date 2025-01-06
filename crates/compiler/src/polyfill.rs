@@ -258,10 +258,12 @@ impl PolyfillMap {
         param_types: &[LLVMType],
         return_type: &LLVMType,
     ) -> Result<&String> {
-        self.get_polyfill(name, param_types, return_type).ok_or_else(|| {
-            let function_type = LLVMType::make_function(return_type.clone(), param_types);
-            Error::missing_polyfill(name, &function_type.to_string())
-        })
+        self.get_polyfill(name, param_types, return_type)
+            .ok_or_else(|| {
+                let function_type = LLVMType::make_function(return_type.clone(), param_types);
+                Error::missing_polyfill(name, &function_type.to_string())
+            })
+            .map_err(std::convert::Into::into)
     }
 
     /// Queries for the polyfill name that corresponds to the provided

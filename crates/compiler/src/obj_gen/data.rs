@@ -288,9 +288,12 @@ impl FunctionContext {
     /// - [`Error::MalformedLLVM`] if `name` does not refer to a block in this
     ///   function.
     pub fn try_lookup_block(&self, name: &str) -> Result<BlockId> {
-        self.lookup_block(name).ok_or(Error::MalformedLLVM(format!(
-            "The block {name} was referenced but is unknown in this function"
-        )))
+        self.lookup_block(name).ok_or(
+            Error::MalformedLLVM(format!(
+                "The block {name} was referenced but is unknown in this function"
+            ))
+            .into(),
+        )
     }
 
     /// Looks up the variable with the given `name` in the function context,
@@ -315,9 +318,12 @@ impl FunctionContext {
     /// - [`Error::MalformedLLVM`] if `name` has not been defined at the time of
     ///   lookup.
     pub fn try_lookup_variable(&self, name: &str) -> Result<VariableId> {
-        self.lookup_variable(name).ok_or(Error::MalformedLLVM(format!(
-            "The SSA variable {name} was used before being defined"
-        )))
+        self.lookup_variable(name).ok_or(
+            Error::MalformedLLVM(format!(
+                "The SSA variable {name} was used before being defined"
+            ))
+            .into(),
+        )
     }
 
     /// Gets a reference to the mapping between identifiers and types for local
