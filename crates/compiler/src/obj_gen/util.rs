@@ -347,12 +347,12 @@ pub fn extract_value_operand(
             Err(Error::invalid_opcode_operand(
                 opcode,
                 &format!("A value was expected where basic block {block_name} was encountered"),
-            ))
+            ))?
         }
         None => Err(Error::invalid_opcode_operand(
             opcode,
             "No operand was found where one was required",
-        )),
+        ))?,
     }
 }
 
@@ -374,12 +374,12 @@ pub fn extract_block_operand(
             Err(Error::invalid_opcode_operand(
                 opcode,
                 &format!("A block was expected where basic value {value_name} was encountered"),
-            ))
+            ))?
         }
         None => Err(Error::invalid_opcode_operand(
             opcode,
             "No operand was found where one was required",
-        )),
+        ))?,
     }
 }
 

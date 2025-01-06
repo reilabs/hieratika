@@ -11,7 +11,7 @@ pub mod util;
 
 use std::{cell::RefCell, collections::VecDeque};
 
-use hieratika_errors::compile::llvm::{Error, Result};
+use hieratika_errors::compile::llvm::{Error, Result, StdResult};
 use hieratika_flo::{
     FlatLoweredObject,
     builders::BlockBuilder,
@@ -2386,7 +2386,7 @@ impl ObjectGenerator {
         let operand_types = operands
             .iter()
             .map(|op| LLVMType::try_from(op.get_type()))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<StdResult<Vec<_>>>()?;
 
         // We also need to grab the return type.
         let return_type = LLVMType::try_from(instruction.get_type())?;
@@ -2521,7 +2521,7 @@ impl ObjectGenerator {
         let operand_types = value_operands
             .iter()
             .map(|op| LLVMType::try_from(op.get_type()))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<StdResult<Vec<_>>>()?;
         let return_type = LLVMType::try_from(instruction.get_type())?;
 
         // If it is NOT one of these, we have to actually generate the call, and to do

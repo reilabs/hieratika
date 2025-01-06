@@ -6,8 +6,12 @@ use std::str::Utf8Error;
 use inkwell::{support::LLVMString, values::InstructionOpcode};
 use thiserror::Error;
 
+use crate::backtrace::WithBacktrace;
+
 /// The result type for use in the compiler.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = miette::Result<T, WithBacktrace<Error>>;
+
+pub type StdResult<T> = std::result::Result<T, Error>;
 
 /// This error type is for use during the process of compilation from LLVM IR to
 /// the Cairo IR.
@@ -145,15 +149,44 @@ impl Error {
     }
 }
 
+/// Wrap an error from LLVM into our error type.
 impl From<LLVMString> for Error {
-    /// Wrap an error from LLVM into our error type.
     fn from(value: LLVMString) -> Self {
         Self::LLVMError(value.to_string())
     }
 }
 
+/// Wrap an error from LLVM into our error type.
 impl From<&str> for Error {
     fn from(value: &str) -> Self {
         Self::LLVMError(value.to_string())
+    }
+}
+
+/// Handle re-wrapping of string conversion errors.
+impl From<Utf8Error> for WithBacktrace<Error> {
+    fn from(value: Utf8Error) -> Self {
+        WithBacktrace::wrap(value.into())
+    }
+}
+
+/// Handle re-wrapping of IO errors.
+impl From<std::io::Error> for WithBacktrace<Error> {
+    fn from(value: std::io::Error) -> Self {
+        WithBacktrace::wrap(value.into())
+    }
+}
+
+/// Wrap an error from LLVM into our error type.
+impl From<LLVMString> for WithBacktrace<Error> {
+    fn from(value: LLVMString) -> Self {
+        WithBacktrace::wrap(value.into())
+    }
+}
+
+/// Wrap an error from LLVM into our error type.
+impl From<&'static str> for WithBacktrace<Error> {
+    fn from(value: &'static str) -> Self {
+        WithBacktrace::wrap(value.into())
     }
 }

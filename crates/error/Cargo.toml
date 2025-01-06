@@ -14,9 +14,11 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ariadne.workspace = true
+backtrace.workspace = true
 cairo-lang-compiler.workspace = true
 cairo-lang-diagnostics.workspace = true
 cairo-lang-lowering.workspace = true
 inkwell.workspace = true
+itertools.workspace = true
+miette.workspace = true
 thiserror.workspace = true
