@@ -386,15 +386,18 @@ impl PolyfillMap {
 
 /// The definition of the [memory access and addressing operations](https://llvm.org/docs/LangRef.html#memory-access-and-addressing-operations).
 impl PolyfillMap {
+    /// This is the platform-level allocator.
+    fn alloc(&mut self) {
+        // The first argument is the size of the allocation in bits, while the second
+        // argument is the number of instances of that size to allocate.
+        self.mk("alloc", &[LLVMType::i64, LLVMType::i64], LLVMType::ptr);
+    }
+
     fn alloca(&mut self) {
-        // The first argument is the size, in felts, of the allocation, while the second
+        // The first argument is the size of the allocation in bits, while the second
         // argument is the number of instances of that size to allocate.
         self.mk("alloca", &[LLVMType::i64, LLVMType::i64], LLVMType::ptr);
     }
-
-    // TODO composites via iteration. load_* for each prim type, taking an offset
-    // from the ptr and the ptr. Need to fix insertvalue and extractvalue. Use
-    // construct and destructure to deal with these things.
 
     fn load(&mut self) {
         // Due to the nature of the types available in FLO, we can only load and store
@@ -402,7 +405,7 @@ impl PolyfillMap {
         // type, and we have to decompose loads and stores of aggregates into loads and
         // stores using primitive types.
 
-        // Our load function takes the pointer to load and an offset (in felts) from
+        // Our load function takes the pointer to load and an offset in bits from
         // that pointer, and returns the result of loading from that pointer.
         for typ in Self::numptr_types() {
             self.mk("load", &[LLVMType::ptr, LLVMType::i64], typ);
@@ -416,7 +419,7 @@ impl PolyfillMap {
         // stores using primitive types.
 
         // Our store function takes the value to store, the pointer to store it at, and
-        // an offset (in felts) from that pointer at which the primitive value should be
+        // an offset in bits from that pointer at which the primitive value should be
         // stored.
         for typ in Self::numptr_types() {
             self.mk(
@@ -487,6 +490,7 @@ impl PolyfillMap {
     }
 
     fn all_memory_ops(&mut self) {
+        self.alloc();
         self.alloca();
         self.load();
         self.store();
@@ -1250,6 +1254,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1103);
+        assert_eq!(count, 1104);
     }
 }
