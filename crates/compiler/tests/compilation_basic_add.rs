@@ -7,8 +7,9 @@ use itertools::Itertools;
 mod common;
 
 #[test]
-fn compiles_add() -> anyhow::Result<()> {
+fn compiles_add() -> miette::Result<()> {
     // We start by constructing and running the compiler
+    common::set_miette_reporting()?;
     let compiler = common::default_compiler_from_path("input/compilation/add.ll")?;
     let flo = compiler.run()?;
 
@@ -20,13 +21,17 @@ fn compiles_add() -> anyhow::Result<()> {
     assert!(num_blocks <= 8);
 
     // We should only see one function in this generation, even if there are lots of
-    // blocks.
+    // blocks. But we also have two constant initializers, which display as
+    // functions.
     let num_functions = common::count_functions(&flo);
     assert_eq!(num_functions, 1);
 
-    // Let's grab that one function and poke at it a bit.
-    let (_, hieratika_rust_test_input) =
-        flo.blocks.iter().find(|(_, b)| b.signature.is_some()).unwrap();
+    // Let's grab that one function and poke at it a bit, being sure to omit the
+    // initializers.
+    let functions = common::get_functions(&flo);
+    let hieratika_rust_test_input = functions
+        .get("_ZN19hieratika_rust_test_input3add17h828e50e9267cb510E")
+        .expect("Function was not present but should have been");
 
     // It should have 13 statements in its body
     assert_eq!(hieratika_rust_test_input.statements.len(), 13);

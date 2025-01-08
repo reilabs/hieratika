@@ -4,8 +4,9 @@
 mod common;
 
 #[test]
-fn compiles_basic_opcodes() -> anyhow::Result<()> {
+fn compiles_basic_opcodes() -> miette::Result<()> {
     // We start by constructing and running the compiler
+    common::set_miette_reporting()?;
     let compiler = common::default_compiler_from_path("input/compilation/opcodes.ll")?;
     let flo = compiler.run()?;
 
@@ -16,11 +17,10 @@ fn compiles_basic_opcodes() -> anyhow::Result<()> {
     assert!(num_blocks >= 47);
     assert!(num_blocks < 100);
 
-    // We should see a _minimum_ of 43 functions, as that is the number that appears
-    // in the source file. However, the construction of the Phi and Select opcodes
-    // will have resulted in the allocation of two additional ones.
+    // We should see 43 functions, as that is the number that appears in the source
+    // file.
     let num_functions = common::count_functions(&flo);
-    assert_eq!(num_functions, 45);
+    assert_eq!(num_functions, 43);
 
     // Unfortunately this file is sufficiently cluttered that there is little sense
     // in poking at this all that much more, so we just treat the above as some

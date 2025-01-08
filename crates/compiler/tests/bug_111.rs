@@ -4,8 +4,9 @@
 mod common;
 
 #[test]
-fn accepts_anonymous_function_argument_names() -> anyhow::Result<()> {
+fn accepts_anonymous_function_argument_names() -> miette::Result<()> {
     // We start by constructing and running the compiler
+    common::set_miette_reporting()?;
     let compiler = common::default_compiler_from_path("input/bug/bug-111.ll")?;
     let flo = compiler.run()?;
 
