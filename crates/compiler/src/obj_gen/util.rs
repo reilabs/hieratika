@@ -67,9 +67,11 @@ pub fn get_var_or_const(
         // Here, it is truly anonymous, which means we have run into the case where it
         // is simply an inline constant.
         let variable = bb.add_variable(ObjectContext::flo_type_of(&value_type)?);
-        build_const_into(variable, value, bb, func_ctx)?;
-
-        variable
+        if let Some(remap) = build_const_into(variable, value, bb, func_ctx)? {
+            remap
+        } else {
+            variable
+        }
     } else {
         func_ctx.try_lookup_variable(value_name)?
     };
@@ -79,6 +81,9 @@ pub fn get_var_or_const(
 
 /// Builds the constant `value` into the provided `variable` inside the block
 /// described by `bb` and the function described by `func_ctx`.
+///
+/// It returns an optional [`VariableId`]. If set, this indicates that the input
+/// `variable` should instead be replaced by the returned variable.
 ///
 /// # Errors
 ///
@@ -96,7 +101,7 @@ pub fn build_const_into(
     value: &BasicValueEnum,
     bb: &mut BlockBuilder,
     func_ctx: &mut FunctionContext,
-) -> Result<()> {
+) -> Result<Option<VariableId>> {
     // We can always _get_ the name of a value, but in the case where it is an
     // inline constant this is the empty string.
     let value_type = LLVMType::try_from(value.get_type())?;
@@ -160,48 +165,53 @@ pub fn build_const_into(
                 "Unnamed pointer value was not a constant: {ptr_val:?}"
             );
 
-            // We cannot have direct pointer constants written out, but instead they take
-            // the form of a constant expression such as the `blockaddress` function. To
-            // make matters more complex, neither Inkwell nor llvm-sys provide ways to get
-            // at the arguments to the constant, so we are forced to parse it out manually.
-            //
-            // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
-            // hence we are safe to convert it to the similarly non-owning str here for
-            // processing. When our `str` gets dropped, so does the `CStr` but the
-            // underlying allocation is left in the control of llvm-sys via Inkwell.
-            let pointer_const_text_c =
-                unsafe { CStr::from_ptr(LLVMPrintValueToString(ptr_val.as_value_ref())) };
-            let pointer_const_text_str = pointer_const_text_c.to_str()?;
+            let value_name = ptr_val.get_name().to_str()?;
 
-            // Next we can parse the blockaddr representation out of the string.
-            let block_addr = BlockAddress::parser().parse(pointer_const_text_str).map_err(|e| {
-                Error::MalformedLLVM(format!(
-                    "Expected a valid blockaddress expression but found {pointer_const_text_str} \
-                     instead: {e:?}",
-                ))
-            })?;
+            if value_name.is_empty() {
+                // Here, this has to be a blockaddress pointer constant.
+                //
+                // We cannot have direct pointer constants written out, but instead they take
+                // the form of a constant expression such as the `blockaddress` function. To
+                // make matters more complex, neither Inkwell nor llvm-sys provide ways to get
+                // at the arguments to the constant, so we are forced to parse it out manually.
+                //
+                // Note that CStr is explicitly a NON-OWNING wrapper over a const* c_char, and
+                // hence we are safe to convert it to the similarly non-owning str here for
+                // processing. When our `str` gets dropped, so does the `CStr` but the
+                // underlying allocation is left in the control of llvm-sys via Inkwell.
+                let pointer_const_text_c =
+                    unsafe { CStr::from_ptr(LLVMPrintValueToString(ptr_val.as_value_ref())) };
+                let pointer_const_text_str = pointer_const_text_c.to_str()?;
 
-            // If this is a valid parse, we now have both the name of the function in which
-            // the block occurs, and the name of the block in that function from which the
-            // address is generated. We assume that:
-            //
-            // 1. The function exists in the current translation unit.
-            // 2. The block is valid in the specified function.
-            //
-            // All other conditions are a malformed LLVM error.
-            let target_function_blocks = func_ctx
-                .module_blocks()
-                .get(&block_addr.function_name)
-                .ok_or_else(|| {
-                    Error::MalformedLLVM(format!(
-                        "blockaddress constant attempted to look up a block in non-local function \
-                         {}",
-                        &block_addr.function_name
-                    ))
-                })?;
+                // Next we can parse the blockaddr representation out of the string.
+                let block_addr =
+                    BlockAddress::parser().parse(pointer_const_text_str).map_err(|e| {
+                        Error::MalformedLLVM(format!(
+                            "Expected a valid blockaddress expression but found \
+                             {pointer_const_text_str} instead: {e:?}",
+                        ))
+                    })?;
 
-            let block_id =
-                target_function_blocks
+                // If this is a valid parse, we now have both the name of the function in which
+                // the block occurs, and the name of the block in that function from which the
+                // address is generated. We assume that:
+                //
+                // 1. The function exists in the current translation unit.
+                // 2. The block is valid in the specified function.
+                //
+                // All other conditions are a malformed LLVM error.
+                let target_function_blocks = func_ctx
+                    .module_blocks()
+                    .get(&block_addr.function_name)
+                    .ok_or_else(|| {
+                        Error::MalformedLLVM(format!(
+                            "blockaddress constant attempted to look up a block in non-local \
+                             function {}",
+                            &block_addr.function_name
+                        ))
+                    })?;
+
+                let block_id = target_function_blocks
                     .get_by_left(&block_addr.block_ref)
                     .ok_or_else(|| {
                         Error::MalformedLLVM(format!(
@@ -210,7 +220,25 @@ pub fn build_const_into(
                         ))
                     })?;
 
-            bb.get_block_address(variable, *block_id, Vec::new(), None);
+                bb.get_block_address(variable, *block_id, Vec::new(), None);
+            } else {
+                // Here our pointer is named, meaning it refers to some other entity.
+                if let Some(constant_ptr) = func_ctx.lookup_variable(value_name) {
+                    // It is referring to some other constant.
+                    //
+                    // Here we have to return early as we do not have a way to assign one variable
+                    // to another in FLO.
+                    return Ok(Some(constant_ptr));
+                } else if let Some(_block_id) = func_ctx.lookup_block(value_name) {
+                    // It is referring to a function by name to get a function pointer.
+                    unimplemented!("Function pointers by name");
+                } else {
+                    panic!(
+                        "Named value {value_name} in constant initializer was not a variable or \
+                         function"
+                    );
+                }
+            }
         }
         BasicValueEnum::ArrayValue(array_val) => {
             assert!(
@@ -245,7 +273,7 @@ pub fn build_const_into(
         )?,
     }
 
-    Ok(())
+    Ok(None)
 }
 
 /// A representation of a [`blockaddress`](https://llvm.org/docs/LangRef.html#addresses-of-basic-blocks)

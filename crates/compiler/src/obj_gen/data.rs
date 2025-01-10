@@ -13,14 +13,14 @@ use inkwell::module::Linkage;
 use crate::llvm::typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType};
 
 /// A mapping from the names of locally-defined functions to their identifiers.
-pub type ModuleFunctions = BiHashMap<String, BlockId>;
+pub type ModuleFunctions = HashMap<String, BlockId>;
 
 /// A mapping from function names to all blocks in the function, which can then
 /// be further looked up by the block name to get the block identifier.
 pub type ModuleBlocks = HashMap<String, BiHashMap<String, BlockId>>;
 
 /// A mapping from the names of locally-defined globals to their identifiers.
-pub type ModuleGlobals = BiHashMap<String, VariableId>;
+pub type ModuleGlobals = HashMap<String, VariableId>;
 
 /// An object map contains a mapping from the module
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -210,13 +210,13 @@ pub struct FunctionContext {
     /// The type signature of the function.
     func_type: LLVMFunction,
 
-    /// The basic blocks that occur in the function as a bidirectional mapping
-    /// from names to block identifiers.
-    blocks: BiHashMap<String, BlockId>,
+    /// The basic blocks that occur in the function as a mapping from names to
+    /// block identifiers.
+    blocks: HashMap<String, BlockId>,
 
-    /// The local variables that occur in the function as a bidirectional
-    /// mapping from names to identifiers.
-    locals: BiHashMap<String, VariableId>,
+    /// The local variables that occur in the function as a mapping from names
+    /// to identifiers.
+    locals: HashMap<String, VariableId>,
 
     /// A mapping from variable identifiers to variable types, used for
     /// consistency checking during compilation.
@@ -234,8 +234,8 @@ impl FunctionContext {
     /// Creates a new, empty instance of the function context.
     #[must_use]
     pub fn new(func_type: LLVMFunction, map: ObjectMap) -> Self {
-        let blocks = BiHashMap::new();
-        let locals = BiHashMap::new();
+        let blocks = HashMap::new();
+        let locals = HashMap::new();
         let var_types = HashMap::new();
 
         Self {
@@ -256,21 +256,21 @@ impl FunctionContext {
     /// Gets a reference to the mapping between names and identifiers for global
     /// variables.
     #[must_use]
-    pub fn globals(&self) -> &BiHashMap<String, VariableId> {
+    pub fn globals(&self) -> &ModuleGlobals {
         &self.map.module_globals
     }
 
     /// Gets a reference to the mapping between names and identifiers for local
     /// variables.
     #[must_use]
-    pub fn locals(&self) -> &BiHashMap<String, VariableId> {
+    pub fn locals(&self) -> &HashMap<String, VariableId> {
         &self.locals
     }
 
     /// Gets a reference to the mapping between names and identifiers for blocks
     /// in this function.
     #[must_use]
-    pub fn blocks(&self) -> &BiHashMap<String, BlockId> {
+    pub fn blocks(&self) -> &HashMap<String, BlockId> {
         &self.blocks
     }
 
@@ -278,7 +278,7 @@ impl FunctionContext {
     /// returning its identifier if it exists or [`None`] if it does not.
     #[must_use]
     pub fn lookup_block(&self, name: &str) -> Option<BlockId> {
-        self.blocks.get_by_left(name).copied()
+        self.blocks.get(name).copied()
     }
 
     /// Looks up the block with the given `name` in the function context,
@@ -304,11 +304,10 @@ impl FunctionContext {
         // We look up in locals and then in globals. This order is very intentional, as
         // it implicitly supports shadowing even though this should not occur in LLVM
         // IR.
-        self.locals.get_by_left(name).copied().or(self
-            .map
-            .module_globals
-            .get_by_left(name)
-            .copied())
+        self.locals
+            .get(name)
+            .copied()
+            .or(self.map.module_globals.get(name).copied())
     }
 
     /// Looks up the variable with the given `name` in the function context,
