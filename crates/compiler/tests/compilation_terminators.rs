@@ -19,7 +19,7 @@ fn compiles_terminator_instructions() -> miette::Result<()> {
 
     // We should see exactly 7 functions, as that is how many appears in the source
     // file and none of these opcodes generate additional ones during compilation.
-    let num_functions = common::count_functions(&flo);
+    let num_functions = common::count_functions(&flo, false);
     assert_eq!(num_functions, 7);
 
     // Unfortunately this file is sufficiently cluttered that there is little sense

@@ -88,3 +88,9 @@ pub const DEFAULT_INTEGER_64_LAYOUT: (usize, usize, usize) = (64, 32, 64);
 /// The numbers are, in order: the address space, the size, the ABI alignment,
 /// the preferred alignment, and the index size.
 pub const DEFAULT_POINTER_0_LAYOUT: (usize, usize, usize, usize, usize) = (0, 64, 64, 64, 64);
+
+/// The function name stub for dispatcher functions.
+pub const DISPATCH_FUNCTION_NAME: &str = "hdisp";
+
+/// The module name for the whole-program scope.
+pub const WHOLE_PROGRAM_MODULE_NAME: &str = "meta";

@@ -15,3 +15,6 @@ pub const BEGIN_STRUCT: &str = "S";
 
 /// A marker used to signify the end of a struct.
 pub const END_STRUCT: &str = "s";
+
+/// The prefix for symbols that indicates that they are internal or reserved.
+pub const INTERNAL_NAME_PREFIX: &str = "__";

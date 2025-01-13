@@ -22,7 +22,7 @@ mod util;
 use hieratika_flo::types::Type;
 
 use crate::{
-    constants::SECTION_SEPARATOR,
+    constants::{INTERNAL_NAME_PREFIX, SECTION_SEPARATOR},
     mapping::{mangle_params, mangle_returns},
 };
 
@@ -52,6 +52,25 @@ pub type Error = hieratika_errors::mangle::Error;
 /// assert_eq!(mangle(func_name).unwrap(), "fc$my_func$dc$my_module");
 /// ```
 ///
+/// If the provided function name is internal or reserved (in other words that
+/// it begins with [`INTERNAL_NAME_PREFIX`]), the output name will also begin
+/// with the same prefix. Note that the prefix will be stripped from the start
+/// of the provided name, ensuring a more compact representation.
+///
+/// ```
+/// use hieratika_flo::types::Type;
+/// use hieratika_mangler::{NameInfo, mangle};
+///
+/// let func_name = NameInfo::new(
+///     "__my_func",
+///     "my_module",
+///     vec![Type::Double, Type::Bool],
+///     vec![Type::Float, Type::Bool],
+/// );
+///
+/// assert_eq!(mangle(func_name).unwrap(), "__fc$my_func$dc$my_module");
+/// ```
+///
 /// # Errors
 ///
 /// - [`Error::InvalidInput`] if any of the types in the input `name` cannot be
@@ -59,9 +78,15 @@ pub type Error = hieratika_errors::mangle::Error;
 pub fn mangle(name: NameInfo) -> Result<String> {
     let returns_string = mangle_returns(&name.return_types)?;
     let params_string = mangle_params(&name.parameter_types)?;
-    let func_name = name.name;
     let func_module = name.module;
-    Ok([returns_string, func_name, params_string, func_module].join(SECTION_SEPARATOR))
+    let trimmed_name = name.name.trim_start_matches(INTERNAL_NAME_PREFIX).into();
+    let combined =
+        [returns_string, trimmed_name, params_string, func_module].join(SECTION_SEPARATOR);
+    if name.name.starts_with(INTERNAL_NAME_PREFIX) {
+        Ok(format!("{INTERNAL_NAME_PREFIX}{combined}"))
+    } else {
+        Ok(combined)
+    }
 }
 
 /// The inputs to the name mangling process.

@@ -4,7 +4,7 @@
 use hieratika_errors::compile::llvm::Error;
 use inkwell::values::{InstructionOpcode, InstructionValue};
 
-use crate::llvm::typesystem::LLVMType;
+use crate::llvm::typesystem::{LLVMFunction, LLVMType};
 
 /// An error message for use when expecting that an instruction had a name.
 pub const INSTRUCTION_NAMED: &str =
@@ -31,6 +31,16 @@ pub fn assert_correct_opcode(instruction: &InstructionValue, expected: Instructi
         actual, expected,
         "{expected:?} instruction expected but found {actual:?} instead"
     );
+}
+
+/// Panics due to being unable to correctly mangle the provided `typ`.
+///
+/// # Panics
+///
+/// - Always
+#[must_use]
+pub fn panic_cannot_mangle(typ: &LLVMFunction) -> String {
+    panic!("Function type {typ} cannot be mangled")
 }
 
 /// Generates an [`Error::MalformedLLVM`] with a message about the number of

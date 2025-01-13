@@ -6,8 +6,14 @@ target triple = "riscv64"
 @constant_pointer_const = constant ptr @test_const
 @constant_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @test_const }
 
-; @function_pointer_const = constant ptr @hieratika_test_const_integer
-; @function_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @hieratika_test_const_integer }
+@function_pointer_const = constant ptr @hieratika_test_const_integer
+@function_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @hieratika_test_const_integer }
+
+define i64 @hieratika_test_call_function_ptr() unnamed_addr {
+start:
+  %result = call i64 @function_pointer_const()
+  ret i64 %result
+}
 
 define ptr @hieratika_test_reference_const() unnamed_addr {
 start:

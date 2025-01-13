@@ -11,7 +11,7 @@ fn accepts_anonymous_function_argument_names() -> miette::Result<()> {
     let flo = compiler.run()?;
 
     // There should be a single function in the context.
-    assert_eq!(common::count_functions(&flo), 1);
+    assert_eq!(common::count_functions(&flo, false), 1);
 
     Ok(())
 }
