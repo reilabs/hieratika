@@ -2,6 +2,11 @@
 /target
 main
 
+# Generated LLVM IR Input Files
+crates/compiler/input/compilation/alloc.ll
+crates/compiler/input/compilation/compiler_builtins.ll
+crates/compiler/input/compilation/core.ll
+
 # Tooling
 .idea/
 .vscode/
