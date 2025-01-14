@@ -3,8 +3,8 @@ target triple = "riscv64"
 
 @test_const = constant { i1, [9 x i8] } { i1 0, [9 x i8] c"hieratika" }
 
-; @constant_pointer_const = constant ptr @test_const
-; @constant_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @test_const }
+@constant_pointer_const = constant ptr @test_const
+@constant_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @test_const }
 
 ; @function_pointer_const = constant ptr @hieratika_test_const_integer
 ; @function_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @hieratika_test_const_integer }

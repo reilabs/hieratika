@@ -65,7 +65,7 @@ use crate::{
     },
     obj_gen::data::{FreshNameSupply, FunctionContext, ObjectContext},
     pass::{
-        analysis::module_map::{BuildModuleMap, FunctionInfo, GlobalInfo, ModuleMap},
+        analysis::module_map::{BuildModuleMap, FunctionInfo, ModuleMap},
         data::DynPassDataMap,
     },
     polyfill::PolyfillMap,
@@ -199,17 +199,10 @@ impl ObjectGenerator {
         // error, so we crash loudly.
         let module_map = self.get_module_map();
 
-        // We start by generating code for globals, as they are referenced in function
-        // definitions.
-        for global in module.get_globals() {
-            let global_name = global.get_name().to_str()?;
-
-            // We generate code regardless of whether it is a definition or a declaration,
-            // as we need to have something to reference regardless.
-            if let Some(global_data) = module_map.globals.get(global_name) {
-                self.generate_global(&global, global_name, global_data, data)?;
-            }
-        }
+        // Globals are referenced in function definitions, but may also reference
+        // function names. To that end, we start by registering variables of the
+        // appropriate type for each global.
+        self.generate_global_decls(module, data)?;
 
         // We then need to generate the object map, which tells us how to go from names
         // to blocks in the entire module. This ensures that we not only have defined
@@ -227,7 +220,7 @@ impl ObjectGenerator {
 
             // We only generate code if the function is actually defined, and it will only
             // exist in the object map if it is indeed defined.
-            if let Some(entry_block_id) = data.map.module_functions.get_by_left(function_name) {
+            if let Some(entry_block_id) = data.map.module_functions.get(function_name) {
                 let func_data = module_map.functions.get(function_name).unwrap_or_else(|| {
                     panic!(
                         "The function {function_name} referenced but is unknown in the module map"
@@ -238,7 +231,61 @@ impl ObjectGenerator {
             }
         }
 
+        // Finally, we generate initializers for globals that have them.
+        for global in module.get_globals() {
+            if global.get_initializer().is_some() {
+                let global_name = global.get_name().to_str()?;
+                let Some(global_id) = data.map.module_globals.get(global_name) else {
+                    panic!("Global with name {global_name} did not exist in the object context.")
+                };
+
+                self.generate_global_initializer(*global_id, &global, data)?;
+            }
+        }
+
         // Having generated both of these portions into the FLO, we are done for now.
+        Ok(())
+    }
+
+    /// This function generates the globals in the module to allow referencing
+    /// them from other parts of the module.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the global declarations cannot be generated properly.
+    ///
+    /// # Panics
+    ///
+    /// - If any global is missing metadata in the [`ModuleMap`].
+    pub fn generate_global_decls(&self, module: &Module, data: &mut ObjectContext) -> Result<()> {
+        for global in module.get_globals() {
+            let global_name = global.get_name().to_str()?;
+            let Some(global_info) = self.get_module_map().globals.get(global_name) else {
+                panic!("Global {global_name} encountered without metadata in module map");
+            };
+
+            // Globals are always pointers (regardless of their pointed-to type), so we
+            // start by building a global variable of that type.
+            let linkage = ObjectContext::linkage_of(&global_info.linkage, global_name);
+            let global_variable = Variable {
+                typ: Type::Pointer,
+                linkage,
+                poison: PoisonType::None,
+                diagnostics: Vec::new(),
+                location: None,
+            };
+            let global_id = data.flo.variables.insert(&global_variable);
+
+            // We then need to register the identifier in the module globals.
+            data.map.module_globals.insert(global_name.to_string(), global_id);
+
+            // Next, we need to add it to the symbol table if it is something with external
+            // visibility.
+            if matches!(global_info.visibility, GlobalVisibility::Default) {
+                data.flo.symbols.data.insert(global_name.to_string(), global_id);
+            }
+        }
+
         Ok(())
     }
 
@@ -453,35 +500,12 @@ impl ObjectGenerator {
     /// # Errors
     ///
     /// - [`Error`], if the global cannot be generated for any reason.
-    pub fn generate_global(
+    pub fn generate_global_initializer(
         &self,
+        global_id: VariableId,
         global: &GlobalValue,
-        global_name: &str,
-        global_info: &GlobalInfo,
         data: &mut ObjectContext,
     ) -> Result<()> {
-        // Now we can start by creating a variable for our variable.
-        let llvm_type = &global_info.typ;
-        let flo_type = ObjectContext::flo_type_of(llvm_type)?;
-        let linkage = ObjectContext::linkage_of(&global_info.linkage, global_name);
-        let global_variable = Variable {
-            typ: flo_type,
-            linkage,
-            poison: PoisonType::None,
-            diagnostics: Vec::new(),
-            location: None,
-        };
-        let global_id = data.flo.variables.insert(&global_variable);
-
-        // With the identifier, we need to shove it into the module globals.
-        data.map.module_globals.insert(global_name.to_string(), global_id);
-
-        // Next, we need to add it to the symbol table if it is something with external
-        // visibility.
-        if matches!(global_info.visibility, GlobalVisibility::Default) {
-            data.flo.symbols.data.insert(global_name.to_string(), global_id);
-        }
-
         // An initializer takes no parameters and also returns no values, but
         // nevertheless must have a signature as it is "callable".
         let sig = Signature {
@@ -490,32 +514,81 @@ impl ObjectGenerator {
             location: None,
         };
 
+        // We also need the pointed-to type of the global.
+        let pointer_target_type = LLVMType::try_from(global.get_value_type())?;
+        let pointer_target_type_flo = ObjectContext::flo_type_of(&pointer_target_type)?;
+
         // While we now have a variable definition that can be referenced elsewhere, the
         // variable is inherently uninitialized. FLO provides an "initializers"
         // mechanism that provides blocks that are executed by the CRT0.
+        //
+        // Our initializer is a block that has to perform two main operations. The first
+        // is to allocate some memory, and the second is to construct the global's
+        // constant value and write that into the allocated memory.
         if let Some(initializer_code) = global.get_initializer() {
-            // We start by creating the initializer itself, which is a block that assigns a
-            // value to the constant variable.
+            // We start by creating the initializer, which is a block that
+            // assigns a value to the constant, while taking no parameters and
+            // returning no values.
+
             let initializer_block = data.flo.add_block(|bb| -> Result<()> {
-                // As the signature is the same for every initializer, we can just re-use the
-                // one above.
+                // All initializers have the same signature, so we re-use the one defined above.
                 bb.set_signature(&sig);
 
-                // We need a dummy function context to get a constant, so we create one here.
+                // As we are technically working within a function scope, we need a function
+                // context.
                 let mut func_ctx =
                     FunctionContext::new(LLVMFunction::new(LLVMType::void, &[]), data.map.clone());
 
-                // The body of our initializer only needs to get the constant value, which we
-                // start by doing using the existing constant handling code.
-                util::build_const_into(global_id, &initializer_code, bb, &mut func_ctx)?;
+                // The first thing that we need to do is define a variable containing the value
+                // to be written to the pointer. We allocate the variable and then build the
+                // constant into it.
+                let mut const_value = bb.add_variable(pointer_target_type_flo);
+                if let Some(var) =
+                    util::build_const_into(const_value, &initializer_code, bb, &mut func_ctx)?
+                {
+                    const_value = var;
+                }
 
-                // An initializer must end without returning any values, but also must return.
+                // This alone is not enough, however, as this does not give us a pointer. The
+                // next step is to allocate some memory for this value to be stored at. We have
+                // to call `alloc` with the global pointer as the output argument so our pointer
+                // ends up in the right place.
+                //
+                // The first step in doing this is getting the name of the polyfill to call.
+                let alloc_ref = self.polyfills.try_get_polyfill(
+                    "alloc",
+                    &[LLVMType::i64, LLVMType::i64],
+                    &LLVMType::ptr,
+                )?;
+
+                // We then need variables describing the size of the allocation to create, and
+                // how many of these allocations.
+                let alloc_size = bb.simple_assign_new_const(ConstantValue {
+                    value: pointer_target_type.alloc_size_of(self.get_data_layout()) as u128,
+                    typ:   Type::Unsigned64,
+                });
+                let alloc_count = bb.simple_assign_new_const(ConstantValue {
+                    value: 1,
+                    typ:   Type::Unsigned64,
+                });
+
+                // With these, we can issue the call to allocate.
+                bb.simple_call_builtin(alloc_ref, vec![alloc_size, alloc_count], vec![global_id]);
+
+                // At this point we have the global as a pointer of the appropriate size, and
+                // the value of the global, but have not actually written that value to the
+                // pointer during initialization. To that end, we need to generate initializer
+                // code that performs the store.
+                self.store_value(&pointer_target_type, const_value, global_id, 0, bb)?;
+
+                // At this point, we have written the value of the global to the pointer for the
+                // global (which is the variable through which the global is accessed). This
+                // means that all that is left to do is return nothing from the initializer.
                 bb.end_with_return(Vec::new());
-
                 Ok(())
             })?;
 
-            // We then set the initializer in the object to be run at program startup.
+            // With the initializer defined, we set it to be run at program startup.
             data.flo.initializers.push(initializer_block);
         }
 
@@ -1164,8 +1237,6 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
         assert_correct_opcode(&instruction, InstructionOpcode::Store);
 
         // We need to handle atomic behavior of the load and store, if it exists, by
@@ -1193,33 +1264,10 @@ impl ObjectGenerator {
         // primitive types (the numerics and pointers). To that end, we have to handle
         // the store differently based on the type being stored.
         let stored_type = LLVMType::try_from(stored_val.get_type())?;
-        match &stored_type {
-            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                // In the case of directly storing a primitive, the offset is _always_ going to
-                // be zero.
-                self.store_primitive(&stored_type, stored_val_var, pointer_var, 0, bb)?;
-            }
-            Array(array_type) => {
-                // Arrays are complex. As we can only load primitive types from the memory
-                // model, we have to break down the array piece by piece and load them
-                // individually while keeping track of the offset.
-                //
-                // The initial offset will always be zero.
-                self.store_array(array_type, stored_val_var, pointer_var, 0, bb)?;
-            }
-            Structure(struct_type) => {
-                // Structures are complex. As we can only load primitive types from the memory
-                // model, we have to break down the structure piece by piece and load them
-                // individually, while keeping track of the offset.
-                //
-                // The initial offset will always be zero.
-                self.store_struct(struct_type, stored_val_var, pointer_var, 0, bb)?;
-            }
-            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                "Encountered a Store instruction attempting to store a value of type \
-                 {stored_type}, but this is not valid"
-            )))?,
-        };
+
+        // We call to the function that performs the destructuring. The initial offset
+        // for a store instruction is always going to be zero.
+        self.store_value(&stored_type, stored_val_var, pointer_var, 0, bb)?;
 
         // Finally we add the fence _afterward_.
         if let Some(ordering) = atomic {
@@ -1227,6 +1275,49 @@ impl ObjectGenerator {
         }
 
         // And we are done.
+        Ok(())
+    }
+
+    /// Stores a value of the provided `typ` at the provided `ptr` and `offset`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the store for any reason.
+    pub fn store_value(
+        &self,
+        typ: &LLVMType,
+        stored_value: VariableId,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<()> {
+        #[allow(clippy::enum_glob_use)]
+        use LLVMType::*;
+        // Storing is complex for us, as we can only provide polyfills that can store
+        // primitive types (the numerics and pointers). To that end, we have to handle
+        // the store differently based on the type being stored.
+        match &typ {
+            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                self.store_primitive(typ, stored_value, pointer, initial_offset, bb)?;
+            }
+            Array(array_type) => {
+                // Arrays are complex. As we can only load primitive types from the memory
+                // model, we have to break down the array piece by piece and load them
+                // individually while keeping track of the offset.
+                self.store_array(array_type, stored_value, pointer, initial_offset, bb)?;
+            }
+            Structure(struct_type) => {
+                // Structures are complex. As we can only load primitive types from the memory
+                // model, we have to break down the structure piece by piece and load them
+                // individually, while keeping track of the offset.
+                self.store_struct(struct_type, stored_value, pointer, initial_offset, bb)?;
+            }
+            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                "Encountered a Store instruction attempting to store a value of type {typ}, but \
+                 this is not valid"
+            )))?,
+        };
+
         Ok(())
     }
 
@@ -1248,8 +1339,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
         assert!(
             typ.is_primitive(),
             "Primitive type expected, but {typ} found instead"
@@ -1264,9 +1353,11 @@ impl ObjectGenerator {
         });
 
         // Next, we need to look up the polyfill to call.
-        let polyfill_name =
-            self.polyfills
-                .try_get_polyfill("store", &[typ.clone(), ptr, i64], &void)?;
+        let polyfill_name = self.polyfills.try_get_polyfill(
+            "store",
+            &[typ.clone(), LLVMType::ptr, LLVMType::i64],
+            &LLVMType::void,
+        )?;
 
         // The store opcode has no return value, so we can simply generate the call
         // here, passing the value to store, the pointer to store to, and the offset
@@ -1290,9 +1381,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
-
         // As we can only store primitive types, we have to pull the struct apart, piece
         // by piece.
         let struct_elements = struct_type.elements.as_slice();
@@ -1318,22 +1406,7 @@ impl ObjectGenerator {
         // polyfills, but we are not doing so now. See #126 for more information.
         let elems_with_vars_and_ix = struct_elements.iter().zip(element_variables).enumerate();
         for (ix, (elem_ty, elem_val)) in elems_with_vars_and_ix {
-            match elem_ty {
-                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                    self.store_primitive(elem_ty, elem_val, pointer, accumulated_offset, bb)?;
-                }
-                Array(array_type) => {
-                    self.store_array(array_type, elem_val, pointer, accumulated_offset, bb)?;
-                }
-                Structure(struct_type) => {
-                    self.store_struct(struct_type, elem_val, pointer, accumulated_offset, bb)?;
-                }
-                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                    "Encountered a Store instruction attempting to store a value of type \
-                     {elem_ty}, but this is not valid"
-                )))?,
-            }
-
+            self.store_value(elem_ty, elem_val, pointer, accumulated_offset, bb)?;
             accumulated_offset = struct_type.offset_of_element_at(ix, self.get_data_layout());
         }
 
@@ -1355,9 +1428,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
-
         // As we can only store primitive types, we have to pull the array apart, piece
         // by piece. We do this using destructuring operations.
         let array_elem_type = array_type.typ.as_ref();
@@ -1378,29 +1448,8 @@ impl ObjectGenerator {
         // needed.
         let mut accumulated_offset = initial_offset;
 
-        for (ix, array_element) in array_elements.into_iter().enumerate() {
-            match &array_elem_type {
-                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                    self.store_primitive(
-                        array_elem_type,
-                        array_element,
-                        pointer,
-                        accumulated_offset,
-                        bb,
-                    )?;
-                }
-                Array(array_type) => {
-                    self.store_array(array_type, array_element, pointer, accumulated_offset, bb)?;
-                }
-                Structure(struct_type) => {
-                    self.store_struct(struct_type, array_element, pointer, accumulated_offset, bb)?;
-                }
-                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                    "Encountered a Store instruction attempting to store a value of type \
-                     {array_elem_type}, but this is not valid"
-                )))?,
-            }
-
+        for (ix, element) in array_elements.into_iter().enumerate() {
+            self.store_value(array_elem_type, element, pointer, accumulated_offset, bb)?;
             accumulated_offset = array_type.offset_of_element_at(ix, self.get_data_layout());
         }
 
@@ -1426,8 +1475,6 @@ impl ObjectGenerator {
         bb: &mut BlockBuilder,
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
         assert_correct_opcode(&instruction, InstructionOpcode::Load);
 
         // We need to handle atomic behavior of the load and store, if it exists, by
@@ -1454,33 +1501,7 @@ impl ObjectGenerator {
         // load primitive types (the numerics and pointers). To that end, we have to
         // handle the type being loaded differently.
         let output_type = LLVMType::try_from(instruction.get_type())?;
-        let output_var = match &output_type {
-            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                // In the case of directly loading a primitive, the offset is _always_ going to
-                // be zero.
-                self.load_primitive(&output_type, pointer_var, 0, bb)?
-            }
-            Array(array_type) => {
-                // Arrays are complex. As we can only load primitive types from the memory
-                // model, we have to break down the array piece by piece and load them
-                // individually while keeping track of the offset.
-                //
-                // The initial offset will always be zero.
-                self.load_array(array_type, pointer_var, 0, bb)?
-            }
-            Structure(struct_type) => {
-                // Structures are complex. As we can only load primitive types from the memory
-                // model, we have to break down the structure piece by piece and load them
-                // individually, while keeping track of the offset.
-                //
-                // The initial offset will always be zero.
-                self.load_structure(struct_type, pointer_var, 0, bb)?
-            }
-            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                "Encountered a Load instruction attempting to load a value of type {output_type}, \
-                 but this is not valid"
-            )))?,
-        };
+        let output_var = self.load_value(&output_type, pointer_var, 0, bb)?;
 
         // We then need to register this result variable in the function context
         let output_type_flo = ObjectContext::flo_type_of(&output_type)?;
@@ -1493,6 +1514,47 @@ impl ObjectGenerator {
         }
 
         Ok(())
+    }
+
+    /// Loads a value of the provided `typ` from the provided `ptr` and
+    /// `offset`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if it is not possible to generate the load for any reason.
+    pub fn load_value(
+        &self,
+        typ: &LLVMType,
+        pointer: VariableId,
+        initial_offset: usize,
+        bb: &mut BlockBuilder,
+    ) -> Result<VariableId> {
+        #[allow(clippy::enum_glob_use)]
+        use LLVMType::*;
+
+        let output_var = match &typ {
+            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
+                self.load_primitive(typ, pointer, initial_offset, bb)?
+            }
+            Array(array_type) => {
+                // Arrays are complex. As we can only load primitive types from the memory
+                // model, we have to break down the array piece by piece and load them
+                // individually while keeping track of the offset.
+                self.load_array(array_type, pointer, initial_offset, bb)?
+            }
+            Structure(struct_type) => {
+                // Structures are complex. As we can only load primitive types from the memory
+                // model, we have to break down the structure piece by piece and load them
+                // individually, while keeping track of the offset.
+                self.load_structure(struct_type, pointer, initial_offset, bb)?
+            }
+            void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
+                "Encountered a Load instruction attempting to load a value of type {typ}, but \
+                 this is not valid"
+            )))?,
+        };
+
+        Ok(output_var)
     }
 
     /// Loads a primitive of the provided `typ` from the provided `ptr`,
@@ -1515,8 +1577,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
         assert!(
             typ.is_primitive(),
             "Primitive type expected, but {typ} found instead"
@@ -1531,7 +1591,9 @@ impl ObjectGenerator {
         });
 
         // Next, we need to look up the polyfill to call.
-        let polyfill_name = self.polyfills.try_get_polyfill("load", &[ptr, i64], typ)?;
+        let polyfill_name =
+            self.polyfills
+                .try_get_polyfill("load", &[LLVMType::ptr, LLVMType::i64], typ)?;
 
         // We also need a variable to write our output into.
         let output_type_flo = ObjectContext::flo_type_of(typ)?;
@@ -1560,9 +1622,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
-
         // We need to track the offset from the pointer as we load elements.
         let mut accumulated_offset = initial_offset;
 
@@ -1573,21 +1632,7 @@ impl ObjectGenerator {
             .enumerate()
             .map(|(ix, elem_ty)| {
                 // We have to start by dispatching based on the child type
-                let loaded_var = match elem_ty {
-                    bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                        self.load_primitive(elem_ty, pointer, accumulated_offset, bb)?
-                    }
-                    Array(array_type) => {
-                        self.load_array(array_type, pointer, accumulated_offset, bb)?
-                    }
-                    Structure(struct_type) => {
-                        self.load_structure(struct_type, pointer, accumulated_offset, bb)?
-                    }
-                    void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                        "Encountered a Load instruction attempting to load a value of type \
-                         {elem_ty}, but this is not valid"
-                    )))?,
-                };
+                let loaded_var = self.load_value(elem_ty, pointer, accumulated_offset, bb)?;
 
                 // We always have to finish by incrementing the offset by the size of the thing
                 // we just loaded so that the next load proceeds correctly.
@@ -1623,9 +1668,6 @@ impl ObjectGenerator {
         initial_offset: usize,
         bb: &mut BlockBuilder,
     ) -> Result<VariableId> {
-        #[allow(clippy::enum_glob_use)]
-        use LLVMType::*;
-
         let mut accumulated_offset = initial_offset;
         let array_elem_type = array_type.typ.as_ref();
         let array_elem_count = array_type.count;
@@ -1633,21 +1675,12 @@ impl ObjectGenerator {
         // We need a variable that is the result of loading each element type.
         let mut component_variables: Vec<VariableId> = Vec::new();
         for ix in 0..array_elem_count {
-            component_variables.push(match array_elem_type {
-                bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
-                    self.load_primitive(array_elem_type, pointer, accumulated_offset, bb)?
-                }
-                Array(array_type) => {
-                    self.load_array(array_type, pointer, accumulated_offset, bb)?
-                }
-                Structure(struct_type) => {
-                    self.load_structure(struct_type, pointer, accumulated_offset, bb)?
-                }
-                void | Function(_) | Metadata => Err(Error::MalformedLLVM(format!(
-                    "Encountered a Load instruction attempting to load a value of type \
-                     {array_elem_type}, but this is not valid"
-                )))?,
-            });
+            component_variables.push(self.load_value(
+                array_elem_type,
+                pointer,
+                accumulated_offset,
+                bb,
+            )?);
 
             // We always have to finish by incrementing the offset by the size of the thing
             // we just loaded so that the next load proceeds correctly.
@@ -2549,8 +2582,7 @@ impl ObjectGenerator {
 
         // If it is NOT one of these, we have to actually generate the call, and to do
         // that we need to know whether it is an internal or external call.
-        let function_ref = if let Some(id) = func_ctx.module_functions().get_by_left(&function_name)
-        {
+        let function_ref = if let Some(id) = func_ctx.module_functions().get(&function_name) {
             BlockRef::Local(*id)
         } else if let Some(polyfill_name) =
             self.polyfills
@@ -2876,7 +2908,7 @@ impl ObjectGenerator {
             InstructionOpcode::Invoke,
         )?;
         let function_name = function_value.get_name().to_str()?;
-        let function_ref = func_ctx.module_functions().get_by_left(function_name).map_or_else(
+        let function_ref = func_ctx.module_functions().get(function_name).map_or_else(
             || BlockRef::External(function_name.to_string()),
             |id| BlockRef::Local(*id),
         );

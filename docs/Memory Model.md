@@ -134,7 +134,17 @@ implementation of these features.
 
 ### Constant Pointers
 
-This section is TBD, and will be filled in as part of the work on constant pointers.
+LLVM IR [specifies](https://llvm.org/docs/LangRef.html#global-variables) that global variables are
+implicitly of type `ptr`, rather than of their declared type. This means that they need to be
+allocated in such a way that they comply with the memory model as described above. This is done as
+follows:
+
+- We use the "initializers" mechanism provided by FLO to execute code during runtime initialization.
+- We declare an initializer block for each variable. This block is responsible for:
+  1. Constructing the value of the constant into a variable `v1 : T`.
+  2. Allocating memory `p : ptr` of the appropriate size to hold the declared type of the constant.
+  3. Storing the `v1` into memory at `p`.
+- The global variable is then set to the pointer `p` allocated by the initializer.
 
 ### Function Pointers
 
