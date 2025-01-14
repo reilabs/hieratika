@@ -50,11 +50,13 @@ use itertools::Itertools;
 use crate::{
     context::SourceContext,
     llvm::{
+        data_layout::DataLayout,
         special_intrinsics::SpecialIntrinsics,
         typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType},
     },
     messages::{
         INSTRUCTION_NAMED,
+        MISSING_MODULE_MAP,
         assert_correct_opcode,
         missing_indices_error,
         non_constant_constant_error,
@@ -195,10 +197,7 @@ impl ObjectGenerator {
         // We need the module map to be able to make correct code generation decisions
         // here, so we start by grabbing this. If it doesn't exist, this is a programmer
         // error, so we crash loudly.
-        let module_map = self.pass_data().get::<BuildModuleMap>().expect(
-            "The module mapping pass does not appear to have been run but is required for code \
-             generation.",
-        );
+        let module_map = self.get_module_map();
 
         // We start by generating code for globals, as they are referenced in function
         // definitions.
@@ -946,6 +945,7 @@ impl ObjectGenerator {
             bb: &mut BlockBuilder,
             func_ctx: &mut FunctionContext,
             polyfills: &PolyfillMap,
+            data_layout: &DataLayout,
         ) -> Result<VariableId> {
             // If the gep_index is constant, we can compute this at compile time.
             let const_value = if let BasicValueEnum::IntValue(int_val) = gep_index {
@@ -960,18 +960,18 @@ impl ObjectGenerator {
             };
 
             let actual_offset = if let Some(const_value) = const_value {
-                let offset = const_value * typ.size_of();
+                let offset_bits = const_value * typ.alloc_size_of(data_layout);
 
                 // In this case, it is a constant that we can compute at compile time.
                 bb.simple_assign_new_const(ConstantValue {
-                    value: offset as u128,
+                    value: offset_bits as u128,
                     typ:   Type::Unsigned64,
                 })
             } else {
                 // In this case it is non-constant, so we have to defer the offset computation
                 // to runtime.
                 let type_size_felts_const = bb.simple_assign_new_const(ConstantValue {
-                    value: typ.size_of() as u128,
+                    value: typ.alloc_size_of(data_layout) as u128,
                     typ:   Type::Unsigned64,
                 });
 
@@ -1055,6 +1055,7 @@ impl ObjectGenerator {
                     bb,
                     func_ctx,
                     &self.polyfills,
+                    self.get_data_layout(),
                 )?;
 
                 // Then we can issue the call to the first offset within the GEP instruction.
@@ -1088,14 +1089,10 @@ impl ObjectGenerator {
 
                         // Our offset is then the sum of the sizes of all the elements in the struct
                         // _before_ the element indicated by the GEP index.
-                        let felts_before_index: usize = struct_type
-                            .elements
-                            .iter()
-                            .take(gep_index_value)
-                            .map(LLVMType::size_of)
-                            .sum();
+                        let bits_before_index = struct_type
+                            .offset_of_element_at(gep_index_value, self.get_data_layout());
                         let const_offset = bb.simple_assign_new_const(ConstantValue {
-                            value: felts_before_index as u128,
+                            value: bits_before_index as u128,
                             typ:   Type::Signed64,
                         });
 
@@ -1118,6 +1115,7 @@ impl ObjectGenerator {
                             bb,
                             func_ctx,
                             &self.polyfills,
+                            self.get_data_layout(),
                         )?;
 
                         // Then we can issue the call to the first offset within the GEP
@@ -1316,7 +1314,10 @@ impl ObjectGenerator {
         // offsets.
         let mut accumulated_offset = initial_offset;
 
-        for (elem_ty, elem_val) in struct_elements.iter().zip(element_variables.into_iter()) {
+        // This could be optimized through use of (aligned and unaligned) memcpy
+        // polyfills, but we are not doing so now. See #126 for more information.
+        let elems_with_vars_and_ix = struct_elements.iter().zip(element_variables).enumerate();
+        for (ix, (elem_ty, elem_val)) in elems_with_vars_and_ix {
             match elem_ty {
                 bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.store_primitive(elem_ty, elem_val, pointer, accumulated_offset, bb)?;
@@ -1333,7 +1334,7 @@ impl ObjectGenerator {
                 )))?,
             }
 
-            accumulated_offset += elem_ty.size_of();
+            accumulated_offset = struct_type.offset_of_element_at(ix, self.get_data_layout());
         }
 
         // There is nothing to return, so we are done.
@@ -1377,7 +1378,7 @@ impl ObjectGenerator {
         // needed.
         let mut accumulated_offset = initial_offset;
 
-        for array_element in array_elements {
+        for (ix, array_element) in array_elements.into_iter().enumerate() {
             match &array_elem_type {
                 bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.store_primitive(
@@ -1400,7 +1401,7 @@ impl ObjectGenerator {
                 )))?,
             }
 
-            accumulated_offset += array_elem_type.size_of();
+            accumulated_offset = array_type.offset_of_element_at(ix, self.get_data_layout());
         }
 
         // There is nothing to return, so we are done.
@@ -1569,7 +1570,8 @@ impl ObjectGenerator {
         let component_variables: Vec<VariableId> = struct_type
             .elements
             .iter()
-            .map(|elem_ty| {
+            .enumerate()
+            .map(|(ix, elem_ty)| {
                 // We have to start by dispatching based on the child type
                 let loaded_var = match elem_ty {
                     bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
@@ -1589,8 +1591,7 @@ impl ObjectGenerator {
 
                 // We always have to finish by incrementing the offset by the size of the thing
                 // we just loaded so that the next load proceeds correctly.
-                let increment_offset_by = elem_ty.size_of();
-                accumulated_offset += increment_offset_by;
+                accumulated_offset = struct_type.offset_of_element_at(ix, self.get_data_layout());
 
                 // Then we return the loaded variable for use in the struct constructor.
                 Ok(loaded_var)
@@ -1631,7 +1632,7 @@ impl ObjectGenerator {
 
         // We need a variable that is the result of loading each element type.
         let mut component_variables: Vec<VariableId> = Vec::new();
-        for _ in 0..array_elem_count {
+        for ix in 0..array_elem_count {
             component_variables.push(match array_elem_type {
                 bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => {
                     self.load_primitive(array_elem_type, pointer, accumulated_offset, bb)?
@@ -1650,8 +1651,7 @@ impl ObjectGenerator {
 
             // We always have to finish by incrementing the offset by the size of the thing
             // we just loaded so that the next load proceeds correctly.
-            let increment_offset_by = array_elem_type.size_of();
-            accumulated_offset += increment_offset_by;
+            accumulated_offset = array_type.offset_of_element_at(ix, self.get_data_layout());
         }
 
         // In FLO, we do not have any first-class array type, so arrays are structures
@@ -2595,8 +2595,7 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is _not_ an `alloca`.
-    /// - If the [`crate::pass::analysis::module_map::ModuleMap`] data is not
-    ///   available.
+    /// - If the [`ModuleMap`] data is not available.
     /// - If the `alloca` instruction does not have a type to allocate.
     /// - If the `alloca` instruction does not have a count of that type to
     ///   allocate.
@@ -2615,7 +2614,7 @@ impl ObjectGenerator {
                     "Alloca instruction encountered without a specified type to allocate",
                 )
             })?)?;
-        let type_size = allocated_type.size_of();
+        let type_size = allocated_type.alloc_size_of(self.get_data_layout());
 
         // We also need to know the allocation count, which inkwell always fills in with
         // the default of 1 for us if not otherwise specified.
@@ -3171,6 +3170,28 @@ impl ObjectGenerator {
                 len = operands.len()
             )))?,
         }
+    }
+}
+
+/// Utility methods on the object generator.
+impl ObjectGenerator {
+    /// Gets a reference to the module map for the current module.
+    ///
+    /// # Panics
+    ///
+    /// - If the module map is not present in the stored pass data.
+    pub fn get_module_map(&self) -> &ModuleMap {
+        self.pass_data.get::<BuildModuleMap>().expect(MISSING_MODULE_MAP)
+    }
+
+    /// Gets a reference to the data layout for the current module.
+    ///
+    /// # Panics
+    ///
+    /// - If the module map containing the data layout is not present in the
+    ///   stored pass data.
+    pub fn get_data_layout(&self) -> &DataLayout {
+        &self.get_module_map().data_layout
     }
 }
 

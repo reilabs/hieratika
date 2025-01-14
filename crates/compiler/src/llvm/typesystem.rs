@@ -1,7 +1,10 @@
 //! The compiler's internal representation of LLVM types, without being tied to
 //! the context as the [`BasicTypeEnum`] is.
 
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp,
+    fmt::{Display, Formatter},
+};
 
 use hieratika_errors::compile::{llvm, llvm::Error};
 use inkwell::{
@@ -22,6 +25,12 @@ use inkwell::{
     },
 };
 use itertools::Itertools;
+
+use crate::{
+    constant::BYTE_SIZE_BITS,
+    llvm::data_layout::DataLayout,
+    messages::STRUCT_TYPE_WITH_NO_MEMBERS,
+};
 
 /// A representation of the LLVM [types](https://llvm.org/docs/LangRef.html#type-system)
 /// for use within the compiler.
@@ -215,41 +224,109 @@ impl LLVMType {
         self.as_function().expect("`self` value was not Self::Function")
     }
 
-    /// Gets the size of `self` in felts.
+    /// Gets the size of `self` in bits under the provided data layout.
     #[must_use]
-    pub fn size_of(&self) -> usize {
-        use LLVMType::{
-            Array,
-            Function,
-            Metadata,
-            Structure,
-            bool,
-            f16,
-            f32,
-            f64,
-            i8,
-            i16,
-            i24,
-            i32,
-            i64,
-            i128,
-            ptr,
-            void,
-        };
+    #[expect(clippy::match_same_arms)] // The similarities are incidental.
+    pub fn size_of(&self, data_layout: &DataLayout) -> usize {
         match self {
-            bool | i8 | i16 | i24 | i32 | i64 | i128 | f16 | f32 | f64 | ptr => 1,
-            void | Metadata => 0,
-            Array(array_ty) => array_ty.size_of(),
-            Structure(struct_ty) => struct_ty.size_of(),
-            Function(func_ty) => func_ty.size_of(),
+            LLVMType::bool => 1,
+            LLVMType::i8 => 8,
+            LLVMType::i16 => 16,
+            LLVMType::i24 => 24,
+            LLVMType::i32 => 32,
+            LLVMType::i64 => 64,
+            LLVMType::i128 => 128,
+            LLVMType::f16 => 16,
+            LLVMType::f32 => 32,
+            LLVMType::f64 => 64,
+            LLVMType::ptr => data_layout.default_pointer_layout().size,
+            LLVMType::void => 0,
+            LLVMType::Array(array_type) => array_type.size_of(data_layout),
+            LLVMType::Structure(struct_type) => struct_type.size_of(data_layout),
+            LLVMType::Function(function_type) => function_type.size_of(data_layout),
+            LLVMType::Metadata => 0,
         }
     }
 
-    /// Gets the ABI alignment of `self` in felts.
+    /// Gets the maximum number of bits that may be overwritten by storing
+    /// `self`.
+    ///
+    /// This is always a multiple of eight.
     #[must_use]
-    pub fn align_of(&self) -> usize {
-        // At the moment we align everything to the nearest felt boundary.
-        1
+    pub fn store_size_of(&self, data_layout: &DataLayout) -> usize {
+        let min_size_bits = self.size_of(data_layout);
+
+        ((min_size_bits + 7) / 8) * 8
+    }
+
+    /// Returns the offset in bits between successive objects of the
+    /// specified type, including the alignment padding.
+    ///
+    /// This is always a multiple of eight.
+    #[must_use]
+    pub fn alloc_size_of(&self, data_layout: &DataLayout) -> usize {
+        // https://llvm.org/doxygen/DataLayout_8h_source.html#l00457
+        align_to(
+            self.store_size_of(data_layout),
+            self.align_of(AlignType::ABI, data_layout),
+        )
+    }
+
+    /// Gets the alignment of `self` in bits under the provided data layout.
+    #[must_use]
+    #[expect(clippy::match_same_arms)] // The similarities are incidental.
+    pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
+        match self {
+            LLVMType::bool => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(1).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(1).preferred_alignment,
+            },
+            LLVMType::i8 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(8).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(8).preferred_alignment,
+            },
+            LLVMType::i16 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(16).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(16).preferred_alignment,
+            },
+            LLVMType::i24 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(24).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(24).preferred_alignment,
+            },
+            LLVMType::i32 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(32).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(32).preferred_alignment,
+            },
+            LLVMType::i64 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(64).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(64).preferred_alignment,
+            },
+            LLVMType::i128 => match align_type {
+                AlignType::ABI => data_layout.expect_int_spec_of(128).abi_alignment,
+                AlignType::Preferred => data_layout.expect_int_spec_of(128).preferred_alignment,
+            },
+            LLVMType::f16 => match align_type {
+                AlignType::ABI => data_layout.expect_float_spec_of(16).abi_alignment,
+                AlignType::Preferred => data_layout.expect_float_spec_of(16).preferred_alignment,
+            },
+            LLVMType::f32 => match align_type {
+                AlignType::ABI => data_layout.expect_float_spec_of(32).abi_alignment,
+                AlignType::Preferred => data_layout.expect_float_spec_of(32).preferred_alignment,
+            },
+            LLVMType::f64 => match align_type {
+                AlignType::ABI => data_layout.expect_float_spec_of(64).abi_alignment,
+                AlignType::Preferred => data_layout.expect_float_spec_of(64).preferred_alignment,
+            },
+            LLVMType::ptr => match align_type {
+                AlignType::ABI => data_layout.default_pointer_layout().abi_alignment,
+                AlignType::Preferred => data_layout.default_pointer_layout().preferred_alignment,
+            },
+            LLVMType::void => 0,
+            LLVMType::Array(array_type) => array_type.align_of(align_type, data_layout),
+            LLVMType::Structure(struct_type) => struct_type.align_of(align_type, data_layout),
+            LLVMType::Function(function_type) => function_type.align_of(align_type, data_layout),
+            LLVMType::Metadata => 0,
+        }
     }
 }
 
@@ -593,16 +670,31 @@ impl LLVMArray {
         Self { count, typ }
     }
 
-    /// Gets the size of `self` in felts.
+    /// Gets the size of `self` in bits under the provided data layout.
     #[must_use]
-    pub fn size_of(&self) -> usize {
-        self.typ.size_of() * self.count
+    pub fn size_of(&self, data_layout: &DataLayout) -> usize {
+        // The size is the allocation size of the element type multiplied by the number
+        // of elements. https://llvm.org/doxygen/DataLayout_8h_source.html#l00625
+        self.typ.alloc_size_of(data_layout) * self.count
     }
 
-    /// Gets the ABI alignment of `self` in felts.
+    /// Gets the alignment of `self` in bits under the provided data layout.
     #[must_use]
-    pub fn align_of(&self) -> usize {
-        1
+    pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
+        // https://llvm.org/doxygen/DataLayout_8cpp_source.html#l00780
+        self.typ.align_of(align_type, data_layout)
+    }
+
+    /// Calculates the offset in bits of the element at the provided `index` in
+    /// the array `self` under the provided data layout.
+    ///
+    /// Note that this method will happily calculate element offsets that are
+    /// outside the bounds of the array, as this is not an uncommon usage for
+    /// LLVM Array types.
+    #[must_use]
+    pub fn offset_of_element_at(&self, index: usize, data_layout: &DataLayout) -> usize {
+        let element_size = self.typ.size_of(data_layout);
+        element_size * index
     }
 }
 
@@ -680,16 +772,132 @@ impl LLVMStruct {
         Self { packed, elements }
     }
 
-    /// Gets the size of `self` in felts.
+    /// Creates a new packed LLVM struct from the provided `elements` types.
     #[must_use]
-    pub fn size_of(&self) -> usize {
-        self.elements.iter().map(LLVMType::size_of).sum()
+    pub fn packed(elements: &[LLVMType]) -> Self {
+        Self::new(true, elements)
     }
 
-    /// Gets the ABI alignment of `self` in felts.
+    /// Creates a new unpacked LLVM struct from the provided `elements` types.
     #[must_use]
-    pub fn align_of(&self) -> usize {
-        1
+    pub fn unpacked(elements: &[LLVMType]) -> Self {
+        Self::new(false, elements)
+    }
+
+    /// Gets the size of `self` in bits under the provided data layout.
+    ///
+    /// # Panics
+    ///
+    /// - If `self` is a struct type without any members.
+    #[must_use]
+    pub fn size_of(&self, data_layout: &DataLayout) -> usize {
+        let mut struct_size = 0;
+
+        assert!(!self.elements.is_empty(), "{}", STRUCT_TYPE_WITH_NO_MEMBERS);
+
+        // Adapted from https://llvm.org/doxygen/DataLayout_8cpp_source.html#l00048
+        for element in &self.elements {
+            // We start by getting the alignment of the element.
+            let element_align = if self.packed {
+                8
+            } else {
+                element.align_of(AlignType::ABI, data_layout)
+            };
+
+            // To add the next element the size of the struct needs to be aligned to that
+            // element's alignment, so we pad it out if needed.
+            if !is_aligned(element_align, struct_size) {
+                struct_size = align_to(struct_size, element_align);
+            }
+
+            // We then increment the size of the struct by the size of the element's
+            // allocation.
+            struct_size += element.alloc_size_of(data_layout);
+        }
+
+        // Finally, we need to ensure that the struct is aligned properly so that it can
+        // fit into arrays contiguously.
+        let struct_alignment = self.align_of(AlignType::ABI, data_layout);
+        if !is_aligned(struct_alignment, struct_size) {
+            struct_size = align_to(struct_size, struct_alignment);
+        }
+
+        struct_size
+    }
+
+    /// Gets the alignment of `self` in bits under the provided data layout.
+    ///
+    /// # Panics
+    ///
+    /// - If `self` is a struct type without any members.
+    #[must_use]
+    pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
+        if self.packed && matches!(align_type, AlignType::ABI) {
+            // If it is packed, the language reference specifies that it has 1 byte
+            // ABI alignment https://llvm.org/docs/LangRef.html#structure-type
+            8
+        } else {
+            // In this case, things are more complex, as the alignment becomes
+            // the maximum required alignment of the child elements.
+            //
+            // https://llvm.org/doxygen/DataLayout_8cpp_source.html#l00048
+            let max_child_alignment = self
+                .elements
+                .iter()
+                .map(|e| e.align_of(AlignType::ABI, data_layout))
+                .max()
+                .expect(STRUCT_TYPE_WITH_NO_MEMBERS);
+
+            let dl_align = match align_type {
+                AlignType::ABI => data_layout.aggregate_layout.abi_alignment,
+                AlignType::Preferred => data_layout.aggregate_layout.preferred_alignment,
+            };
+
+            cmp::max(max_child_alignment, dl_align)
+        }
+    }
+
+    /// Calculates the offset in bits of the element at the provided `index` in
+    /// the struct `self` under the provided data layout.
+    ///
+    /// # Panics
+    ///
+    /// - If the index is not within the bounds of the structure.
+    #[must_use]
+    pub fn offset_of_element_at(&self, index: usize, data_layout: &DataLayout) -> usize {
+        // We cannot compute the offset at all if the index exceeds the number of
+        // elements in the structure.
+        assert!(
+            index < self.elements.len(),
+            "Element index {index} was not in bounds of structure with {} elements",
+            self.elements.len()
+        );
+
+        let mut current_offset = 0;
+
+        for (ix, element) in self.elements.iter().enumerate() {
+            // We need the element alignment.
+            let element_align = if self.packed {
+                8
+            } else {
+                element.align_of(AlignType::ABI, data_layout)
+            };
+
+            // We then force the element aligned, just like for computing size.
+            if !is_aligned(element_align, current_offset) {
+                current_offset = align_to(current_offset, element_align);
+            }
+
+            // If we have reached the target index, current_offset will contain the right
+            // value as long as we have forced alignment as above.
+            if ix == index {
+                break;
+            }
+
+            current_offset += element.alloc_size_of(data_layout);
+        }
+
+        current_offset
     }
 }
 
@@ -768,21 +976,20 @@ impl LLVMFunction {
         }
     }
 
-    /// Gets the size of `self` in felts.
-    ///
-    /// This is given by the size of the function's return type.
+    /// Gets the size of `self` in bits under the provided data layout.
     #[must_use]
-    pub fn size_of(&self) -> usize {
-        self.return_type.size_of()
+    pub fn size_of(&self, data_layout: &DataLayout) -> usize {
+        self.return_type.size_of(data_layout)
     }
 
-    /// Gets the ABI alignment of `self` in felts under the provided data
+    /// Gets the ABI alignment of `self` in bits under the provided data
     /// layout.
     ///
-    /// This is given by the ABI alignment of the function's return type.
+    /// This is just the required ABI alignment, and does not account for the
+    /// case where a type may be _larger_ than its alignment.
     #[must_use]
-    pub fn align_of(&self) -> usize {
-        self.return_type.align_of()
+    pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
+        self.return_type.align_of(align_type, data_layout)
     }
 }
 
@@ -827,5 +1034,319 @@ impl<'ctx> TryFrom<&FunctionType<'ctx>> for LLVMFunction {
             .collect::<Result<Vec<LLVMType>, Error>>()?;
 
         Ok(Self::new(return_type, &param_types))
+    }
+}
+
+/// The type of alignment to be requested.
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum AlignType {
+    /// The required alignment of the type as given by the ABI.
+    ABI,
+
+    /// The preferred alignment of the type as given by the data layout.
+    Preferred,
+}
+
+/// Gets the nearest multiple of the provided `alignment` that fits `size`
+/// within it (in bits).
+///
+/// The algorithm is the same as the one used
+/// [in LLVM](https://llvm.org/doxygen/namespacellvm.html#ab102f0f12dd38aeea5906b1d80c792ff).
+#[must_use]
+pub fn align_to(size_bits: usize, alignment_bits: usize) -> usize {
+    let size_bytes = size_bits / BYTE_SIZE_BITS;
+    let alignment_bytes = alignment_bits / BYTE_SIZE_BITS;
+    let aligned_bytes = size_bytes.div_ceil(alignment_bytes) * alignment_bytes;
+    aligned_bytes * BYTE_SIZE_BITS
+}
+
+/// Checks that `size_bits` is a multiple of `align_bits`.
+#[must_use]
+pub fn is_aligned(align_bits: usize, size_bits: usize) -> bool {
+    let size_bytes = size_bits / BYTE_SIZE_BITS;
+    let align_bytes = align_bits / BYTE_SIZE_BITS;
+
+    size_bytes % align_bytes == 0
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        constant::TARGET_DATA_LAYOUT,
+        llvm::{
+            data_layout::DataLayout,
+            typesystem::{
+                AlignType::{ABI, Preferred},
+                LLVMArray,
+                LLVMFunction,
+                LLVMStruct,
+                LLVMType,
+            },
+        },
+    };
+
+    /// Allows quick access to a data layout for passing in as part of the
+    /// tests.
+    fn dl() -> DataLayout {
+        DataLayout::new(TARGET_DATA_LAYOUT).expect("Constant data layout should parse correctly")
+    }
+
+    #[test]
+    fn calculates_correct_size_for_bool() {
+        assert_eq!(LLVMType::bool.size_of(&dl()), 1);
+        assert_eq!(LLVMType::bool.store_size_of(&dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i8() {
+        assert_eq!(LLVMType::i8.size_of(&dl()), 8);
+        assert_eq!(LLVMType::i8.store_size_of(&dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i16() {
+        assert_eq!(LLVMType::i16.size_of(&dl()), 16);
+        assert_eq!(LLVMType::i16.size_of(&dl()), 16);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i24() {
+        assert_eq!(LLVMType::i24.size_of(&dl()), 24);
+        assert_eq!(LLVMType::i24.store_size_of(&dl()), 24);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i32() {
+        assert_eq!(LLVMType::i32.size_of(&dl()), 32);
+        assert_eq!(LLVMType::i32.store_size_of(&dl()), 32);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i64() {
+        assert_eq!(LLVMType::i64.size_of(&dl()), 64);
+        assert_eq!(LLVMType::i64.store_size_of(&dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i128() {
+        assert_eq!(LLVMType::i128.size_of(&dl()), 128);
+        assert_eq!(LLVMType::i128.store_size_of(&dl()), 128);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_f16() {
+        assert_eq!(LLVMType::f16.size_of(&dl()), 16);
+        assert_eq!(LLVMType::f16.store_size_of(&dl()), 16);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_f32() {
+        assert_eq!(LLVMType::f32.size_of(&dl()), 32);
+        assert_eq!(LLVMType::f32.store_size_of(&dl()), 32);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_f64() {
+        assert_eq!(LLVMType::f64.size_of(&dl()), 64);
+        assert_eq!(LLVMType::f64.store_size_of(&dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_ptr() {
+        assert_eq!(LLVMType::ptr.size_of(&dl()), 64);
+        assert_eq!(LLVMType::ptr.store_size_of(&dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_void() {
+        assert_eq!(LLVMType::void.size_of(&dl()), 0);
+        assert_eq!(LLVMType::void.store_size_of(&dl()), 0);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_array() {
+        // It should work easily for simple types
+        let simple_array = LLVMType::Array(LLVMArray::new(10, LLVMType::i8));
+        assert_eq!(simple_array.size_of(&dl()), 80);
+        assert_eq!(simple_array.store_size_of(&dl()), 80);
+
+        // But also for compound types
+        let complex_array = LLVMType::Array(LLVMArray::new(
+            8,
+            LLVMType::Structure(LLVMStruct::unpacked(&[
+                LLVMType::bool,
+                LLVMType::i8,
+                LLVMType::i32,
+            ])),
+        ));
+        assert_eq!(complex_array.size_of(&dl()), 512);
+        assert_eq!(complex_array.alloc_size_of(&dl()), 512);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_struct() {
+        // Unpacked structs contain padding between elements.
+        let unpacked_struct_type = LLVMType::Structure(LLVMStruct::unpacked(&[
+            LLVMType::bool,
+            LLVMType::i8,
+            LLVMType::i32,
+        ]));
+        assert_eq!(unpacked_struct_type.size_of(&dl()), 64);
+        assert_eq!(unpacked_struct_type.alloc_size_of(&dl()), 64);
+
+        // But packed structs (even with the same elements) do not.
+        let packed_struct_type = LLVMType::Structure(LLVMStruct::packed(&[
+            LLVMType::bool,
+            LLVMType::i8,
+            LLVMType::i32,
+        ]));
+        assert_eq!(packed_struct_type.size_of(&dl()), 48);
+        assert_eq!(packed_struct_type.alloc_size_of(&dl()), 48);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_function() {
+        let fn_type = LLVMFunction::new(LLVMType::i8, &[LLVMType::bool, LLVMType::ptr]);
+        assert_eq!(LLVMType::Function(fn_type).size_of(&dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_metadata() {
+        assert_eq!(LLVMType::Metadata.size_of(&dl()), 0);
+        assert_eq!(LLVMType::Metadata.store_size_of(&dl()), 0);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_bool() {
+        assert_eq!(LLVMType::bool.align_of(ABI, &dl()), 8);
+        assert_eq!(LLVMType::bool.align_of(Preferred, &dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i8() {
+        assert_eq!(LLVMType::i8.align_of(ABI, &dl()), 8);
+        assert_eq!(LLVMType::i8.align_of(Preferred, &dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i16() {
+        assert_eq!(LLVMType::i16.align_of(ABI, &dl()), 16);
+        assert_eq!(LLVMType::i16.align_of(Preferred, &dl()), 16);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i32() {
+        assert_eq!(LLVMType::i32.align_of(ABI, &dl()), 32);
+        assert_eq!(LLVMType::i32.align_of(Preferred, &dl()), 32);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i64() {
+        assert_eq!(LLVMType::i64.align_of(ABI, &dl()), 64);
+        assert_eq!(LLVMType::i64.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i128() {
+        assert_eq!(LLVMType::i128.align_of(ABI, &dl()), 128);
+        assert_eq!(LLVMType::i128.align_of(Preferred, &dl()), 128);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_f16() {
+        assert_eq!(LLVMType::f16.align_of(ABI, &dl()), 16);
+        assert_eq!(LLVMType::f16.align_of(Preferred, &dl()), 16);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_f32() {
+        assert_eq!(LLVMType::f32.align_of(ABI, &dl()), 32);
+        assert_eq!(LLVMType::f32.align_of(Preferred, &dl()), 32);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_f64() {
+        assert_eq!(LLVMType::f64.align_of(ABI, &dl()), 64);
+        assert_eq!(LLVMType::f64.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_ptr() {
+        assert_eq!(LLVMType::ptr.align_of(ABI, &dl()), 64);
+        assert_eq!(LLVMType::ptr.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_void() {
+        assert_eq!(LLVMType::void.align_of(ABI, &dl()), 0);
+        assert_eq!(LLVMType::void.align_of(Preferred, &dl()), 0);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_array() {
+        assert_eq!(
+            LLVMArray::new(10, LLVMType::i8).align_of(ABI, &dl()),
+            LLVMType::i8.align_of(ABI, &dl())
+        );
+        assert_eq!(
+            LLVMArray::new(10, LLVMType::i8).align_of(Preferred, &dl()),
+            LLVMType::i8.align_of(Preferred, &dl())
+        );
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_struct() {
+        let unpacked_struct = LLVMStruct::unpacked(&[LLVMType::bool, LLVMType::i16, LLVMType::i64]);
+        assert_eq!(unpacked_struct.align_of(ABI, &dl()), 64);
+        assert_eq!(unpacked_struct.align_of(Preferred, &dl()), 64);
+
+        let packed_struct = LLVMStruct::packed(&[LLVMType::bool, LLVMType::i16, LLVMType::i64]);
+        assert_eq!(packed_struct.align_of(ABI, &dl()), 8);
+        assert_eq!(packed_struct.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_function() {
+        let fn_type = LLVMFunction::new(LLVMType::i8, &[LLVMType::bool, LLVMType::ptr]);
+        assert_eq!(fn_type.align_of(ABI, &dl()), 8);
+        assert_eq!(fn_type.align_of(Preferred, &dl()), 8);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_metadata() {
+        assert_eq!(LLVMType::Metadata.align_of(ABI, &dl()), 0);
+        assert_eq!(LLVMType::Metadata.align_of(Preferred, &dl()), 0);
+    }
+
+    #[test]
+    fn calculates_correct_offset_for_array_element() {
+        let simple_array = LLVMArray::new(10, LLVMType::i8);
+        assert_eq!(simple_array.offset_of_element_at(6, &dl()), 48);
+
+        let complex_array = LLVMArray::new(
+            8,
+            LLVMType::Structure(LLVMStruct::unpacked(&[
+                LLVMType::bool,
+                LLVMType::i8,
+                LLVMType::i32,
+            ])),
+        );
+        assert_eq!(complex_array.offset_of_element_at(10, &dl()), 640);
+    }
+
+    #[test]
+    fn calculates_correct_offset_for_struct_element() {
+        let packed_struct_type = LLVMStruct::packed(&[LLVMType::bool, LLVMType::i8, LLVMType::i64]);
+        assert_eq!(packed_struct_type.offset_of_element_at(0, &dl()), 0);
+        assert_eq!(packed_struct_type.offset_of_element_at(1, &dl()), 8);
+        assert_eq!(packed_struct_type.offset_of_element_at(2, &dl()), 16);
+        assert_eq!(packed_struct_type.size_of(&dl()), 80);
+
+        let unpacked_struct_type =
+            LLVMStruct::unpacked(&[LLVMType::bool, LLVMType::i8, LLVMType::i64]);
+        assert_eq!(unpacked_struct_type.offset_of_element_at(0, &dl()), 0);
+        assert_eq!(unpacked_struct_type.offset_of_element_at(1, &dl()), 8);
+        assert_eq!(unpacked_struct_type.offset_of_element_at(2, &dl()), 64);
+        assert_eq!(unpacked_struct_type.size_of(&dl()), 128);
     }
 }

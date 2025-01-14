@@ -10,6 +10,14 @@ use crate::llvm::typesystem::LLVMType;
 pub const INSTRUCTION_NAMED: &str =
     "Instruction was not named, but all non-terminator instructions should be";
 
+/// An error message for use when expecting that the module mapping pass exists.
+pub const MISSING_MODULE_MAP: &str =
+    "No data was available for the module mapping pass, but is required";
+
+/// An error message for use when expecting that a struct type has at least one
+/// element.
+pub const STRUCT_TYPE_WITH_NO_MEMBERS: &str = "Struct type had no members but must have at least 1";
+
 /// Asserts that the provided `instruction` is an instruction of the `expected`
 /// opcode.
 ///
