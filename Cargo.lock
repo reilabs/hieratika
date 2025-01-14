@@ -1520,6 +1520,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hieratika-mangler"
+version = "0.1.0"
+dependencies = [
+ "hieratika-errors",
+ "hieratika-flo",
+]
+
+[[package]]
 name = "hieratika-test-utils"
 version = "0.1.0"
 dependencies = [
