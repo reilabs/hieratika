@@ -259,15 +259,16 @@ language.
 
 Each function will follow the semantics of its LLVM IR counterpart. This requires:
 
-- accepting the same number of arguments, of the same type and in the same order as the original
-  operation's operands,
-- returning the same number or values, of the same type and in the same order as the original
-  operation,
+- accepting the same number of arguments in the same order as the original operation's operands and
+  of at least the same width,
+- returning the same number or values in the same order as the original operation and of at least
+  the same width,
 - implementing the exact semantics as expected by LLVM.
 
 As an example, for the `sub` instruction, our polyfill operating on `i8` operands must:
 
-- accept exactly two `i8` operands,
+- accept exactly two operands,
+- the operands must be guaranteed to contain values that fit in `i8`,
 - the operands must be in the same order, i.e. for `sub %a, %b` our polyfill `__llvm_sub_i8_i8` must
   accept `a` and `b` in the same order,
 - as `sub %a, %b` performs the `a-b` subtraction, our polyfill must not perform `b-a` instead and
@@ -275,6 +276,44 @@ As an example, for the `sub` instruction, our polyfill operating on `i8` operand
 
 Each function will follow the naming scheme described in the
 [relevant section below](#naming-convention).
+
+### Operands
+
+[Research has shown](https://github.com/reilabs/hieratika/issues/38) that unsigned integers in Cairo
+have all necessary operations implemented to provide us with means to implement more complex
+operations using the existing ones. Signed types are very limited in this area. Moreover, there is
+no robust signed<->unsigned conversion available.
+
+LLVM IR does not care about sign - its integers are just n-bit wide objects and they're good for
+both signed and unsigned numbers (see [**Integers**](#integers) for more details).
+
+Based on the above observations and to simplify the way Hieratika handles polyfills, a decision has
+been made to unify polyfills API by using only `u128` for arguments and return values (and
+optionally `bool` if a polyfill returns a flag, possibly as a `(u128, bool)` tuple).
+
+Negative numbers are problematic with `u128` in the sense that calling e.g.
+`__llvm_and_i8_i8(-128, 127)` would result in the first value being interpreted a huge positive
+number due to the modulo arithmetic wraparound. As a counter measure, a bit notation can be used,
+e.g. `__llvm_and_i8_i8(0b10000000, 0b01111111)`. This way when handling negative values we treat
+`u128` arguments as containers for bit patterns.
+
+### Sign extension
+
+Passing a signed integer in the form of a bit pattern like `0b10000000` into a 128-bit unsigned
+integer variable creates a a value that is not interpreted as the desired input value under two's
+complement arithmetic. In two's complement, the most significant bit (MSB) acts as the sign bit: `0`
+indicates a positive number, while `1` indicates a negative number. When converting a signed integer
+from a smaller bit-width (e.g., 8 bits) to a larger bit-width (e.g., 16 bits), sign extension
+involves filling the additional bits with the value of the sign bit.
+
+When handing signed `iN` integers where n < 128, we check bit N-1 of the input value and copy its to
+bits 127 to N-2. For example:
+
+- input integer: `-127`
+- 8-bit bit pattern: `0b10000000`
+- 7th bit: `1`
+- `-127` after sign extension as a 128-bit pattern:
+  `0b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111110000000`.
 
 ### Naming Convention
 
