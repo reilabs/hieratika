@@ -6,7 +6,16 @@ use bimap::BiHashMap;
 use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::{
     FlatLoweredObject,
-    types::{ArrayType, BlockId, PoisonType, StructType, Type, VariableId, VariableLinkage},
+    types::{
+        ArrayType,
+        BlockExit,
+        BlockId,
+        PoisonType,
+        StructType,
+        Type,
+        VariableId,
+        VariableLinkage,
+    },
 };
 use hieratika_mangler::{NameInfo, constants::INTERNAL_NAME_PREFIX, mangle};
 use inkwell::module::Linkage;
@@ -86,18 +95,45 @@ pub struct ObjectContext {
     /// Behavior may be inconsistent if the identifiers within are not allocated
     /// in the `flo` object contained in `Self`.
     pub map: ObjectMap,
+
+    /// A block that can be used to represent a null pointer.
+    pub null_block: BlockId,
 }
 
 /// Functionality that requires access to the FLO context directly.
 impl ObjectContext {
     /// Constructs a new code generator data store for the module with the
     /// provided name.
+    ///
+    /// # Panics
+    ///
+    /// - If the constant block value cannot be created for some reason.
     #[must_use]
     pub fn new(name: &str) -> Self {
-        let flo = FlatLoweredObject::new(name);
+        let mut flo = FlatLoweredObject::new(name);
         let map = ObjectMap::new();
+        let null_block = flo
+            .add_block(|bb| -> Result<()> {
+                bb.set_exit(&BlockExit::Panic(
+                    "Poison block was reachable".to_string(),
+                    Vec::new(),
+                ));
+                Ok(())
+            })
+            .expect("Constant block could not be created.");
 
-        Self { flo, map }
+        Self {
+            flo,
+            map,
+            null_block,
+        }
+    }
+
+    /// Creates a new function context for a function of type `function_type`
+    /// and wrapping data from `self`.
+    #[must_use]
+    pub fn new_func_ctx(&self, function_type: &LLVMFunction) -> FunctionContext {
+        FunctionContext::new(function_type.clone(), self.map.clone(), self.null_block)
     }
 }
 
@@ -319,12 +355,15 @@ pub struct FunctionContext {
     /// allocated from the same `flo` object in which this function is
     /// allocated.
     map: ObjectMap,
+
+    /// A block that can be used to represent a null pointer.
+    null_block: BlockId,
 }
 
 impl FunctionContext {
     /// Creates a new, empty instance of the function context.
     #[must_use]
-    pub fn new(func_type: LLVMFunction, map: ObjectMap) -> Self {
+    pub fn new(func_type: LLVMFunction, map: ObjectMap, null_block: BlockId) -> Self {
         let blocks = HashMap::new();
         let locals = HashMap::new();
         let var_types = HashMap::new();
@@ -335,6 +374,7 @@ impl FunctionContext {
             locals,
             var_types,
             map,
+            null_block,
         }
     }
 
@@ -363,6 +403,12 @@ impl FunctionContext {
     #[must_use]
     pub fn blocks(&self) -> &HashMap<String, BlockId> {
         &self.blocks
+    }
+
+    /// Gets the identifier for the poison block for this module.
+    #[must_use]
+    pub fn poison_block(&self) -> BlockId {
+        self.null_block
     }
 
     /// Looks up the block with the given `name` in the function context,

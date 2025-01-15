@@ -66,7 +66,7 @@ in stdenvNoCC.mkDerivation (self: {
     for llName in "''${desiredLlFiles[@]}"; do
       ${fd'} -t f \
         "^$llName-.+\.ll$" \
-        -x cp "{}" "$out/$llName.ll"
+        -x cp --no-preserve=mode "{}" "$out/$llName.ll";
     done
 
     runHook postInstall

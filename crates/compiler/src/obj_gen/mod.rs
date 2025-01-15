@@ -15,6 +15,7 @@ use std::{
     iter,
 };
 
+use chumsky::Parser;
 use hieratika_errors::compile::llvm::{Error, Result, StdResult};
 use hieratika_flo::{
     FlatLoweredObject,
@@ -40,13 +41,20 @@ use inkwell::{
     llvm_sys,
     module::Module,
     values::{
+        AnyValue,
+        ArrayValue,
         AsValueRef,
+        BasicValue,
         BasicValueEnum,
+        FloatValue,
         FunctionValue,
         GlobalValue,
         InstructionOpcode,
         InstructionValue,
+        IntValue,
         PhiValue,
+        PointerValue,
+        StructValue,
     },
 };
 use itertools::Itertools;
@@ -69,6 +77,7 @@ use crate::{
         operand_count_error,
     },
     obj_gen::data::{FreshNameSupply, FunctionContext, ObjectContext},
+    parser::{constant_expr::ConstantExpression, integer_constant::IntegerConstant},
     pass::{
         analysis::module_map::{BuildModuleMap, FunctionInfo, ModuleMap},
         data::DynPassDataMap,
@@ -595,7 +604,7 @@ impl ObjectGenerator {
     ) -> Result<()> {
         // We use the function context to keep track of all the data needed to correctly
         // generate the FLO code for the function. This includes in-scope variables.
-        let mut func_ctx = FunctionContext::new(func_info.typ.clone(), data.map.clone());
+        let mut func_ctx = data.new_func_ctx(&func_info.typ);
 
         // The function signature gives us our inputs, which are necessary to be
         // referenced later. To that end, we generate it first, as it does not depend on
@@ -762,28 +771,26 @@ impl ObjectGenerator {
         // is to allocate some memory, and the second is to construct the global's
         // constant value and write that into the allocated memory.
         if let Some(initializer_code) = global.get_initializer() {
-            // We start by creating the initializer, which is a block that
-            // assigns a value to the constant, while taking no parameters and
-            // returning no values.
+            // We start by creating the initializer, which is a block that assigns a value
+            // to the constant, while taking no parameters and returning no values.
+            //
+            // As we are technically working within a function scope, we need a function
+            // context.
+            let mut func_ctx = data.new_func_ctx(&LLVMFunction::new(LLVMType::void, &[]));
 
             let initializer_block = data.flo.add_block(|bb| -> Result<()> {
                 // All initializers have the same signature, so we re-use the one defined above.
                 bb.set_signature(&sig);
 
-                // As we are technically working within a function scope, we need a function
-                // context.
-                let mut func_ctx =
-                    FunctionContext::new(LLVMFunction::new(LLVMType::void, &[]), data.map.clone());
-
                 // The first thing that we need to do is define a variable containing the value
                 // to be written to the pointer. We allocate the variable and then build the
                 // constant into it.
-                let mut const_value = bb.add_variable(pointer_target_type_flo);
-                if let Some(var) =
-                    util::build_const_into(const_value, &initializer_code, bb, &mut func_ctx)?
-                {
-                    const_value = var;
-                }
+                let const_value = self.build_const_into(
+                    bb.add_variable(pointer_target_type_flo),
+                    &initializer_code,
+                    bb,
+                    &mut func_ctx,
+                )?;
 
                 // This alone is not enough, however, as this does not give us a pointer. The
                 // next step is to allocate some memory for this value to be stored at. We have
@@ -972,8 +979,8 @@ impl ObjectGenerator {
         };
 
         let aggregate_type = LLVMType::try_from(aggregate.get_type())?;
-        let aggregate_id = util::get_var_or_const(&aggregate, bb, func_ctx)?;
-        let value_id = util::get_var_or_const(&value, bb, func_ctx)?;
+        let aggregate_id = self.get_var_or_const(&aggregate, bb, func_ctx)?;
+        let value_id = self.get_var_or_const(&value, bb, func_ctx)?;
 
         // We also need the indices, which describe where in the value we are going to
         // be inserting the value.
@@ -1104,7 +1111,6 @@ impl ObjectGenerator {
     /// - If the provided instruction is _not_ an `extractvalue`.
     /// - If any extraction index is out of bounds for the number of fields in
     ///   the type being extracted from.
-    #[expect(clippy::unused_self)] // For consistency with the majority of generate_* methods
     fn generate_extract_value(
         &self,
         instruction: InstructionValue,
@@ -1125,7 +1131,7 @@ impl ObjectGenerator {
             Err(operand_count_error(&instruction, 1))?
         };
         let extract_from_type = LLVMType::try_from(extract_from.get_type())?;
-        let extract_from_id = util::get_var_or_const(&extract_from, bb, func_ctx)?;
+        let extract_from_id = self.get_var_or_const(&extract_from, bb, func_ctx)?;
 
         // We also need to know _where_ in the operand we are grabbing the values from.
         // This is given as a path of indices in the instruction, that are guaranteed to
@@ -1249,6 +1255,7 @@ impl ObjectGenerator {
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
         fn compute_offset_const_type_size(
+            gen: &ObjectGenerator,
             gep_index: &BasicValueEnum,
             typ: &LLVMType,
             bb: &mut BlockBuilder,
@@ -1292,7 +1299,7 @@ impl ObjectGenerator {
                     &[LLVMType::i64, LLVMType::i64],
                     &LLVMType::i64,
                 )?;
-                let gep_index_offset = util::get_var_or_const(gep_index, bb, func_ctx)?;
+                let gep_index_offset = gen.get_var_or_const(gep_index, bb, func_ctx)?;
                 let actual_offset = bb.add_variable(Type::Unsigned64);
                 bb.simple_call_builtin(
                     mul_func,
@@ -1329,7 +1336,7 @@ impl ObjectGenerator {
         // We can safely directly index here as the instruction is malformed if it does
         // not have a pointer operand.
         let pointer = operands[0];
-        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let pointer_id = self.get_var_or_const(&pointer, bb, func_ctx)?;
 
         // The remaining operands are the indices, which can be constant or variable,
         // that we need to pull out.
@@ -1359,6 +1366,7 @@ impl ObjectGenerator {
                 // For the purposes of the call, the actual offset passed to the polyfill is the
                 // GEP offset on the pointer multiplied by the pointer increment.
                 let actual_offset = compute_offset_const_type_size(
+                    self,
                     gep_index,
                     &source_type,
                     bb,
@@ -1419,6 +1427,7 @@ impl ObjectGenerator {
                     }
                     LLVMType::Array(array_type) => {
                         let actual_offset = compute_offset_const_type_size(
+                            self,
                             gep_index,
                             &source_type,
                             bb,
@@ -1493,8 +1502,8 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 2))?
         };
-        let stored_val_var = util::get_var_or_const(&stored_val, bb, func_ctx)?;
-        let pointer_var = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let stored_val_var = self.get_var_or_const(&stored_val, bb, func_ctx)?;
+        let pointer_var = self.get_var_or_const(&pointer, bb, func_ctx)?;
 
         // Storing is complex for us, as we can only provide polyfills that can store
         // primitive types (the numerics and pointers). To that end, we have to handle
@@ -1731,7 +1740,7 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 1))?
         };
-        let pointer_var = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let pointer_var = self.get_var_or_const(&pointer, bb, func_ctx)?;
 
         // Loading is quite complex for us, as we can only provide polyfills that can
         // load primitive types (the numerics and pointers). To that end, we have to
@@ -1987,11 +1996,11 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 3))?
         };
-        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let pointer_id = self.get_var_or_const(&pointer, bb, func_ctx)?;
         let pointer_typ = LLVMType::try_from(pointer.get_type())?;
-        let compare_to_id = util::get_var_or_const(&compare_to, bb, func_ctx)?;
+        let compare_to_id = self.get_var_or_const(&compare_to, bb, func_ctx)?;
         let compare_to_typ = LLVMType::try_from(compare_to.get_type())?;
-        let replace_with_id = util::get_var_or_const(&replace_with, bb, func_ctx)?;
+        let replace_with_id = self.get_var_or_const(&replace_with, bb, func_ctx)?;
         let replace_with_typ = LLVMType::try_from(replace_with.get_type())?;
 
         // We then need a place to put the result, which is typed as `{T, i1}`.
@@ -2080,9 +2089,9 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 2))?
         };
-        let pointer_op_id = util::get_var_or_const(&pointer_op, bb, func_ctx)?;
+        let pointer_op_id = self.get_var_or_const(&pointer_op, bb, func_ctx)?;
         let pointer_op_type = LLVMType::try_from(pointer_op.get_type())?;
-        let numeric_op_id = util::get_var_or_const(&numeric_op, bb, func_ctx)?;
+        let numeric_op_id = self.get_var_or_const(&numeric_op, bb, func_ctx)?;
         let numeric_op_type = LLVMType::try_from(numeric_op.get_type())?;
 
         // We then need a variable into which we return the result.
@@ -2128,7 +2137,6 @@ impl ObjectGenerator {
     ///
     /// - If the provided instruction is _not_ a valid `select` instruction.
     /// - If the provided instruction is missing an output name.
-    #[expect(clippy::unused_self)] // For uniformity with the other `generate_*` methods
     fn generate_select(
         &self,
         instruction: InstructionValue,
@@ -2146,9 +2154,9 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 3))?
         };
-        let condition_id = util::get_var_or_const(&condition, bb, func_ctx)?;
-        let if_true_id = util::get_var_or_const(&if_true, bb, func_ctx)?;
-        let if_false_id = util::get_var_or_const(&if_false, bb, func_ctx)?;
+        let condition_id = self.get_var_or_const(&condition, bb, func_ctx)?;
+        let if_true_id = self.get_var_or_const(&if_true, bb, func_ctx)?;
+        let if_false_id = self.get_var_or_const(&if_false, bb, func_ctx)?;
         let return_typ = bb.context.variables.get(if_true_id).typ.clone();
 
         // We also need a return value, which has a type matching that of the `if_true`
@@ -2214,7 +2222,6 @@ impl ObjectGenerator {
     /// # Panics
     ///
     /// - If the provided instruction is _not_ a valid `bitcast` instruction.
-    #[expect(clippy::unused_self)] // For uniformity with the other generate_* methods
     fn generate_bitcast(
         &self,
         instruction: InstructionValue,
@@ -2238,7 +2245,7 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 1))?
         };
-        let source_var_id = util::get_var_or_const(&source_var, bb, func_ctx)?;
+        let source_var_id = self.get_var_or_const(&source_var, bb, func_ctx)?;
 
         // From here, we emit a transmute statement into the block, and register that
         // variable in the function context.
@@ -2329,7 +2336,7 @@ impl ObjectGenerator {
             .get_operands()
             .map(|op| {
                 let bv = util::extract_value_operand(op, instruction.get_opcode())?;
-                let id = util::get_var_or_const(&bv, bb, func_ctx)?;
+                let id = self.get_var_or_const(&bv, bb, func_ctx)?;
                 let typ = LLVMType::try_from(bv.get_type())?;
 
                 Ok((id, typ))
@@ -2403,7 +2410,7 @@ impl ObjectGenerator {
             // We start by resolving the incoming value to an identifier, handling both
             // constants and variables.
             incoming_value_names.push(value.get_name().to_str()?.to_string());
-            incoming_value_ids.push(util::get_var_or_const(&value, bb, func_ctx)?);
+            incoming_value_ids.push(self.get_var_or_const(&value, bb, func_ctx)?);
             incoming_value_types.push(LLVMType::try_from(value.get_type())?);
 
             // We then need to check that we know of the block, and its identifier.
@@ -2578,7 +2585,7 @@ impl ObjectGenerator {
             Err(operand_count_error(&instruction, 1))?
         };
         let source_op_type = LLVMType::try_from(source_op.get_type())?;
-        let source_op_id = util::get_var_or_const(&source_op, bb, func_ctx)?;
+        let source_op_id = self.get_var_or_const(&source_op, bb, func_ctx)?;
 
         // We then need to get the name of the polyfill in question.
         let poly_name = self.polyfills.try_get_polyfill(
@@ -2692,7 +2699,7 @@ impl ObjectGenerator {
         // polyfill. We start with the operands.
         let inputs = operands
             .iter()
-            .map(|operand| util::get_var_or_const(operand, bb, func_ctx))
+            .map(|operand| self.get_var_or_const(operand, bb, func_ctx))
             .collect::<Result<Vec<_>>>()?;
 
         // We then need to get the output variable for this opcode.
@@ -2734,7 +2741,7 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 1))?
         };
-        let input_id = util::get_var_or_const(&operand, bb, func_ctx)?;
+        let input_id = self.get_var_or_const(&operand, bb, func_ctx)?;
         let input_type = LLVMType::try_from(operand.get_type())?;
         let inputs = vec![input_id];
 
@@ -2848,7 +2855,7 @@ impl ObjectGenerator {
         // latter in the context.
         let mut function_inputs = function_arguments
             .iter()
-            .map(|op| util::get_var_or_const(op, bb, func_ctx))
+            .map(|op| self.get_var_or_const(op, bb, func_ctx))
             .collect::<Result<Vec<_>>>()?;
         let output_type_flo = ObjectContext::flo_type_of(&ret_type)?;
         let output_var = bb.add_variable(output_type_flo.clone());
@@ -2906,7 +2913,7 @@ impl ObjectGenerator {
                 //
                 // Note that we ALWAYS dispatch through the global / meta dispatch function, as
                 // this function pointer could have come from anywhere.
-                let func_ptr_var = util::get_var_or_const(function_value, bb, func_ctx)?;
+                let func_ptr_var = self.get_var_or_const(function_value, bb, func_ctx)?;
                 function_inputs.insert(0, func_ptr_var);
 
                 BlockRef::External(ObjectContext::global_dispatch_name_for(&func_type)?)
@@ -3098,7 +3105,7 @@ impl ObjectGenerator {
             })?,
             InstructionOpcode::IndirectBr,
         )?;
-        let pointer_id = util::get_var_or_const(&pointer, bb, func_ctx)?;
+        let pointer_id = self.get_var_or_const(&pointer, bb, func_ctx)?;
 
         // The remaining ones are the potential block labels in the function, which we
         // can instantly turn into variables for comparison against. From the LLVM IR
@@ -3285,7 +3292,7 @@ impl ObjectGenerator {
             InstructionOpcode::Switch,
         )?;
         let compare_to_type = LLVMType::try_from(compare_to.get_type())?;
-        let compare_to_id = util::get_var_or_const(&compare_to, bb, func_ctx)?;
+        let compare_to_id = self.get_var_or_const(&compare_to, bb, func_ctx)?;
 
         // The second, which also MUST exist, is the destination to jump to in the
         // default case (the fallthrough).
@@ -3305,7 +3312,7 @@ impl ObjectGenerator {
                 let &[value, block] = pair else { Err(missing_operands_error())? };
                 let value = util::extract_value_operand(value, InstructionOpcode::Switch)?;
                 let value_type = LLVMType::try_from(value.get_type())?;
-                let value_id = util::get_var_or_const(&value, bb, func_ctx)?;
+                let value_id = self.get_var_or_const(&value, bb, func_ctx)?;
                 let block = util::extract_block_operand(block, InstructionOpcode::Switch)?;
                 let block_id = func_ctx.try_lookup_block(block.get_name().to_str()?)?;
 
@@ -3404,7 +3411,7 @@ impl ObjectGenerator {
                 let expected_return_type = &func_ctx.typ().return_type;
                 assert_eq!(expected_return_type.as_ref(), &value_type);
 
-                vec![util::get_var_or_const(&value, bb, func_ctx)?]
+                vec![self.get_var_or_const(&value, bb, func_ctx)?]
             }
             _ => Err(Error::malformed_llvm(&format!(
                 "Ret instruction had {len} operands where 0 or 1 were expected",
@@ -3465,7 +3472,7 @@ impl ObjectGenerator {
                 let false_block = util::extract_block_operand(operands[2], InstructionOpcode::Br)?;
 
                 // The condition must be an already-extant variable.
-                let cond_id = util::get_var_or_const(&condition, bb, func_ctx)?;
+                let cond_id = self.get_var_or_const(&condition, bb, func_ctx)?;
                 let cond_typ = bb.context.variables.get(cond_id).typ;
                 if !matches!(&cond_typ, Type::Bool) {
                     Err(Error::MalformedLLVM(format!(
@@ -3493,6 +3500,533 @@ impl ObjectGenerator {
                 "Br instruction had {len} operands where 1 or 3 were expected",
                 len = operands.len()
             )))?,
+        }
+    }
+}
+
+/// Constant building methods for the object generator.
+impl ObjectGenerator {
+    /// Returns a variable id that either points to a constant or is the
+    /// variable definition corresponding to the name of the provided
+    /// `value`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    /// - [`Error::UnsupportedType`] if an LLVM vector type is encountered.
+    ///
+    /// # Panics
+    ///
+    /// - If any value is both non-constant and lacking a name.
+    pub fn get_var_or_const(
+        &self,
+        value: &BasicValueEnum,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        // We can always _get_ the name of a value, but in the case where it is an
+        // inline constant this is the empty string.
+        let value_name = value.get_name().to_str()?;
+        let value_type = LLVMType::try_from(value.get_type())?;
+
+        let variable_id = if value_name.is_empty() {
+            // Here, it is truly anonymous, which means we have run into the case where it
+            // is simply an inline constant.
+            self.build_const_into(
+                bb.add_variable(ObjectContext::flo_type_of(&value_type)?),
+                value,
+                bb,
+                func_ctx,
+            )?
+        } else {
+            func_ctx.try_lookup_variable(value_name)?
+        };
+
+        Ok(variable_id)
+    }
+
+    /// Builds the constant `value` into the provided `variable` inside the
+    /// block described by `bb` and the function described by `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Constant Expressions
+    ///
+    /// Though LLVM [specifies](https://llvm.org/docs/LangRef.html#constant-expressions)
+    /// more constant expressions than we have added support for here, this
+    /// [post](https://www.npopov.com/2024/01/01/This-year-in-LLVM-2023.html#constant-expression-removal)
+    /// says that the missing ones are intended to be removed in the future, and
+    /// so we will not support them unless necessary, or are ones we have not
+    /// yet encountered a need for.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    /// - [`Error::UnsupportedType`] if an LLVM vector type is encountered.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    /// - If the provided variable type does not match that expected for the
+    ///   value.
+    #[allow(unreachable_code)]
+    pub fn build_const_into(
+        &self,
+        variable: VariableId,
+        value: &BasicValueEnum,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        // We can always _get_ the name of a value, but in the case where it is an
+        // inline constant this is the empty string.
+        let value_type = LLVMType::try_from(value.get_type())?;
+        let value_type_flo = ObjectContext::flo_type_of(&value_type)?;
+        assert_eq!(
+            bb.context.variables.get(variable).typ,
+            value_type_flo,
+            "The type of variable {variable} did not match the type of the provided value but is \
+             required to."
+        );
+
+        // Each kind of constant expression has to be handled individually.
+        let result = match value {
+            BasicValueEnum::IntValue(int_val) => {
+                self.build_int_const_into(variable, int_val, bb, func_ctx)?
+            }
+            BasicValueEnum::FloatValue(float_val) => {
+                self.build_float_const_into(variable, float_val, bb, func_ctx)?
+            }
+            BasicValueEnum::PointerValue(ptr_val) => {
+                self.build_pointer_const_into(variable, ptr_val, bb, func_ctx)?
+            }
+            BasicValueEnum::ArrayValue(array_val) => {
+                self.build_array_const_into(variable, array_val, bb, func_ctx)?
+            }
+            BasicValueEnum::StructValue(struct_val) => {
+                self.build_struct_const_into(variable, struct_val, bb, func_ctx)?
+            }
+            BasicValueEnum::VectorValue(_) | BasicValueEnum::ScalableVectorValue(_) => Err(
+                Error::unsupported_type("LLVM vector types are not supported"),
+            )?,
+        };
+
+        Ok(result)
+    }
+
+    /// Builds the integer constant `value` into the provided `variable` inside
+    /// the block described by `bb` and the function described by `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    pub fn build_int_const_into(
+        &self,
+        variable: VariableId,
+        value: &IntValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        assert!(
+            value.is_const(),
+            "Unnamed integer value was not a constant: {value:?}"
+        );
+
+        let value_type = LLVMType::try_from(value.get_type())?;
+        let value_type_flo = ObjectContext::flo_type_of(&value_type)?;
+
+        let constant_value = if value.is_poison() | value.is_undef() {
+            // The language ref states that it is correct to replace a poison or undef value
+            // with any value of the correct type, so we default to zero for integers.
+            0
+        } else if value.is_constant_int() {
+            // In this case, it can still, unfortunately, be many
+            // possible constant values, and it is tricky for us to
+            // figure out which.
+            if let Some(constant) = value.get_zero_extended_constant() {
+                u128::from(constant)
+            } else {
+                // Unfortunately LLVM-SYS (and hence Inkwell) only report constant values to 64
+                // bits of precision. We need to be able to work with constant values of the
+                // i128 type, so we are forced to parse them ourselves in this case.
+                let source_text = value.print_to_string().to_string();
+                let parsed_result =
+                    IntegerConstant::parser().parse(source_text.as_str()).map_err(|_| {
+                        Error::MalformedLLVM(format!(
+                            "`{source_text}` is not a valid integer constant"
+                        ))
+                    })?;
+
+                u128::from_le_bytes(parsed_result.value.to_le_bytes())
+            }
+        } else {
+            // In this case, we have an expression that is constant but not a bare constant
+            // integer. Unfortunately, Inkwell does not appear to provide any tools for
+            // processing these, so we have to parse and process them ourselves.
+            let constant_expression_fragment = value.print_to_string().to_string();
+
+            // If the parsing process fails, we have LLVM that is malformed as far as this
+            // compiler is concerned.
+            let constant_expr = ConstantExpression::parser()
+                .parse(constant_expression_fragment.as_str())
+                .map_err(|_| {
+                    Error::MalformedLLVM(format!(
+                        "The expression `{constant_expression_fragment}` is not a valid integer \
+                         constant expression"
+                    ))
+                })?;
+
+            // Once we have the parsed form of the constant expression, we can process it
+            // into the same variable. This is a short path, so we have to return directly
+            // here.
+            return self.build_constant_expression_into(variable, &constant_expr, bb, func_ctx);
+        };
+
+        // Unfortunately our constants from LLVM are not always in the format that we
+        // need, so we have to be careful to retain the correct bits after conversion.
+        //
+        // Casting between a signed and unsigned number of the same size is a no-op, and
+        // casting from a smaller unsigned number to a larger unsigned number causes
+        // zero extension.
+        //
+        // See: https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics
+        let flo_const = ConstantValue {
+            value: constant_value,
+            typ:   value_type_flo,
+        };
+        bb.simple_assign_const(variable, flo_const);
+
+        Ok(variable)
+    }
+
+    /// Builds the floating-point constant `value` into the provided `variable`
+    /// inside the block described by `bb` and the function described by
+    /// `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    pub fn build_float_const_into(
+        &self,
+        variable: VariableId,
+        value: &FloatValue,
+        bb: &mut BlockBuilder,
+        _func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        assert!(
+            value.is_const(),
+            "Unnamed floating-point value was not a constant: {value:?}"
+        );
+
+        let value_type = LLVMType::try_from(value.get_type())?;
+        let value_type_flo = ObjectContext::flo_type_of(&value_type)?;
+
+        // Unfortunately, we do not natively support FP constants in FLO, so we have to
+        // represent the _bits_ of the float inside our constant value. This behavior
+        // is safe as we construct the value with the same bytes as the float, and then
+        // use the above-mentioned zero-extension to fit it into the u128.
+        //
+        // The language ref says that it is safe to replace a poison with any value of
+        // any type, so we default to zero.
+        let const_value = if value.is_poison() || value.is_undef() {
+            0
+        } else {
+            let (const_float, _) = value.get_constant().expect(
+                "Floating-point value already known to be a constant had no constant value",
+            );
+
+            u128::from(u64::from_le_bytes(const_float.to_le_bytes()))
+        };
+        let flo_const = ConstantValue {
+            value: const_value,
+            typ:   value_type_flo.clone(),
+        };
+
+        bb.assign_const(variable, flo_const, Vec::new(), None);
+
+        Ok(variable)
+    }
+
+    /// Builds the pointer constant `value` into the provided `variable` inside
+    /// the block described by `bb` and the function described by `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    pub fn build_pointer_const_into(
+        &self,
+        variable: VariableId,
+        value: &PointerValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        assert!(
+            value.is_const(),
+            "Unnamed pointer value was not a constant: {value:?}"
+        );
+
+        let value_name = value.get_name().to_str()?;
+
+        if value.is_poison() || value.is_undef() || value.is_null() {
+            // In the case that it is a poison value, we can set it to any pointer. We
+            // choose the null block for this module.
+            bb.simple_get_block_address(variable, func_ctx.poison_block());
+
+            Ok(variable)
+        } else if let Some(const_ptr) = func_ctx.lookup_variable(value_name) {
+            // Sometimes we can actually look these things up, so we try that.
+            Ok(const_ptr)
+        } else {
+            // In this case we have a constant pointer that is some kind of constant
+            // expression. Unfortunately, Inkwell does not appear to provide any tools for
+            // processing these, so we have to parse and process them ourselves.
+            let constant_expression_fragment = value.print_to_string().to_string();
+
+            // If the parsing process fails, we have LLVM that is malformed as far as this
+            // compiler is concerned.
+            let constant_expr = ConstantExpression::parser()
+                .parse(constant_expression_fragment.as_str())
+                .map_err(|_| {
+                    Error::MalformedLLVM(format!(
+                        "The expression `{constant_expression_fragment}` is not a valid pointer \
+                         constant expression"
+                    ))
+                })?;
+
+            // Once we have the parsed form of the constant expression, we can process it
+            // into the same variable.
+            self.build_constant_expression_into(variable, &constant_expr, bb, func_ctx)
+        }
+    }
+
+    /// Builds the array constant `value` into the provided `variable` inside
+    /// the block described by `bb` and the function described by `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    pub fn build_array_const_into(
+        &self,
+        variable: VariableId,
+        value: &ArrayValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        assert!(
+            value.is_const(),
+            "Unnamed array value was not a constant {value:?}"
+        );
+
+        let constant_arguments =
+            util::extract_constant_aggregate_values(&value.as_basic_value_enum())?;
+        let constant_ids = constant_arguments
+            .iter()
+            .map(|c| self.get_var_or_const(c, bb, func_ctx))
+            .collect::<Result<Vec<_>>>()?;
+
+        bb.construct(variable, constant_ids, Vec::new(), None);
+
+        Ok(variable)
+    }
+
+    /// Builds the struct constant `value` into the provided `variable` inside
+    /// the block described by `bb` and the function described by `func_ctx`.
+    ///
+    /// It returns a [`VariableId`]. This may be the same as the provided
+    /// `variable`, but may otherwise be replaced with another one. The caller
+    /// should _always_ use the returned variable.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if the variable referenced by `value` is not
+    ///   defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If the provided `value` is not a valid constant.
+    pub fn build_struct_const_into(
+        &self,
+        variable: VariableId,
+        value: &StructValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        assert!(
+            value.is_const(),
+            "Unnamed structure value was not a constant {value:?}"
+        );
+
+        let constant_arguments =
+            util::extract_constant_aggregate_values(&value.as_basic_value_enum())?;
+        let constant_ids = constant_arguments
+            .iter()
+            .map(|c| self.get_var_or_const(c, bb, func_ctx))
+            .collect::<Result<Vec<_>>>()?;
+
+        bb.construct(variable, constant_ids, Vec::new(), None);
+
+        Ok(variable)
+    }
+
+    /// Processes the provided constant `expression` into a program fragment in
+    /// FLO.
+    ///
+    /// It returns an optional [`VariableId`]. If set, this indicates that the
+    /// input `variable` should instead be replaced by the returned variable.
+    ///
+    /// Note that we do not process these expressions at compile time for now,
+    /// instead generating runtime code for them. This makes it easier to
+    /// interface with the Hieratika memory model correctly.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MalformedLLVM`] if any variable referenced by the
+    ///   `expression` is not defined before its usage.
+    pub fn build_constant_expression_into(
+        &self,
+        variable: VariableId,
+        expression: &ConstantExpression,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<VariableId> {
+        // The builder process is different based on the kind of constant expression we
+        // see. We can process indiscriminately as the correctness of the expression's
+        // usage has already been verified by the LLVM parser and type checker itself.
+        match expression {
+            ConstantExpression::Name(name) => {
+                // Here we have a name directly, which we can just return a replacement variable
+                // from.
+                Ok(func_ctx.try_lookup_variable(name)?)
+            }
+            ConstantExpression::Integer(integer) => {
+                // An integer constant can be trivially turned into a constant value in FLO.
+                let flo_const = ConstantValue {
+                    value: u128::from_le_bytes(integer.value.to_le_bytes()),
+                    typ:   ObjectContext::flo_type_of(&integer.underlying_type)?,
+                };
+                bb.simple_assign_const(variable, flo_const);
+
+                Ok(variable)
+            }
+            ConstantExpression::PtrToInt(ptr_to_int) => {
+                // These are a bit more complex as they may be recursive. We start by processing
+                // any constant expression children of the ptrtoint expression.
+                let pointer_var = self.build_constant_expression_into(
+                    bb.add_variable(Type::Pointer),
+                    ptr_to_int.pointer.as_ref(),
+                    bb,
+                    func_ctx,
+                )?;
+
+                // At this point, we have the variable to feed to the expression, but we need to
+                // actually call the function, and we put its output directly into the provided
+                // variable.
+                let function_name = self.polyfills.try_get_polyfill(
+                    "ptrtoint",
+                    &[LLVMType::ptr],
+                    &ptr_to_int.int_type,
+                )?;
+                bb.simple_call_builtin(function_name, vec![pointer_var], vec![variable]);
+
+                Ok(variable)
+            }
+            ConstantExpression::IntToPtr(int_to_ptr) => {
+                // These, too, are possibly recursive, so we start by processing any constant
+                // expression children of the inttoptr expression.
+                let integer_var = self.build_constant_expression_into(
+                    bb.add_variable(ObjectContext::flo_type_of(&int_to_ptr.int_type)?),
+                    int_to_ptr.integer.as_ref(),
+                    bb,
+                    func_ctx,
+                )?;
+
+                // We now have the variable to feed to the expression, but we need to actually
+                // call the function performing the operation.
+                let function_name = self.polyfills.try_get_polyfill(
+                    "inttoptr",
+                    &[int_to_ptr.int_type.clone()],
+                    &LLVMType::ptr,
+                )?;
+                bb.simple_call_builtin(function_name, vec![integer_var], vec![variable]);
+
+                Ok(variable)
+            }
+            ConstantExpression::Blockaddress(block_addr) => {
+                // If we have a blockaddress constant expression, we have both the name of the
+                // function in which the block occurs, and the name of the block IN that
+                // function from which the address is generated.
+                //
+                // In accordance with LLVM, we assume that:
+                //
+                // 1. The function exists in the current translation unit (and is hence
+                //    available in the context).
+                // 2. The block name refers to a valid block within the specified function.
+                //
+                // If either of these conditions do not hold, we issue a malformed LLVM error.
+                let target_function_blocks = func_ctx
+                    .module_blocks()
+                    .get(&block_addr.function_name)
+                    .ok_or_else(|| {
+                        Error::MalformedLLVM(format!(
+                            "blockaddress constant attempted to look up a block in non-local \
+                             function {}",
+                            &block_addr.function_name
+                        ))
+                    })?;
+
+                let block_id = target_function_blocks
+                    .get_by_left(&block_addr.block_ref)
+                    .ok_or_else(|| {
+                        Error::MalformedLLVM(format!(
+                            "blockaddress constant attempted to look up an unknown block {} in \
+                             function {}",
+                            &block_addr.block_ref, &block_addr.function_name
+                        ))
+                    })?;
+
+                bb.simple_get_block_address(variable, *block_id);
+
+                Ok(variable)
+            }
         }
     }
 }

@@ -133,7 +133,7 @@
 
           shellHook = ''
             mkdir -p "$rustTestInputsDest"
-            cp -r "$rustTestInputs"/* "$rustTestInputsDest"
+            cp -r --no-preserve=mode "$rustTestInputs"/* "$rustTestInputsDest"
 
             exec $(${getUserShellCommand})
           '';

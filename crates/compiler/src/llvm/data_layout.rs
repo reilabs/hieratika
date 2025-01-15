@@ -11,20 +11,23 @@ use hieratika_errors::{
     compile::llvm::{Error, Result},
 };
 
-use crate::constant::{
-    BYTE_SIZE_BITS,
-    DEFAULT_FLOAT_16_LAYOUT,
-    DEFAULT_FLOAT_32_LAYOUT,
-    DEFAULT_FLOAT_64_LAYOUT,
-    DEFAULT_FLOAT_128_LAYOUT,
-    DEFAULT_INTEGER_1_LAYOUT,
-    DEFAULT_INTEGER_8_LAYOUT,
-    DEFAULT_INTEGER_16_LAYOUT,
-    DEFAULT_INTEGER_32_LAYOUT,
-    DEFAULT_INTEGER_64_LAYOUT,
-    DEFAULT_POINTER_0_LAYOUT,
-    DEFAULT_VECTOR_64_LAYOUT,
-    DEFAULT_VECTOR_128_LAYOUT,
+use crate::{
+    constant::{
+        BYTE_SIZE_BITS,
+        DEFAULT_FLOAT_16_LAYOUT,
+        DEFAULT_FLOAT_32_LAYOUT,
+        DEFAULT_FLOAT_64_LAYOUT,
+        DEFAULT_FLOAT_128_LAYOUT,
+        DEFAULT_INTEGER_1_LAYOUT,
+        DEFAULT_INTEGER_8_LAYOUT,
+        DEFAULT_INTEGER_16_LAYOUT,
+        DEFAULT_INTEGER_32_LAYOUT,
+        DEFAULT_INTEGER_64_LAYOUT,
+        DEFAULT_POINTER_0_LAYOUT,
+        DEFAULT_VECTOR_64_LAYOUT,
+        DEFAULT_VECTOR_128_LAYOUT,
+    },
+    parser::number::positive_integer,
 };
 
 /// Information about the expected data-layout for this module.
@@ -450,11 +453,11 @@ impl PointerLayout {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<PointerLayout> {
         just("p")
-            .ignore_then(parsing::pos_int(10).delimited_by(just("["), just("]")).or_not())
-            .then(parsing::field(parsing::pos_int(10)))
-            .then(parsing::field(parsing::pos_int(10)))
-            .then(parsing::field(parsing::pos_int(10)).or_not())
-            .then(parsing::field(parsing::pos_int(10)).or_not())
+            .ignore_then(positive_integer(10).delimited_by(just("["), just("]")).or_not())
+            .then(parsing::field(positive_integer(10)))
+            .then(parsing::field(positive_integer(10)))
+            .then(parsing::field(positive_integer(10)).or_not())
+            .then(parsing::field(positive_integer(10)).or_not())
             .try_map(
                 |((((address_space, size), abi_alignment), preferred_alignment), index_size),
                  span| {
@@ -502,9 +505,9 @@ impl IntegerLayout {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<IntegerLayout> {
         just("i")
-            .ignore_then(parsing::pos_int(10))
-            .then(parsing::field(parsing::pos_int(10)))
-            .then(parsing::field(parsing::pos_int(10)).or_not())
+            .ignore_then(positive_integer(10))
+            .then(parsing::field(positive_integer(10)))
+            .then(parsing::field(positive_integer(10)).or_not())
             .try_map(|((size, abi_alignment), preferred_alignment), span| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
                 if size == BYTE_SIZE_BITS && abi_alignment != size {
@@ -542,9 +545,9 @@ impl VectorLayout {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<VectorLayout> {
         just("v")
-            .ignore_then(parsing::pos_int(10))
-            .then(parsing::field(parsing::pos_int(10)))
-            .then(parsing::field(parsing::pos_int(10)).or_not())
+            .ignore_then(positive_integer(10))
+            .then(parsing::field(positive_integer(10)))
+            .then(parsing::field(positive_integer(10)).or_not())
             .map(|((size, abi_alignment), preferred_alignment)| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
 
@@ -576,9 +579,9 @@ impl FloatLayout {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<FloatLayout> {
         just("f")
-            .ignore_then(parsing::pos_int(10))
-            .then(parsing::field(parsing::pos_int(10)))
-            .then(parsing::field(parsing::pos_int(10)).or_not())
+            .ignore_then(positive_integer(10))
+            .then(parsing::field(positive_integer(10)))
+            .then(parsing::field(positive_integer(10)).or_not())
             .try_map(|((size, abi_alignment), preferred_alignment), span| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
                 if !&[16, 32, 64, 80, 128].contains(&size) {
@@ -613,8 +616,8 @@ impl AggregateLayout {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<AggregateLayout> {
         just("a")
-            .ignore_then(parsing::pos_int(10))
-            .then(parsing::field(parsing::pos_int(10)).or_not())
+            .ignore_then(positive_integer(10))
+            .then(parsing::field(positive_integer(10)).or_not())
             .map(|(abi_alignment, preferred_alignment)| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
 
@@ -668,7 +671,7 @@ impl FunctionPointerLayout {
     pub fn parser() -> impl parsing::DLParser<FunctionPointerLayout> {
         just("F")
             .ignore_then(FunctionPointerType::parser())
-            .then(parsing::pos_int(10))
+            .then(positive_integer(10))
             .map(|(ptr_type, abi_alignment)| Self {
                 ptr_type,
                 abi_alignment,
@@ -690,8 +693,8 @@ impl NativeIntegerWidths {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<NativeIntegerWidths> {
         just("n")
-            .ignore_then(parsing::pos_int(10))
-            .then(parsing::field(parsing::pos_int(10)).repeated())
+            .ignore_then(positive_integer(10))
+            .then(parsing::field(positive_integer(10)).repeated())
             .map(|(first, mut rest)| {
                 rest.insert(0, first);
                 Self { widths: rest }
@@ -713,7 +716,7 @@ impl NonIntegralPointerAddressSpaces {
     #[must_use]
     pub fn parser() -> impl parsing::DLParser<NonIntegralPointerAddressSpaces> {
         just("ni")
-            .ignore_then(parsing::field(parsing::pos_int(10)).repeated().at_least(1))
+            .ignore_then(parsing::field(positive_integer(10)).repeated().at_least(1))
             .try_map(|address_spaces, span| {
                 if address_spaces.contains(&0) {
                     Err(Simple::custom(
@@ -730,9 +733,9 @@ impl NonIntegralPointerAddressSpaces {
 /// Utility parsing functions to aid in the parsing of data-layouts but that are
 /// not associated directly with any type.
 pub mod parsing {
-    use chumsky::{Parser, error::Simple, prelude::just, text::int};
+    use chumsky::{Parser, error::Simple, prelude::just};
 
-    use crate::{constant::BYTE_SIZE_BITS, llvm::data_layout::parsing};
+    use crate::{constant::BYTE_SIZE_BITS, parser::number::positive_integer};
 
     /// Simply to avoid typing out the whole parser type parameter specification
     /// every single time given it only varies in one parameter.
@@ -759,33 +762,25 @@ pub mod parsing {
         field_sep().ignore_then(then)
     }
 
-    /// Parses a positive integer in the specified `radix`.
-    #[must_use]
-    pub fn pos_int(radix: u32) -> impl DLParser<usize> {
-        int(radix).try_map(|num: String, span| {
-            num.parse::<usize>().map_err(|_| {
-                Simple::custom(span, format!("Could not parse {num} as a positive integer"))
-            })
-        })
-    }
-
     /// Parses the stack alignment specification part of the data-layout.
     #[must_use]
     pub fn stack_alignment() -> impl DLParser<usize> {
-        just("S").ignore_then(pos_int(10)).validate(|alignment, span, emit| {
-            if alignment % BYTE_SIZE_BITS != 0 {
-                emit(Simple::custom(
-                    span,
-                    format!("{alignment} must be aligned to a byte offset"),
-                ));
-            }
-            alignment
-        })
+        just("S")
+            .ignore_then(positive_integer(10))
+            .validate(|alignment, span, emit| {
+                if alignment % BYTE_SIZE_BITS != 0 {
+                    emit(Simple::custom(
+                        span,
+                        format!("{alignment} must be aligned to a byte offset"),
+                    ));
+                }
+                alignment
+            })
     }
 
     /// Parses the address space specification part of the data-layout.
     fn address_space(space: &str) -> impl DLParser<usize> + '_ {
-        just(space).ignore_then(parsing::pos_int(10))
+        just(space).ignore_then(positive_integer(10))
     }
 
     #[must_use]
