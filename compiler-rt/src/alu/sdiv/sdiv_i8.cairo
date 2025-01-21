@@ -268,7 +268,7 @@ mod tests {
         TestCaseTwoArgs{lhs: 0b11101000, rhs: 0b10011110, expected: 0}, // lhs = -24 rhs = -98
         TestCaseTwoArgs{lhs: 0b11100111, rhs: 53, expected: 0b11111111}, // lhs = -25 expected = -1
         TestCaseTwoArgs{lhs: 14, rhs: 0b10111001, expected: 0b11111111}, // rhs = -71 expected = -1
-       
+
         // Edge cases
         TestCaseTwoArgs{lhs: 0, rhs: 127, expected: 0},
         TestCaseTwoArgs{lhs: 0, rhs: 0b10000000, expected: 0}, // rhs = -128

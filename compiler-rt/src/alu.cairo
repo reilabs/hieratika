@@ -25,5 +25,6 @@ pub mod smul_with_overflow;
 pub mod udiv;
 pub mod sdiv;
 pub mod urem;
+pub mod srem;
 
 mod test_case;
