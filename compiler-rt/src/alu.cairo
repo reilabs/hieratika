@@ -27,5 +27,6 @@ pub mod sdiv;
 pub mod urem;
 pub mod srem;
 pub mod abs;
+pub mod ashr;
 
 mod test_case;
