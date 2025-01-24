@@ -1,7 +1,8 @@
 pub mod sdiv_i8;
 
-use crate::utils::assert_fits_in_type;
+use crate::utils::{assert_fits_in_type, negate_twos_complement};
 use crate::alu::shl::shl;
+use crate::alu::abs::abs;
 use core::num::traits::{BitSize, Bounded, WrappingAdd};
 
 // Perform signed division of integers. Return quotient and remainder.
@@ -36,22 +37,9 @@ pub fn divide_with_remainder_signed<
     let is_divisor_negative = (rhs & sign_mask) != 0;
     let is_quotient_negative = is_dividend_negative ^ is_divisor_negative;
 
-    // A helper function to compute two's complement
-    let twos_complement = |x: u128| -> u128 {
-        (~x).wrapping_add(1)
-    };
-
     // Get absolute value of operands
-    let abs_dividend = if is_dividend_negative {
-        twos_complement(lhs) & Bounded::<T>::MAX.into()
-    } else {
-        lhs
-    };
-    let abs_divisor = if is_divisor_negative {
-        twos_complement(rhs) & Bounded::<T>::MAX.into()
-    } else {
-        rhs
-    };
+    let abs_dividend = abs::<T>(lhs);
+    let abs_divisor = abs::<T>(rhs);
 
     // Perform unsigned division and get quotient and remainder.
     // Adjust quotient for floor division if result is negative and there's a remainder.
@@ -65,12 +53,12 @@ pub fn divide_with_remainder_signed<
 
     // Apply sign to the quotient and the remainder
     let quotient = if is_quotient_negative {
-        twos_complement(quotient_unsigned)
+        negate_twos_complement(quotient_unsigned)
     } else {
         quotient_unsigned
     };
     let remainder = if is_divisor_negative && remainder != 0 {
-        twos_complement(remainder)
+        negate_twos_complement(remainder)
     } else {
         remainder
     };

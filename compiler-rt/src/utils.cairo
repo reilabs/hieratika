@@ -1,4 +1,4 @@
-use core::num::traits::BitSize;
+use core::num::traits::{BitSize, WrappingAdd};
 
 // Indicated the direction of overflow in polyfills implementing arithmetic operations that can
 // overflow.
@@ -42,4 +42,10 @@ pub fn assert_fits_in_type<
     v: u128,
 ) {
     expect_into::<T>(v);
+}
+
+// Negates the given value using two's complement representation.
+#[inline]
+pub fn negate_twos_complement(value: u128) -> u128 {
+    (~value).wrapping_add(1)
 }
