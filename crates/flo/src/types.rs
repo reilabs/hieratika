@@ -394,7 +394,7 @@ pub struct GetBlockAddressStatement {
 
     /// The local block identifier to relocate as a global identifier during
     /// linking.
-    pub block: BlockId,
+    pub block: BlockRef,
 
     /// Any diagnostics associated with this statement.
     pub diagnostics: Vec<DiagnosticId>,

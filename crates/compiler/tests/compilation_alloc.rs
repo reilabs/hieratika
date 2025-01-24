@@ -9,12 +9,11 @@ fn compiles_alloc() -> miette::Result<()> {
 
     // Currently known to fail due to missing features and bugs.
 
-    // let compiler =
-    // common::default_compiler_from_path("input/compilation/alloc.ll")?;
-    // let flo = compiler.run()?;
-    //
-    // // There should be a single function in the context.
-    // assert_eq!(common::count_functions(&flo, false), 1);
+    let compiler = common::default_compiler_from_path("input/compilation/alloc.ll")?;
+    let flo = compiler.run()?;
+
+    // There should be a single function in the context.
+    assert_eq!(common::count_functions(&flo, false), 778);
 
     Ok(())
 }

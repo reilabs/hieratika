@@ -877,11 +877,11 @@ impl BlockBuilder<'_> {
     ///
     /// * `target_var` - The SSA variable of type `ptr` into which the `block`
     ///   identifier will be relocated.
-    /// * `block` - The identifier of the block to relocate.
+    /// * `block` - The reference to the block to relocate.
     pub fn get_block_address(
         &mut self,
         target_var: VariableId,
-        block: BlockId,
+        block: BlockRef,
         diagnostics: Vec<DiagnosticId>,
         location: Option<LocationId>,
     ) -> StatementId {
@@ -895,21 +895,22 @@ impl BlockBuilder<'_> {
         self.add_statement(&Statement::GetBlockAddress(statement))
     }
 
-    /// Adds a statement that relocates the provided `block` identifier into a
-    /// new variable.
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
     ///
     /// # Arguments
     ///
-    /// * `block` - The identifier of the block to relocate.
-    pub fn get_new_block_address(
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The reference to the block to relocate.
+    pub fn get_internal_block_address(
         &mut self,
+        target_var: VariableId,
         block: BlockId,
         diagnostics: Vec<DiagnosticId>,
         location: Option<LocationId>,
-    ) -> VariableId {
-        let target_var = self.add_variable(Type::Pointer);
-        self.get_block_address(target_var, block, diagnostics, location);
-        target_var
+    ) -> StatementId {
+        self.get_block_address(target_var, BlockRef::Local(block), diagnostics, location)
     }
 
     /// Adds a statement that relocates the provided `block` identifier into the
@@ -919,13 +920,20 @@ impl BlockBuilder<'_> {
     ///
     /// * `target_var` - The SSA variable of type `ptr` into which the `block`
     ///   identifier will be relocated.
-    /// * `block` - The identifier of the block to relocate.
-    pub fn simple_get_block_address(
+    /// * `block` - The reference to the block to relocate.
+    pub fn get_external_block_address(
         &mut self,
         target_var: VariableId,
-        block: BlockId,
+        block_name: &str,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
     ) -> StatementId {
-        self.get_block_address(target_var, block, vec![], None)
+        self.get_block_address(
+            target_var,
+            BlockRef::External(block_name.into()),
+            diagnostics,
+            location,
+        )
     }
 
     /// Adds a statement that relocates the provided `block` identifier into a
@@ -933,9 +941,124 @@ impl BlockBuilder<'_> {
     ///
     /// # Arguments
     ///
-    /// * `block` - The identifier of the block to relocate.
-    pub fn simple_get_new_block_address(&mut self, block: BlockId) -> VariableId {
+    /// * `block` - The reference to the block to relocate.
+    pub fn get_new_block_address(
+        &mut self,
+        block: BlockRef,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        let target_var = self.add_variable(Type::Pointer);
+        self.get_block_address(target_var, block, diagnostics, location);
+        target_var
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The reference to the block to relocate.
+    pub fn get_new_internal_block_address(
+        &mut self,
+        block: BlockId,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        self.get_new_block_address(BlockRef::Local(block), diagnostics, location)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The reference to the block to relocate.
+    pub fn get_new_external_block_address(
+        &mut self,
+        block_name: &str,
+        diagnostics: Vec<DiagnosticId>,
+        location: Option<LocationId>,
+    ) -> VariableId {
+        self.get_new_block_address(BlockRef::External(block_name.into()), diagnostics, location)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_block_address(
+        &mut self,
+        target_var: VariableId,
+        block: BlockRef,
+    ) -> StatementId {
+        self.get_block_address(target_var, block, vec![], None)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_internal_block_address(
+        &mut self,
+        target_var: VariableId,
+        block: BlockId,
+    ) -> StatementId {
+        self.simple_get_block_address(target_var, BlockRef::Local(block))
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into the
+    /// specified `target_var`.
+    ///
+    /// # Arguments
+    ///
+    /// * `target_var` - The SSA variable of type `ptr` into which the `block`
+    ///   identifier will be relocated.
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_external_block_address(
+        &mut self,
+        target_var: VariableId,
+        block_name: &str,
+    ) -> StatementId {
+        self.simple_get_block_address(target_var, BlockRef::External(block_name.into()))
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_new_block_address(&mut self, block: BlockRef) -> VariableId {
         self.get_new_block_address(block, Vec::new(), None)
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_new_internal_block_address(&mut self, block: BlockId) -> VariableId {
+        self.simple_get_new_block_address(BlockRef::Local(block))
+    }
+
+    /// Adds a statement that relocates the provided `block` identifier into a
+    /// new variable.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The reference to the block to relocate.
+    pub fn simple_get_new_external_block_address(&mut self, block_name: &str) -> StatementId {
+        self.simple_get_new_block_address(BlockRef::External(block_name.into()))
     }
 }
 
