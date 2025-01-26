@@ -2,6 +2,7 @@ pub mod and;
 pub mod or;
 pub mod xor;
 pub mod shl;
+pub mod ushl_sat;
 pub mod lshr;
 pub mod fshl;
 pub mod fshr;
