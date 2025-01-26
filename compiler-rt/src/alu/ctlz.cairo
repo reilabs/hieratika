@@ -14,7 +14,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the ctlz/ctlz_<type>.cairo files.
-fn ctlz<
+pub fn ctlz<
     T,
     // The trait bounds are chosen so that:
     //
