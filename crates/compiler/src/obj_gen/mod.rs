@@ -370,8 +370,13 @@ impl ObjectGenerator {
     ///
     /// - [`Error`], if the function pointer variable cannot be generated for
     ///   any reason.
+    ///
+    /// # Panics
+    ///
+    /// - If a function is known to be internal in the module map but has no
+    ///   associated block in the Object Map.
     pub fn generate_function_pointer_vars(&self, data: &mut ObjectContext) -> Result<()> {
-        for (function_name, block_id) in data.map.module_functions.clone() {
+        for (function_name, function_data) in &self.get_module_map().functions {
             // We start by creating a variable to represent the function pointer, which is
             // unconditionally set to be local as these are synthetic constructs.
             let function_pointer_var = Variable {
@@ -387,7 +392,9 @@ impl ObjectGenerator {
 
             // We can then insert this variable in to the object map as a
             // global, which is a not-inaccurate way to think about it.
-            data.map.module_globals.insert(function_name, function_pointer);
+            data.map
+                .module_globals
+                .insert(function_name.clone(), function_pointer);
 
             // This is not sufficient, however, as we also need to _initialize_
             // this variable to a sensible function pointer representation.
@@ -409,7 +416,18 @@ impl ObjectGenerator {
                 // We use the blockaddress mechanism that already exists here to mark it as
                 // relocatable, writing it into the already-declared variable for the function
                 // pointer.
-                bb.simple_get_block_address(function_pointer, block_id);
+                match function_data.kind {
+                    TopLevelEntryKind::Definition => {
+                        let block_id =
+                            data.map.module_functions.get(function_name).unwrap_or_else(|| {
+                                panic!("No block found for local function {function_name}")
+                            });
+                        bb.simple_get_internal_block_address(function_pointer, *block_id);
+                    }
+                    TopLevelEntryKind::Declaration => {
+                        bb.simple_get_external_block_address(function_pointer, function_name);
+                    }
+                }
 
                 // All that is left to do is return nothing from the initializer.
                 bb.end_with_return(Vec::new());
@@ -3800,7 +3818,7 @@ impl ObjectGenerator {
         if value.is_poison() || value.is_undef() || value.is_null() {
             // In the case that it is a poison value, we can set it to any pointer. We
             // choose the null block for this module.
-            bb.simple_get_block_address(variable, func_ctx.poison_block());
+            bb.simple_get_internal_block_address(variable, func_ctx.poison_block());
 
             Ok(variable)
         } else if let Some(const_ptr) = func_ctx.lookup_variable(value_name) {
@@ -4023,7 +4041,7 @@ impl ObjectGenerator {
                         ))
                     })?;
 
-                bb.simple_get_block_address(variable, *block_id);
+                bb.simple_get_internal_block_address(variable, *block_id);
 
                 Ok(variable)
             }

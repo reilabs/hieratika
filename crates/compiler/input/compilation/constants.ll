@@ -9,9 +9,12 @@ target triple = "riscv64"
 @function_pointer_const = constant ptr @hieratika_test_reference_const
 @function_pointer_const_in_struct = constant { i1, ptr } { i1 0, ptr @hieratika_test_reference_const }
 
+declare i64 @test_external_function()
+
 define i64 @hieratika_test_call_function_ptr() unnamed_addr {
 start:
   %result = call i64 @function_pointer_const()
+  %result2 = call i64 @test_external_function()
   ret i64 %result
 }
 

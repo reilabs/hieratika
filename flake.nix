@@ -127,14 +127,9 @@
           LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratika;
           packages = devshellPackages;
-
-          rustTestInputs = test-inputs;
-          rustTestInputsDest = "crates/compiler/input/compilation";
+          RUST_TEST_INPUTS = test-inputs;
 
           shellHook = ''
-            mkdir -p "$rustTestInputsDest"
-            cp -r --no-preserve=mode "$rustTestInputs"/* "$rustTestInputsDest"
-
             exec $(${getUserShellCommand})
           '';
         };
@@ -143,6 +138,7 @@
           LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratikaUnstable;
           packages = devshellPackages;
+
           shellHook = ''
             exec $(${getUserShellCommand})
           '';
@@ -153,6 +149,7 @@
           LLVM_SYS_191_PREFIX = "${pkgs.lib.getDev pkgs.llvmPackages_19.libllvm}";
           inputsFrom = lib.attrValues hieratika;
           packages = devshellPackages;
+          RUST_TEST_INPUTS = test-inputs;
         };
       }
     );
