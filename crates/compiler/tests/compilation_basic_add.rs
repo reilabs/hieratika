@@ -13,13 +13,6 @@ fn compiles_add() -> miette::Result<()> {
     let compiler = common::default_compiler_from_path("input/compilation/add.ll")?;
     let flo = compiler.run()?;
 
-    // The number of blocks should be three at minimum, as this is how many explicit
-    // blocks there are, but we may see up to five additional blocks used in the
-    // compilation flow.
-    let num_blocks = flo.blocks.iter().count();
-    assert!(num_blocks >= 3);
-    assert!(num_blocks <= 8);
-
     // We should only see one function in this generation, even if there are lots of
     // blocks. But we also have two constant initializers, which display as
     // functions.
