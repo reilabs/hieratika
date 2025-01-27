@@ -12,6 +12,7 @@
 
 pub mod backtrace;
 pub mod compile;
+pub mod mangle;
 
 use thiserror::Error;
 
@@ -28,9 +29,15 @@ pub type Result<T> = miette::Result<T, WithBacktrace<Error>>;
 /// _truly_ public interface of this library should return this error type.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Errors in the compilation of cairo code to FLO.
+    #[error(transparent)]
+    CairoCompile(#[from] compile::cairo::Error),
+
+    /// Errors in the compilation of LLVM code to FLO.
     #[error(transparent)]
     LLVMCompile(#[from] compile::llvm::Error),
 
+    /// Errors in the mangling or de-mangling of names.
     #[error(transparent)]
-    CairoCompile(#[from] compile::cairo::Error),
+    Mangle(#[from] mangle::Error),
 }

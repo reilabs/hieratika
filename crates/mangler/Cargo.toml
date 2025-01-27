@@ -1,0 +1,20 @@
+[package]
+name = "hieratika-mangler"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+authors.workspace = true
+description = "A crate implementing the Hieratika internal mangling scheme."
+keywords.workspace = true
+categories.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hieratika-errors.workspace = true
+hieratika-flo.workspace = true
+
+[dev-dependencies]
