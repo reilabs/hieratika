@@ -351,28 +351,9 @@ impl Display for LLVMType {
             LLVMType::ptr => "ptr".to_string(),
             LLVMType::void => "void".to_string(),
             LLVMType::Metadata => "metadata".to_string(),
-            LLVMType::Array(LLVMArray { count, typ }) => {
-                let ty_str = typ.to_string();
-                format!("[{ty_str}; {count}]")
-            }
-            LLVMType::Structure(LLVMStruct { packed, elements }) => {
-                let elem_strs = elements.iter().map(std::string::ToString::to_string).join(", ");
-                if *packed {
-                    format!("<{{ {elem_strs} }}>")
-                } else {
-                    format!("{{ {elem_strs} }}")
-                }
-            }
-            LLVMType::Function(LLVMFunction {
-                return_type,
-                parameter_types,
-            }) => {
-                let params_string = parameter_types
-                    .iter()
-                    .map(std::string::ToString::to_string)
-                    .join(", ");
-                format!("({params_string}) -> {return_type}")
-            }
+            LLVMType::Array(array_type) => array_type.to_string(),
+            LLVMType::Structure(struct_type) => struct_type.to_string(),
+            LLVMType::Function(function_type) => function_type.to_string(),
         };
 
         write!(f, "{result}")
@@ -698,6 +679,14 @@ impl LLVMArray {
     }
 }
 
+impl Display for LLVMArray {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let ty_str = self.typ.to_string();
+        let count = self.count;
+        write!(f, "[{ty_str}; {count}]")
+    }
+}
+
 impl From<LLVMArray> for LLVMType {
     fn from(value: LLVMArray) -> Self {
         LLVMType::from(&value)
@@ -901,6 +890,17 @@ impl LLVMStruct {
     }
 }
 
+impl Display for LLVMStruct {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let elem_strs = self.elements.iter().map(std::string::ToString::to_string).join(", ");
+        if self.packed {
+            write!(f, "<{{ {elem_strs} }}>")
+        } else {
+            write!(f, "{{ {elem_strs} }}")
+        }
+    }
+}
+
 impl From<LLVMStruct> for LLVMType {
     fn from(value: LLVMStruct) -> Self {
         LLVMType::from(&value)
@@ -990,6 +990,18 @@ impl LLVMFunction {
     #[must_use]
     pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
         self.return_type.align_of(align_type, data_layout)
+    }
+}
+
+impl Display for LLVMFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let params_string = self
+            .parameter_types
+            .iter()
+            .map(std::string::ToString::to_string)
+            .join(", ");
+        let return_type = &self.return_type;
+        write!(f, "({params_string}) -> {return_type}")
     }
 }
 

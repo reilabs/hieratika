@@ -1479,6 +1479,7 @@ dependencies = [
  "ethnum",
  "hieratika-errors",
  "hieratika-flo",
+ "hieratika-mangler",
  "inkwell",
  "itertools 0.13.0",
  "miette",

@@ -9,7 +9,11 @@
 pub mod data;
 pub mod util;
 
-use std::{cell::RefCell, collections::VecDeque};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet, VecDeque},
+    iter,
+};
 
 use hieratika_errors::compile::llvm::{Error, Result, StdResult};
 use hieratika_flo::{
@@ -50,6 +54,7 @@ use itertools::Itertools;
 use crate::{
     context::SourceContext,
     llvm::{
+        TopLevelEntryKind,
         data_layout::DataLayout,
         special_intrinsics::SpecialIntrinsics,
         typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType},
@@ -213,6 +218,15 @@ impl ObjectGenerator {
         // they do not have a body to be generated in this translation unit.
         self.generate_blocks_map(module, data, module_map)?;
 
+        // In order to use function pointers properly, we need variables describing
+        // these function pointers. These are generated as global constants that are
+        // initialized to the correct function pointer value.
+        self.generate_function_pointer_vars(data)?;
+
+        // As part of handling function pointers, we ALSO need dispatch functions for
+        // each function type in the current module.
+        self.generate_local_dispatch_functions(data)?;
+
         // With that done, we have to actually generate the code for the functions that
         // are defined locally.
         for function in module.get_functions() {
@@ -332,6 +346,228 @@ impl ObjectGenerator {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Generates the variables that serve as by-name targets for referencing a
+    /// function pointer.
+    ///
+    /// It works via the functions known about by `data`, and hence the function
+    /// stubs must be filled in the [`ObjectContext`] before calling this
+    /// method.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`], if the function pointer variable cannot be generated for
+    ///   any reason.
+    pub fn generate_function_pointer_vars(&self, data: &mut ObjectContext) -> Result<()> {
+        for (function_name, block_id) in data.map.module_functions.clone() {
+            // We start by creating a variable to represent the function pointer, which is
+            // unconditionally set to be local as these are synthetic constructs.
+            let function_pointer_var = Variable {
+                typ:         Type::Pointer,
+                linkage:     VariableLinkage::Local,
+                poison:      PoisonType::None,
+                diagnostics: Vec::new(),
+                location:    None,
+            };
+
+            // We then add this variable to the FLO.
+            let function_pointer = data.flo.variables.insert(&function_pointer_var);
+
+            // We can then insert this variable in to the object map as a
+            // global, which is a not-inaccurate way to think about it.
+            data.map.module_globals.insert(function_name, function_pointer);
+
+            // This is not sufficient, however, as we also need to _initialize_
+            // this variable to a sensible function pointer representation.
+            //
+            // An initializer takes no parameters and also returns no values, but
+            // nevertheless must have a signature as it is "callable".
+            let sig = Signature {
+                params:   Vec::new(),
+                returns:  Vec::new(),
+                location: None,
+            };
+
+            // We then can define our initializer properly, which is thankfully extremely
+            // simple.
+            let initializer_block = data.flo.add_block(|bb| -> Result<()> {
+                // All initializers have a signature, making them "callable".
+                bb.set_signature(&sig);
+
+                // We use the blockaddress mechanism that already exists here to mark it as
+                // relocatable, writing it into the already-declared variable for the function
+                // pointer.
+                bb.simple_get_block_address(function_pointer, block_id);
+
+                // All that is left to do is return nothing from the initializer.
+                bb.end_with_return(Vec::new());
+                Ok(())
+            })?;
+
+            // Finally, we need to register the initializer to be run.
+            data.flo.initializers.push(initializer_block);
+        }
+
+        Ok(())
+    }
+
+    /// Generates functions that perform the local (`blockaddress`-based)
+    /// portion of dispatch for function pointers within the current module.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`], if the dispatch functions cannot be generated for any
+    ///   reason.
+    pub fn generate_local_dispatch_functions(&self, data: &mut ObjectContext) -> Result<()> {
+        // We need to start by collecting functions under common types, which can all be
+        // done from the module map.
+        let mut functions_by_type: HashMap<LLVMFunction, Vec<String>> = HashMap::new();
+        for (name, info) in &self.get_module_map().functions {
+            // We only want to do this for top level DEFINITIONS, so we omit any
+            // declarations from this mapping.
+            if matches!(info.kind, TopLevelEntryKind::Definition) {
+                functions_by_type
+                    .entry(info.typ.clone())
+                    .or_default()
+                    .push(name.to_string());
+            }
+        }
+
+        // Next, we can generate an appropriate local dispatch function for each
+        // collection of functions.
+        for (func_type, func_names) in functions_by_type {
+            self.generate_local_dispatch_function(&func_type, &func_names, data)?;
+        }
+
+        Ok(())
+    }
+
+    /// Generates a single function that performs the local
+    /// (`blockaddress`-based) function pointer dispatch for all functions
+    /// (given by `func_names`) of the provided `typ`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`], if the dispatch function cannot be generated for any
+    ///   reason.
+    ///
+    /// # Panics
+    ///
+    /// - If an attempt is made to look up a function pointer global for a
+    ///   function that does not exist.
+    /// - If an attempt is made to look up a function entry point block for a
+    ///   function that does not exist.
+    pub fn generate_local_dispatch_function(
+        &self,
+        typ: &LLVMFunction,
+        func_names: &[String],
+        data: &mut ObjectContext,
+    ) -> Result<()> {
+        // We start by getting the dispatch function name, which is generated
+        // programmatically based on the type of all the functions that it collates.
+        let dispatch_func_name =
+            ObjectContext::local_dispatch_name_for(&typ.clone(), &data.flo.module_name)?;
+
+        // After that, we can build the signature for the function we are about to
+        // create. This starts with the input and output variables.
+        let input_func_ptr = data.flo.add_variable(Type::Pointer);
+        let parameter_vars = typ
+            .parameter_types
+            .iter()
+            .map(|typ| Ok(data.flo.add_variable(ObjectContext::flo_type_of(typ)?)))
+            .collect::<Result<Vec<_>>>()?;
+        let input_vars = iter::once(input_func_ptr)
+            .chain(parameter_vars.iter().copied())
+            .collect_vec();
+        let return_vars =
+            vec![data.flo.add_variable(ObjectContext::flo_type_of(&typ.return_type)?)];
+
+        // Then we have the information we need to build the signature itself.
+        let signature = Signature {
+            params:   input_vars.clone(),
+            returns:  return_vars.clone(),
+            location: None,
+        };
+
+        // We also need the (relocatable) function pointers for all the functions of
+        // this type.
+        let pointer_vars = func_names
+            .iter()
+            .map(|func_name| {
+                data.map.module_globals.get(func_name).unwrap_or_else(|| {
+                    panic!("Function {func_name} does not have a corresponding function pointer")
+                })
+            })
+            .copied()
+            .collect_vec();
+
+        // We ALSO need a target block for each match arm, which has to do nothing but
+        // call the function with the correct arguments and return its result.
+        let target_blocks = func_names
+            .iter()
+            .map(|func_name| {
+                let func_block = data.map.module_functions.get(func_name).unwrap_or_else(|| {
+                    panic!("Attempting to resolve {func_name} in a module where it does not exist")
+                });
+                data.flo.add_block(|bb| -> Result<()> {
+                    // We need a variable to write the result of the call into.
+                    let result_var =
+                        bb.add_variable(ObjectContext::flo_type_of(typ.return_type.as_ref())?);
+
+                    // Our input arguments are our parameter vars.
+                    let input_vars = parameter_vars.clone();
+
+                    // We can then issue the call in the block.
+                    bb.simple_call_local(*func_block, input_vars, vec![result_var]);
+
+                    // We then just have to return the result of that call.
+                    bb.end_with_return(vec![result_var]);
+                    Ok(())
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // We also need the name of the function we call to perform comparisons for the
+        // match arm conditions.
+        let eq_fn = self.polyfills.try_get_polyfill(
+            "icmp_eq",
+            &[LLVMType::ptr, LLVMType::ptr],
+            &LLVMType::bool,
+        )?;
+
+        // We then have to build the block that represents the function.
+        let function_block = data.flo.add_block(|bb| -> Result<()> {
+            // We start by setting the signature of the function.
+            bb.set_signature(&signature);
+
+            // We then have to build the comparison variables for the match construct that
+            // this function is going to end with.
+            let match_arms = pointer_vars
+                .iter()
+                .zip(target_blocks)
+                .map(|(ptr, target_block)| {
+                    let function_inputs = vec![*ptr, input_func_ptr];
+                    let boolean_output = bb.add_variable(Type::Bool);
+                    bb.simple_call_builtin(eq_fn, function_inputs, vec![boolean_output]);
+                    bb.add_match_arm_without_metadata(boolean_output, target_block)
+                })
+                .collect_vec();
+
+            // Once we have the match arms, that is all we need to generate the body of this
+            // function, which is simply a match as a terminator instruction.
+            bb.end_with_match(&match_arms, None, None);
+            Ok(())
+        })?;
+
+        // We then need to register this block in the module's functions, as well as the
+        // symbol table.
+        data.map
+            .module_functions
+            .insert(dispatch_func_name.clone(), function_block);
+        data.flo.symbols.code.insert(dispatch_func_name, function_block);
 
         Ok(())
     }
@@ -2545,73 +2781,140 @@ impl ObjectGenerator {
     ) -> Result<()> {
         assert_correct_opcode(&instruction, InstructionOpcode::Call);
 
-        // TODO (#100) Handle function pointers.
-
         // Let's start by grabbing the function being called, which is always the LAST
         // operand to the call instruction.
-        let num_operands = instruction.get_num_operands();
-        let func_ptr_value = util::extract_value_operand(
-            instruction.get_operand(num_operands - 1),
+        let function_value = util::extract_value_operand(
+            instruction.get_operand(instruction.get_num_operands() - 1),
             InstructionOpcode::Call,
         )?;
-        let function_name = util::expect_func_name_from_bv(func_ptr_value);
 
-        // There are certain unfortunate functions that need to be handled specially, so
-        // we have to check if this is one of these, and drop it entirely if so.
-        let special_intrinsics = SpecialIntrinsics::new();
-        if special_intrinsics.info_for(&function_name).is_some() {
-            return Ok(());
-        }
-
-        // To lookup opcodes we need the types of the arguments and return value.
-        let args = instruction
+        // We also need the arguments to the function, making sure to remove the last
+        // one that provides the name.
+        let value_operands = instruction
             .get_operands()
             .collect_vec()
             .split_last()
             .map(|(_, args)| args.to_vec())
-            .unwrap_or_default();
-        let value_operands = args
+            .unwrap_or_default()
             .into_iter()
             .map(|a| util::extract_value_operand(a, instruction.get_opcode()))
             .collect::<Result<Vec<_>>>()?;
-        let operand_types = value_operands
+
+        // Finally, we delegate to the underlying call generation functionality, which
+        // is responsible for handling function pointer dispatch.
+        self.generate_raw_call(&function_value, &value_operands, &instruction, bb, func_ctx)
+    }
+
+    /// Generates the FLO that corresponds to calling a function, handling the
+    /// logic necessary to dispatch on a function pointer as needed.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error`] if the correct FLO representation of the call cannot be
+    ///   generated.
+    ///
+    /// # Panics
+    ///
+    /// - If any name is used before being defined.
+    pub fn generate_raw_call(
+        &self,
+        function_value: &BasicValueEnum,
+        function_arguments: &[BasicValueEnum],
+        instruction: &InstructionValue,
+        bb: &mut BlockBuilder,
+        func_ctx: &mut FunctionContext,
+    ) -> Result<()> {
+        // We start by resolving the name given by the function value operand. This
+        // value may be a direct reference or an unknown function pointer, but it should
+        // always be named.
+        let func_name = util::expect_func_name_from_bv(*function_value);
+
+        // There are certain unfortunate functions that need to be handled specially, so
+        // we have to check if this is one of those, and drop it entirely if so.
+        if SpecialIntrinsics::new().info_for(&func_name).is_some() {
+            return Ok(());
+        }
+
+        // To determine how to call the function, we need to pull out the argument and
+        // return types.
+        let arg_types = function_arguments
             .iter()
             .map(|op| LLVMType::try_from(op.get_type()))
             .collect::<StdResult<Vec<_>>>()?;
-        let return_type = LLVMType::try_from(instruction.get_type())?;
+        let ret_type = LLVMType::try_from(instruction.get_type())?;
+        let func_type = LLVMFunction::new(ret_type.clone(), arg_types.as_slice());
 
-        // If it is NOT one of these, we have to actually generate the call, and to do
-        // that we need to know whether it is an internal or external call.
-        let function_ref = if let Some(id) = func_ctx.module_functions().get(&function_name) {
-            BlockRef::Local(*id)
-        } else if let Some(polyfill_name) =
-            self.polyfills
-                .get_polyfill(&function_name, &operand_types, &return_type)
-        {
-            BlockRef::Builtin(polyfill_name.to_string())
+        // We also need our arguments and return values, remembering to register the
+        // latter in the context.
+        let mut function_inputs = function_arguments
+            .iter()
+            .map(|op| util::get_var_or_const(op, bb, func_ctx))
+            .collect::<Result<Vec<_>>>()?;
+        let output_type_flo = ObjectContext::flo_type_of(&ret_type)?;
+        let output_var = bb.add_variable(output_type_flo.clone());
+
+        // The name for the output variable may not exist depending on where this call
+        // comes from, so we may have to create one.
+        let output_name = if let Some(name) = instruction.get_name() {
+            name.to_str()?.to_string()
         } else {
-            BlockRef::External(function_name)
+            self.name_supply.borrow_mut().allocate()
+        };
+        func_ctx.register_local(output_var, &output_name, output_type_flo);
+
+        let function_outputs =
+            vec![bb.add_variable(ObjectContext::flo_type_of(&ret_type.clone())?)];
+
+        // To call the function we need to resolve the block reference through which it
+        // will be called.
+        let func_ref = if let Some(id) = func_ctx.module_functions().get(&func_name) {
+            // In this case, it is a function in the same module that we can issue a direct
+            // call to. These names come from LLVM IR, and hence must be defined or
+            // declared. They are prevented from clashing by the LLVM IR ingest phase
+            // performed before this compilation process begins.
+            BlockRef::Local(*id)
+        } else if let Some(name) = self.polyfills.get_polyfill(&func_name, &arg_types, &ret_type) {
+            // In this case, it is a call to a known polyfill in the runtime.
+            BlockRef::Builtin(name.to_string())
+        } else {
+            // In this case, we do not know the name locally, but we also don't know if it
+            // is a function pointer or just a call to an external function.
+            //
+            // As all function names are implicitly pointers, we have to figure this out by
+            // looking for the value amongst the DECLARED functions in the module map.
+            let declared_names: HashSet<String> = self
+                .get_module_map()
+                .functions
+                .iter()
+                .filter_map(|(name, info)| {
+                    if info.kind == TopLevelEntryKind::Declaration {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                })
+                .cloned()
+                .collect();
+
+            if declared_names.contains(&func_name) {
+                // If it is in the declared names then it is an external call.
+                BlockRef::External(func_name.to_string())
+            } else {
+                // However, if it is not, then it is a function pointer that has come from some
+                // unknown place, and we have to issue the call via our function pointer calling
+                // mechanism.
+                //
+                // Note that we ALWAYS dispatch through the global / meta dispatch function, as
+                // this function pointer could have come from anywhere.
+                let func_ptr_var = util::get_var_or_const(function_value, bb, func_ctx)?;
+                function_inputs.insert(0, func_ptr_var);
+
+                BlockRef::External(ObjectContext::global_dispatch_name_for(&func_type)?)
+            }
         };
 
-        // We then need to put together the operands by grabbing the variables from the
-        // context and passing them in. Given that the function name is the LAST
-        // operand, it is the one we want to ignore.
-        let inputs = value_operands
-            .into_iter()
-            .map(|op| util::get_var_or_const(&op, bb, func_ctx))
-            .collect::<Result<Vec<_>>>()?;
-
-        // We also the need to handle providing the return value, if one exists, using
-        // the type and whether the instruction has a name telling us.
-        let outputs = util::make_opcode_output(&instruction, bb, func_ctx)?;
-
-        // We have no diagnostics or locations for now.
-        let diagnostics = Vec::default();
-        let location = None;
-
-        // Finally, we can build the call itself.
-        bb.call(&function_ref, inputs, outputs, diagnostics, location);
-
+        // And we can issue the call itself.
+        bb.simple_call(&func_ref, function_inputs, function_outputs);
         Ok(())
     }
 
@@ -2882,8 +3185,8 @@ impl ObjectGenerator {
     ) -> Result<()> {
         assert_correct_opcode(&instruction, InstructionOpcode::Invoke);
 
-        // TODO (#100) Handle function pointers.
-
+        // Invoke requires a minimum of three operands, so we have to check for this and
+        // bail if that condition is not satisfied.
         let missing_operands_error = || {
             Error::MalformedLLVM(format!(
                 "Invoke instruction had {} operands but 3 or more were expected",
@@ -2900,19 +3203,29 @@ impl ObjectGenerator {
         // function described by the LAST operand.
         let all_operands = instruction.get_operands().collect_vec();
 
-        // First we pull out the function operand, and get a block reference for it.
-        // This can either be a foreign call or a local call, and we have to check
-        // which.
+        // First we pull out the function operand.
         let function_value = util::extract_value_operand(
             *all_operands.last().ok_or_else(missing_operands_error)?,
             InstructionOpcode::Invoke,
         )?;
-        let function_name = function_value.get_name().to_str()?;
-        let function_ref = func_ctx.module_functions().get(function_name).map_or_else(
-            || BlockRef::External(function_name.to_string()),
-            |id| BlockRef::Local(*id),
-        );
 
+        // We also need the arguments to pass to the function.
+        let function_arg_values = all_operands[0..(all_operands.len() - 3)]
+            .iter()
+            .map(|op| util::extract_value_operand(*op, InstructionOpcode::Invoke))
+            .collect::<Result<Vec<_>>>()?;
+
+        // We can then delegate to the underlying call generation function.
+        self.generate_raw_call(
+            &function_value,
+            &function_arg_values,
+            &instruction,
+            bb,
+            func_ctx,
+        )?;
+
+        // We then have to jump to the target block.
+        //
         // While on many platforms the `invoke` instruction is used to associate a label
         // for unwinding purposes, we cannot perform any unwinding on our platform. To
         // that end, we ignore the error-case label and instead just translate this as a
@@ -2928,29 +3241,8 @@ impl ObjectGenerator {
         )?;
         let happy_block_id = func_ctx.try_lookup_block(happy_block.get_name().to_str()?)?;
 
-        // In order to call the function (obtained above), we also need to have the
-        // arguments to the function.
-        let function_args = all_operands[0..(all_operands.len() - 3)]
-            .iter()
-            .map(|op| {
-                let value = util::extract_value_operand(*op, InstructionOpcode::Invoke)?;
-                util::get_var_or_const(&value, bb, func_ctx)
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        // Finally we also need the return value, which we also register in the function
-        // context.
-        let return_type = LLVMType::try_from(instruction.get_type())?;
-        let return_type_flo = ObjectContext::flo_type_of(&return_type)?;
-        let return_name = instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?;
-        let return_id = bb.add_variable(return_type_flo.clone());
-        func_ctx.register_local(return_id, return_name, return_type_flo);
-
-        // Finally we issue the call and perform the jump.
-        bb.simple_call(&function_ref, function_args, vec![return_id]);
+        // We then end the block with a goto to the happy case block.
         bb.end_with_goto(happy_block_id);
-
-        // We have nothing to return, so we are done.
         Ok(())
     }
 

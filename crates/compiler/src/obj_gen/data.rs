@@ -8,9 +8,14 @@ use hieratika_flo::{
     FlatLoweredObject,
     types::{ArrayType, BlockId, PoisonType, StructType, Type, VariableId, VariableLinkage},
 };
+use hieratika_mangler::{NameInfo, constants::INTERNAL_NAME_PREFIX, mangle};
 use inkwell::module::Linkage;
 
-use crate::llvm::typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType};
+use crate::{
+    constant::{DISPATCH_FUNCTION_NAME, WHOLE_PROGRAM_MODULE_NAME},
+    llvm::typesystem::{LLVMArray, LLVMFunction, LLVMStruct, LLVMType},
+    messages::panic_cannot_mangle,
+};
 
 /// A mapping from the names of locally-defined functions to their identifiers.
 pub type ModuleFunctions = HashMap<String, BlockId>;
@@ -99,6 +104,92 @@ impl ObjectContext {
 /// Useful functionality that does not require access to the FLO context
 /// directly, but nevertheless deals with the generation of FLO.
 impl ObjectContext {
+    /// Gets the name of the local dispatch function for the provided `typ`.
+    ///
+    /// Note that the return value is not guaranteed to be a valid Rust
+    /// identifier, but is valid in both LLVM IR and FLO.
+    ///
+    /// ```
+    /// use hieratika_compiler::{
+    ///     llvm::typesystem::{LLVMFunction, LLVMType},
+    ///     obj_gen::data::ObjectContext,
+    /// };
+    ///
+    /// let function_type = LLVMFunction::new(LLVMType::f32, &[LLVMType::bool, LLVMType::i128]);
+    /// let module_name = "my_module";
+    /// let local_dispatch_name =
+    ///     ObjectContext::local_dispatch_name_for(&function_type, module_name).unwrap();
+    ///
+    /// assert_eq!(local_dispatch_name, "__f$hdisp$co$my_module");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidTypeConversion`] if any of the types in `typ` cannot
+    ///   be represented in FLO.
+    ///
+    /// # Panics
+    ///
+    /// - If `typ` contains a type that cannot be mangled.
+    pub fn local_dispatch_name_for(typ: &LLVMFunction, module_name: &str) -> Result<String> {
+        let func_name = format!("{INTERNAL_NAME_PREFIX}{DISPATCH_FUNCTION_NAME}");
+        let input_types = typ
+            .parameter_types
+            .iter()
+            .map(Self::flo_type_of)
+            .collect::<Result<Vec<_>>>()?;
+        let return_types = vec![Self::flo_type_of(typ.return_type.as_ref())?];
+        let mangle_input = NameInfo::new(&func_name, module_name, input_types, return_types);
+        let mangled_name = mangle(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
+
+        Ok(mangled_name)
+    }
+
+    /// Gets the name of the global (or meta) dispatch function for the provided
+    /// `typ`.
+    ///
+    /// Note that the return value is not guaranteed to be a valid Rust
+    /// identifier, but is valid in both LLVM IR and FLO.
+    ///
+    /// ```
+    /// use hieratika_compiler::{
+    ///     llvm::typesystem::{LLVMFunction, LLVMType},
+    ///     obj_gen::data::ObjectContext,
+    /// };
+    ///
+    /// let function_type = LLVMFunction::new(LLVMType::f32, &[LLVMType::bool, LLVMType::i128]);
+    /// let global_dispatch_name = ObjectContext::global_dispatch_name_for(&function_type).unwrap();
+    ///
+    /// assert_eq!(global_dispatch_name, "__f$hdisp$co$meta");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidTypeConversion`] if any of the types in `typ` cannot
+    ///   be represented in FLO.
+    ///
+    /// # Panics
+    ///
+    /// - If `typ` contains a type that cannot be mangled.
+    pub fn global_dispatch_name_for(typ: &LLVMFunction) -> Result<String> {
+        let func_name = format!("{INTERNAL_NAME_PREFIX}{DISPATCH_FUNCTION_NAME}");
+        let input_types = typ
+            .parameter_types
+            .iter()
+            .map(Self::flo_type_of)
+            .collect::<Result<Vec<_>>>()?;
+        let return_types = vec![Self::flo_type_of(typ.return_type.as_ref())?];
+        let mangle_input = NameInfo::new(
+            &func_name,
+            WHOLE_PROGRAM_MODULE_NAME,
+            input_types,
+            return_types,
+        );
+        let mangled_name = mangle(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
+
+        Ok(mangled_name)
+    }
+
     /// Generates the correct FLO linkage from the provided LLVM `linkage`.
     #[must_use]
     pub fn linkage_of(linkage: &Linkage, name: &str) -> VariableLinkage {

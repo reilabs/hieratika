@@ -23,7 +23,7 @@ fn compiles_add() -> miette::Result<()> {
     // We should only see one function in this generation, even if there are lots of
     // blocks. But we also have two constant initializers, which display as
     // functions.
-    let num_functions = common::count_functions(&flo);
+    let num_functions = common::count_functions(&flo, false);
     assert_eq!(num_functions, 1);
 
     // Let's grab that one function and poke at it a bit, being sure to omit the

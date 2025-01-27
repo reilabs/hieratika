@@ -12,6 +12,7 @@ use hieratika_flo::{
     FlatLoweredObject,
     types::{Block, FunctionSymbol},
 };
+use hieratika_mangler::constants::INTERNAL_NAME_PREFIX;
 use itertools::Itertools;
 use miette::MietteHandlerOpts;
 
@@ -44,10 +45,21 @@ pub fn get_functions(flo: &FlatLoweredObject) -> HashMap<FunctionSymbol, Block> 
 
 /// Counts the number of functions found in the provided `flo`.
 ///
+/// If `include_internal` is set, it will include functions that begin with the
+/// `__` prefix for internal names.
+///
 /// Note that this works from the _symbol table_, and will not detect functions
 /// not inserted into said table.
-pub fn count_functions(flo: &FlatLoweredObject) -> usize {
-    get_functions(flo).len()
+pub fn count_functions(flo: &FlatLoweredObject, include_internal: bool) -> usize {
+    let all_funcs = get_functions(flo);
+    if include_internal {
+        all_funcs.len()
+    } else {
+        all_funcs
+            .iter()
+            .filter(|(s, _)| !s.starts_with(INTERNAL_NAME_PREFIX))
+            .count()
+    }
 }
 
 /// Sets default reporting options for Miette in tests.
