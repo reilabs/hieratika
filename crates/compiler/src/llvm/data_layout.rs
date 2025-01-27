@@ -10,6 +10,7 @@ use hieratika_errors::{
     backtrace::WithBacktrace,
     compile::llvm::{Error, Result},
 };
+use itertools::Itertools;
 
 use crate::{
     constant::{
@@ -277,23 +278,32 @@ impl DataLayout {
     }
 
     /// Gets the integer layout corresponding to integers of the provided
-    /// `size`, or returns [`None`] if no such layout is available.
-    #[must_use]
-    pub fn int_spec_of(&self, size: usize) -> Option<&IntegerLayout> {
-        self.integer_layouts.iter().find(|int_spec| int_spec.size == size)
-    }
-
-    /// Gets the integer layout corresponding to integers of the provided
     /// `size`.
     ///
     /// # Panics
     ///
-    /// If no layout exists in the data layout for integers of the provided
-    /// `size`.
+    /// - If the data layout does not contain any integer specifications.
     #[must_use]
-    pub fn expect_int_spec_of(&self, size: usize) -> &IntegerLayout {
-        self.int_spec_of(size)
-            .unwrap_or_else(|| panic!("No layout found for integer of size {size}"))
+    pub fn int_spec_of(&self, size: usize) -> &IntegerLayout {
+        // LLVM's language ref states that: "If no match is found, and the type sought
+        // is an integer type, then the smallest integer type that is larger
+        // than the bitwidth of the sought type is used. If none of the
+        // specifications are larger than the bitwidth then the largest
+        // integer type is used."
+        //
+        // We implement this algorithm here.
+        if let Some(layout) = self.integer_layouts.iter().find(|int_spec| int_spec.size >= size) {
+            // In this case, we have found a layout that is the same size or larger, so we
+            // just return it.
+            layout
+        } else {
+            // In this case, we have to provide the largest defined layout.
+            self.integer_layouts
+                .iter()
+                .sorted_by_key(|l| l.size)
+                .last()
+                .expect("There must be at least one integer layout for the data layout to be valid")
+        }
     }
 
     /// Gets the floating-point layout corresponding to floating-point numbers

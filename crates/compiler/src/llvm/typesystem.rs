@@ -73,6 +73,12 @@ pub enum LLVMType {
     /// The 32-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
     i32,
 
+    /// The 40-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
+    i40,
+
+    /// The 48-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
+    i48,
+
     /// The 64-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
     i64,
 
@@ -171,6 +177,8 @@ impl LLVMType {
                 | Self::i16
                 | Self::i24
                 | Self::i32
+                | Self::i40
+                | Self::i48
                 | Self::i64
                 | Self::i128
                 | Self::f16
@@ -234,6 +242,8 @@ impl LLVMType {
             LLVMType::i16 => 16,
             LLVMType::i24 => 24,
             LLVMType::i32 => 32,
+            LLVMType::i40 => 40,
+            LLVMType::i48 => 48,
             LLVMType::i64 => 64,
             LLVMType::i128 => 128,
             LLVMType::f16 => 16,
@@ -278,32 +288,40 @@ impl LLVMType {
     pub fn align_of(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
         match self {
             LLVMType::bool => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(1).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(1).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(1).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(1).preferred_alignment,
             },
             LLVMType::i8 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(8).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(8).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(8).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(8).preferred_alignment,
             },
             LLVMType::i16 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(16).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(16).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(16).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(16).preferred_alignment,
             },
             LLVMType::i24 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(24).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(24).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(24).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(24).preferred_alignment,
             },
             LLVMType::i32 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(32).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(32).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(32).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(32).preferred_alignment,
+            },
+            LLVMType::i40 => match align_type {
+                AlignType::ABI => data_layout.int_spec_of(40).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(40).preferred_alignment,
+            },
+            LLVMType::i48 => match align_type {
+                AlignType::ABI => data_layout.int_spec_of(48).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(48).preferred_alignment,
             },
             LLVMType::i64 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(64).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(64).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(64).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(64).preferred_alignment,
             },
             LLVMType::i128 => match align_type {
-                AlignType::ABI => data_layout.expect_int_spec_of(128).abi_alignment,
-                AlignType::Preferred => data_layout.expect_int_spec_of(128).preferred_alignment,
+                AlignType::ABI => data_layout.int_spec_of(128).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(128).preferred_alignment,
             },
             LLVMType::f16 => match align_type {
                 AlignType::ABI => data_layout.expect_float_spec_of(16).abi_alignment,
@@ -343,6 +361,8 @@ impl Display for LLVMType {
             LLVMType::i16 => "i16".to_string(),
             LLVMType::i24 => "i24".to_string(),
             LLVMType::i32 => "i32".to_string(),
+            LLVMType::i40 => "i40".to_string(),
+            LLVMType::i48 => "i48".to_string(),
             LLVMType::i64 => "i64".to_string(),
             LLVMType::i128 => "i128".to_string(),
             LLVMType::f16 => "f16".to_string(),
@@ -479,6 +499,8 @@ impl<'ctx> TryFrom<&IntType<'ctx>> for LLVMType {
             16 => Self::i16,
             24 => Self::i24,
             32 => Self::i32,
+            40 => Self::i40,
+            48 => Self::i48,
             64 => Self::i64,
             128 => Self::i128,
             _ => Err(Error::UnsupportedType(value.to_string()))?,
@@ -1134,6 +1156,18 @@ mod test {
     }
 
     #[test]
+    fn calculates_correct_size_for_i40() {
+        assert_eq!(LLVMType::i40.size_of(&dl()), 40);
+        assert_eq!(LLVMType::i40.store_size_of(&dl()), 40);
+    }
+
+    #[test]
+    fn calculates_correct_size_for_i48() {
+        assert_eq!(LLVMType::i48.size_of(&dl()), 48);
+        assert_eq!(LLVMType::i48.store_size_of(&dl()), 48);
+    }
+
+    #[test]
     fn calculates_correct_size_for_i64() {
         assert_eq!(LLVMType::i64.size_of(&dl()), 64);
         assert_eq!(LLVMType::i64.store_size_of(&dl()), 64);
@@ -1250,6 +1284,18 @@ mod test {
     fn calculates_correct_alignment_for_i32() {
         assert_eq!(LLVMType::i32.align_of(ABI, &dl()), 32);
         assert_eq!(LLVMType::i32.align_of(Preferred, &dl()), 32);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i40() {
+        assert_eq!(LLVMType::i40.align_of(ABI, &dl()), 64);
+        assert_eq!(LLVMType::i40.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_i48() {
+        assert_eq!(LLVMType::i48.align_of(ABI, &dl()), 64);
+        assert_eq!(LLVMType::i48.align_of(Preferred, &dl()), 64);
     }
 
     #[test]

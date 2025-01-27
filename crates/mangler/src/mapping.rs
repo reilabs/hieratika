@@ -88,6 +88,8 @@ pub fn mangle_type(typ: &Type) -> Result<String> {
         Type::Signed16 => "h",
         Type::Signed24 => "x",
         Type::Signed32 => "i",
+        Type::Signed40 => "n",
+        Type::Signed48 => "k",
         Type::Signed64 => "q",
         Type::Signed128 => "o",
         Type::WeaklyTypedFelt => "w",

@@ -1187,6 +1187,8 @@ impl PolyfillMap {
             LLVMType::i16,
             LLVMType::i24,
             LLVMType::i32,
+            LLVMType::i40,
+            LLVMType::i48,
             LLVMType::i64,
             LLVMType::i128,
         ]
@@ -1254,6 +1256,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1104);
+        assert_eq!(count, 1379);
     }
 }

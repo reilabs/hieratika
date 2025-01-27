@@ -7,8 +7,6 @@ fn compiles_alloc() -> miette::Result<()> {
     // We start by constructing and running the compiler
     common::set_miette_reporting()?;
 
-    // Currently known to fail due to missing features and bugs.
-
     let compiler = common::default_compiler_from_path("input/compilation/alloc.ll")?;
     let flo = compiler.run()?;
 

@@ -4,10 +4,7 @@
 use std::ffi::{CStr, c_uint};
 
 use hieratika_errors::compile::llvm::{Error, Result};
-use hieratika_flo::{
-    builders::BlockBuilder,
-    types::{MemoryOrdering, VariableId},
-};
+use hieratika_flo::types::{MemoryOrdering, VariableId};
 use inkwell::{
     basic_block::BasicBlock,
     llvm_sys::{
@@ -25,7 +22,8 @@ use itertools::Either;
 
 use crate::{
     llvm::{TopLevelEntryKind, typesystem::LLVMType},
-    obj_gen::data::{FunctionContext, ObjectContext},
+    messages::INSTRUCTION_NAMED,
+    obj_gen::data::FunctionContext,
     pass::analysis::module_map::ModuleMap,
 };
 
@@ -392,28 +390,21 @@ pub fn get_indices(instruction: &InstructionValue) -> Option<Vec<u64>> {
     }
 }
 
-/// Generates the output variable for an opcode.
+/// Gets the output variable for an `instruction`.
 ///
 /// # Errors
 ///
-/// - [`Error`] if the opcode type cannot be converted into an [`LLVMType`], or
-///   if the resultant type cannot be converted into a flo
-///   [`hieratika_flo::types::Type`].
-pub fn make_opcode_output(
+/// - [`Error::CStrConversionError`] if the instruction's name cannot be
+///   converted to a rust `str`.
+/// - [`Error::MalformedLLVM`] if the name of the `instruction` has not been
+///   defined at the time of usage.
+///
+/// # Panics
+///
+/// - If called on an instruction that has no name.
+pub fn get_opcode_output(
     instruction: &InstructionValue,
-    bb: &mut BlockBuilder,
     func_ctx: &mut FunctionContext,
-) -> Result<Vec<VariableId>> {
-    let output = if let Some(name) = instruction.get_name() {
-        let output_name = name.to_str()?.to_string();
-        let instruction_type = LLVMType::try_from(instruction.get_type())?;
-        let flo_type = ObjectContext::flo_type_of(&instruction_type)?;
-        let output_var = bb.add_variable(flo_type.clone());
-        func_ctx.register_local(output_var, &output_name, flo_type);
-        vec![output_var]
-    } else {
-        Vec::new()
-    };
-
-    Ok(output)
+) -> Result<VariableId> {
+    func_ctx.try_lookup_variable(instruction.get_name().expect(INSTRUCTION_NAMED).to_str()?)
 }
