@@ -1197,7 +1197,7 @@ impl PolyfillMap {
     /// Gets the types that we want to generate floating-point operations over.
     #[must_use]
     pub fn float_types() -> Vec<LLVMType> {
-        vec![LLVMType::f16, LLVMType::f32, LLVMType::f64]
+        vec![LLVMType::f16, LLVMType::f32, LLVMType::f64, LLVMType::f128]
     }
 
     /// Gets all the numeric types that we want to potentially generate
@@ -1256,6 +1256,6 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1379);
+        assert_eq!(count, 1559);
     }
 }

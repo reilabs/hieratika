@@ -1572,7 +1572,7 @@ impl ObjectGenerator {
         // primitive types (the numerics and pointers). To that end, we have to handle
         // the store differently based on the type being stored.
         match &typ {
-            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | f128 | ptr => {
                 self.store_primitive(typ, stored_value, pointer, initial_offset, bb)?;
             }
             Array(array_type) => {
@@ -1808,7 +1808,7 @@ impl ObjectGenerator {
         use LLVMType::*;
 
         match &typ {
-            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | f128 | ptr => {
                 self.load_primitive_into(target, typ, pointer, initial_offset, bb)?;
             }
             Array(array_type) => {

@@ -94,6 +94,9 @@ pub enum LLVMType {
     /// The IEEE-754 `binary64` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
     f64,
 
+    /// The IEEE-754 `binary128` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
+    f128,
+
     /// Used to specify locations in memory as described in the
     /// [LLVM IR reference](https://llvm.org/docs/LangRef.html#pointer-type).
     ///
@@ -184,6 +187,7 @@ impl LLVMType {
                 | Self::f16
                 | Self::f32
                 | Self::f64
+                | Self::f128
                 | Self::ptr
                 | Self::void
                 | Self::Metadata
@@ -249,6 +253,7 @@ impl LLVMType {
             LLVMType::f16 => 16,
             LLVMType::f32 => 32,
             LLVMType::f64 => 64,
+            LLVMType::f128 => 128,
             LLVMType::ptr => data_layout.default_pointer_layout().size,
             LLVMType::void => 0,
             LLVMType::Array(array_type) => array_type.size_of(data_layout),
@@ -335,6 +340,10 @@ impl LLVMType {
                 AlignType::ABI => data_layout.expect_float_spec_of(64).abi_alignment,
                 AlignType::Preferred => data_layout.expect_float_spec_of(64).preferred_alignment,
             },
+            LLVMType::f128 => match align_type {
+                AlignType::ABI => data_layout.expect_float_spec_of(128).abi_alignment,
+                AlignType::Preferred => data_layout.expect_float_spec_of(128).preferred_alignment,
+            },
             LLVMType::ptr => match align_type {
                 AlignType::ABI => data_layout.default_pointer_layout().abi_alignment,
                 AlignType::Preferred => data_layout.default_pointer_layout().preferred_alignment,
@@ -368,6 +377,7 @@ impl Display for LLVMType {
             LLVMType::f16 => "f16".to_string(),
             LLVMType::f32 => "f32".to_string(),
             LLVMType::f64 => "f64".to_string(),
+            LLVMType::f128 => "f128".to_string(),
             LLVMType::ptr => "ptr".to_string(),
             LLVMType::void => "void".to_string(),
             LLVMType::Metadata => "metadata".to_string(),
@@ -471,6 +481,7 @@ impl<'ctx> TryFrom<&FloatType<'ctx>> for LLVMType {
             LLVMTypeKind::LLVMHalfTypeKind => Self::f16,
             LLVMTypeKind::LLVMFloatTypeKind => Self::f32,
             LLVMTypeKind::LLVMDoubleTypeKind => Self::f64,
+            LLVMTypeKind::LLVMFP128TypeKind => Self::f128,
             _ => Err(Error::UnsupportedType(value.to_string()))?,
         };
         Ok(ret_val)
@@ -1198,6 +1209,12 @@ mod test {
     }
 
     #[test]
+    fn calculates_correct_size_for_f128() {
+        assert_eq!(LLVMType::f128.size_of(&dl()), 128);
+        assert_eq!(LLVMType::f128.store_size_of(&dl()), 128);
+    }
+
+    #[test]
     fn calculates_correct_size_for_ptr() {
         assert_eq!(LLVMType::ptr.size_of(&dl()), 64);
         assert_eq!(LLVMType::ptr.store_size_of(&dl()), 64);
@@ -1326,6 +1343,12 @@ mod test {
     fn calculates_correct_alignment_for_f64() {
         assert_eq!(LLVMType::f64.align_of(ABI, &dl()), 64);
         assert_eq!(LLVMType::f64.align_of(Preferred, &dl()), 64);
+    }
+
+    #[test]
+    fn calculates_correct_alignment_for_f128() {
+        assert_eq!(LLVMType::f128.align_of(ABI, &dl()), 128);
+        assert_eq!(LLVMType::f128.align_of(Preferred, &dl()), 128);
     }
 
     #[test]

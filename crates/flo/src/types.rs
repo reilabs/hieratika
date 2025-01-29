@@ -524,8 +524,10 @@ pub enum Type {
     WeaklyTypedFelt,
 
     // Floating point types.
+    Half,
     Float,
     Double,
+    Quad,
 
     // Pointer-ish types.
     Pointer,

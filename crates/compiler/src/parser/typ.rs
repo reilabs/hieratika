@@ -24,6 +24,8 @@ pub fn integer() -> impl crate::parser::SimpleParser<LLVMType> {
         just("8").to(LLVMType::i8),
         just("24").to(LLVMType::i24),
         just("32").to(LLVMType::i32),
+        just("48").to(LLVMType::i48),
+        just("40").to(LLVMType::i40),
         just("64").to(LLVMType::i64),
     )))
 }
@@ -31,11 +33,12 @@ pub fn integer() -> impl crate::parser::SimpleParser<LLVMType> {
 /// Parses a floating point type from the LLVM IR source text.
 #[must_use]
 pub fn float() -> impl crate::parser::SimpleParser<LLVMType> {
-    just("f").ignore_then(choice((
-        just("16").to(LLVMType::f16),
-        just("32").to(LLVMType::f32),
-        just("64").to(LLVMType::f64),
-    )))
+    choice((
+        just("half").to(LLVMType::f16),
+        just("float").to(LLVMType::f32),
+        just("double").to(LLVMType::f64),
+        just("fp128").to(LLVMType::f128),
+    ))
 }
 
 /// Parses a void type from the LLVM IR source text.
@@ -130,6 +133,8 @@ mod test {
         assert_eq!(super::integer().parse("i16"), Ok(LLVMType::i16));
         assert_eq!(super::integer().parse("i24"), Ok(LLVMType::i24));
         assert_eq!(super::integer().parse("i32"), Ok(LLVMType::i32));
+        assert_eq!(super::integer().parse("i40"), Ok(LLVMType::i40));
+        assert_eq!(super::integer().parse("i48"), Ok(LLVMType::i48));
         assert_eq!(super::integer().parse("i64"), Ok(LLVMType::i64));
         assert_eq!(super::integer().parse("i128"), Ok(LLVMType::i128));
 
@@ -141,9 +146,10 @@ mod test {
     #[test]
     fn can_parse_float_types() {
         // Successes
-        assert_eq!(super::float().parse("f16"), Ok(LLVMType::f16));
-        assert_eq!(super::float().parse("f32"), Ok(LLVMType::f32));
-        assert_eq!(super::float().parse("f64"), Ok(LLVMType::f64));
+        assert_eq!(super::float().parse("half"), Ok(LLVMType::f16));
+        assert_eq!(super::float().parse("float"), Ok(LLVMType::f32));
+        assert_eq!(super::float().parse("double"), Ok(LLVMType::f64));
+        assert_eq!(super::float().parse("fp128"), Ok(LLVMType::f128));
 
         // Failures
         assert!(super::float().parse("f31").is_err());
@@ -338,7 +344,7 @@ mod test {
     fn can_parse_any_type() {
         // Successes
         assert_eq!(super::any().parse("i1"), Ok(LLVMType::bool));
-        assert_eq!(super::any().parse("f64"), Ok(LLVMType::f64));
+        assert_eq!(super::any().parse("double"), Ok(LLVMType::f64));
         assert_eq!(super::any().parse("void"), Ok(LLVMType::void));
         assert_eq!(
             super::any().parse("[1 x i8]"),
