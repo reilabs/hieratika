@@ -49,7 +49,7 @@ ethnum = "1.5.0"
 inkwell = { git = "https://github.com/stevefan1999-personal/inkwell", rev = "0c1e5dd52cf3e012cb238ecfbdb3b1731b987c03", features = [
   "llvm19-0",
 ] }
-itertools = "0.13.0"
+itertools = "0.14.0"
 hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
