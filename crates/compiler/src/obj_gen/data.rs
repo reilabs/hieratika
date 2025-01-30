@@ -298,6 +298,8 @@ impl ObjectContext {
             LLVMType::i16 => Type::Signed16,
             LLVMType::i24 => Type::Signed24,
             LLVMType::i32 => Type::Signed32,
+            LLVMType::i40 => Type::Signed40,
+            LLVMType::i48 => Type::Signed48,
             LLVMType::i64 => Type::Signed64,
             LLVMType::i128 => Type::Signed128,
             LLVMType::f16 => Err(Error::invalid_type_conversion(
@@ -472,15 +474,39 @@ impl FunctionContext {
 
     /// Register the variable with the provided `id`, `name`, and `typ` into the
     /// function context.
+    ///
+    /// # Panics
+    ///
+    /// - If an attempt is made to re-register a block for a given `name`. This
+    ///   only occurs with `debug_assertions` enabled.
     pub fn register_local(&mut self, id: VariableId, name: &str, typ: Type) {
-        self.locals.insert(name.to_string(), id);
+        // In debug builds we run a consistency check here.
+        if cfg!(debug_assertions) {
+            if let Some(prior) = self.locals.insert(name.to_string(), id) {
+                panic!("Variable {name} was re-registered, substituting {prior} for {id}");
+            }
+        } else {
+            self.locals.insert(name.to_string(), id);
+        }
         self.var_types.insert(id, typ);
     }
 
     /// Register the block with the provided `id` and `name` into the function
     /// context.
+    ///
+    /// # Panics
+    ///
+    /// - If an attempt is made to re-register a block for a given `name`. This
+    ///   only occurs with `debug_assertions` enabled.
     pub fn register_block(&mut self, id: BlockId, name: &str) {
-        self.blocks.insert(name.to_string(), id);
+        // In debug builds we run a consistency check here.
+        if cfg!(debug_assertions) {
+            if let Some(prior) = self.blocks.insert(name.to_string(), id) {
+                panic!("Block {name} was re-registered, substituting {prior} for {id}")
+            }
+        } else {
+            self.blocks.insert(name.to_string(), id);
+        }
     }
 
     /// Gets a reference to a mapping between the names and identifiers of the
@@ -526,6 +552,6 @@ impl FreshNameSupply {
     pub fn allocate(&mut self) -> String {
         let name_num = self.name_counter;
         self.name_counter += 1;
-        name_num.to_string()
+        format!("anon_{name_num}")
     }
 }

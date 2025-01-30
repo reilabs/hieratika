@@ -67,3 +67,9 @@ tracing = "0.1.40"
 debug = true           # Include full debug information in release builds.
 overflow-checks = true # Keep overflow checks in production builds.
 lto = "thin"           # Thin LTO performs cheaper cross-crate LTO.
+
+# Running the compiler tests in a reasonable time means we need to optimize,
+# but we also want to retain debug assertions and debug information.
+[profile.test]
+opt-level = 1
+debug = "full"
