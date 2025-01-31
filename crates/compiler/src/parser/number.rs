@@ -8,23 +8,21 @@ use crate::parser::SimpleParser;
 
 /// Parses a positive or negative integer in the specified `radix`.
 #[must_use]
-pub fn integer<T>(radix: u32) -> impl SimpleParser<T>
-where
-    T: FromStr + std::ops::Neg<Output = T>,
-{
+pub fn integer<T: FromStr>(radix: u32) -> impl SimpleParser<T> {
     just("-")
         .or_not()
         .then(text::int(radix))
         .try_map(|(uminus, num): (_, String), span| {
-            let parsed_num = num
-                .parse::<T>()
-                .map_err(|_| Simple::custom(span, format!("Could not parse {num} as an i128")))?;
+            let minus = uminus.unwrap_or_default();
+            let actual_num = format!("{minus}{num}");
+            let parsed_num = actual_num.parse::<T>().map_err(|_| {
+                Simple::custom(
+                    span,
+                    format!("Could not parse {num} as an {}", std::any::type_name::<T>()),
+                )
+            })?;
 
-            if uminus.is_some() {
-                Ok(-parsed_num)
-            } else {
-                Ok(parsed_num)
-            }
+            Ok(parsed_num)
         })
 }
 

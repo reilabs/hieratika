@@ -73,6 +73,20 @@ mod test {
             IntegerConstant::parser().parse("i24 -37"),
             Ok(IntegerConstant::new(LLVMType::i24, -37))
         );
+        assert_eq!(
+            IntegerConstant::parser().parse("i128 -4176471573560389552232087451844504212"),
+            Ok(IntegerConstant::new(
+                LLVMType::i128,
+                -4_176_471_573_560_389_552_232_087_451_844_504_212
+            ))
+        );
+        assert_eq!(
+            IntegerConstant::parser().parse("i128 -170141183460469231731687303715884105728"),
+            Ok(IntegerConstant::new(
+                LLVMType::i128,
+                -170_141_183_460_469_231_731_687_303_715_884_105_728
+            ))
+        );
 
         // Failures
         assert!(IntegerConstant::parser().parse("i64 a1").is_err());
