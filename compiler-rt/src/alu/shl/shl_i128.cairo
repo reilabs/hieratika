@@ -1,40 +1,7 @@
-use core::num::traits::{BitSize, WrappingAdd, Bounded};
-use crate::utils::assert_fits_in_type;
+use crate::alu::shl::shl;
 
 pub fn __llvm_shl_i128_i128(n: u128, shift: u128) -> u128 {
-    // The generic shl::<T> function does not handle 128-bit values properly, hence a more complex
-    // approach is used here.
-
-    // Make sure the value passed in the u128 arguments can fit in the concrete type.
-    assert_fits_in_type::<u128>(n);
-    assert_fits_in_type::<u128>(shift);
-
-    // Cairo does not have << or >> operators so we must implement the shift manually.
-    let mut result = n;
-    // Perform the shift `shift`` number of times.
-    for _ in 0..shift {
-        // Initialize new_result to 0 for the current shift.
-        let mut new_result = 0;
-        // Initialize mask to 0b0000..1 (it will move to the left so we can check each bit).
-        let mut mask = 1;
-
-        // Iterate through each bit position of the integer.
-        for _ in 0..BitSize::<u128>::bits() {
-            if result & mask != 0 {
-                // If the current bit is set, set the corresponding bit in new_result,
-                // but shifted one position to the left.
-                //
-                // mask.wrapping_add(mask) is essentially mask * 2 or mask << 1
-                // with the benefit of wrapping back at 0 when we reach the MSB.
-                new_result = new_result | mask.wrapping_add(mask);
-            }
-            mask = mask.wrapping_add(mask);
-        };
-        result = new_result;
-    };
-
-    // Make sure the result is limited only to the bit width of the concrete type.
-    result & Bounded::<u128>::MAX.into()
+    shl::<u128>(n, shift)
 }
 
 #[cfg(test)]
