@@ -1,3 +1,4 @@
+use core::num::traits::OverflowingMul;
 pub mod shl_i1;
 pub mod shl_i8;
 pub mod shl_i16;
@@ -12,10 +13,6 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the shl/shl_<type>.cairo files.
-//
-// Please note that this implementation is valid up to 64-bit values due to extra bits
-// needed to accommodate overflows that happen during computation. A 128-bit implementation
-// uses different approach.
 pub fn shl<
     T,
     // The trait bounds are chosen so that:
@@ -42,10 +39,10 @@ pub fn shl<
     let mut result = n;
     // Perform the shift `shift`` number of times.
     for _ in 0..shift {
-        result = result * 2;
-        // Make sure the result is limited only to the bit width of the concrete type.
-        result = result & Bounded::<T>::MAX.into();
+        let (r, _) = result.overflowing_mul(2);
+        result = r
     };
 
-    result
+    // Make sure the result is limited only to the bit width of the concrete type.
+    result & Bounded::<T>::MAX.into()
 }
