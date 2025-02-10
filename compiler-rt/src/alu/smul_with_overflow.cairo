@@ -1,6 +1,6 @@
 pub mod smul_with_overflow_i8;
 
-use crate::utils::{assert_fits_in_type};
+use crate::utils::{assert_fits_in_type, extend_sign};
 use crate::alu::shl::shl;
 use core::num::traits::{BitSize, Bounded, OverflowingMul};
 
@@ -37,24 +37,9 @@ fn smul_with_overflow<
     let value_mask = sign_bit_mask - 1;
     let sign_ext_bit_mask = ~value_mask;
 
-    // Function performing sign extension. This is needed, because the polyfill API
-    // requires operands to be u128, despite the actual value can be e.g. i8.
-    // In such case the remaining MSBs of u128 are zero, even if the operand is negative
-    // and should be sign-extended.
-    let extend_sign = |value: u128,
-    sign_bit: bool| -> u128 {
-        if sign_bit {
-            sign_ext_bit_mask | value
-        } else {
-            value
-        }
-    };
-
     // Extend signs of operands if necessary.
-    let lhs_sign_bit = (lhs & sign_bit_mask) != 0;
-    let lhs = extend_sign(lhs, lhs_sign_bit);
-    let rhs_sign_bit = (rhs & sign_bit_mask) != 0;
-    let rhs = extend_sign(rhs, rhs_sign_bit);
+    let lhs = extend_sign(lhs, sign_bit_mask);
+    let rhs = extend_sign(rhs, sign_bit_mask);
 
     // Perform the multiplication and check for overflow.
     let (result, overflow) = lhs.overflowing_mul(rhs);
