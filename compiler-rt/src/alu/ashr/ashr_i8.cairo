@@ -60,22 +60,10 @@ mod tests {
     //  this instruction returns a poison value.
     //
     // As per `docs/ALU Design.md`, poison values are not supported.
-    pub const test_cases_panic: [TestCaseTwoArgs; 8] = [
-        TestCaseTwoArgs { lhs: 0b11111111, rhs: 8, expected: 0b11111111 },
-        TestCaseTwoArgs { lhs: 0b11111111, rhs: 9, expected: 0b11111111 },
-        TestCaseTwoArgs { lhs: 0b11111111, rhs: 90, expected: 0b11111111 },
-        TestCaseTwoArgs { lhs: 0b11111111, rhs: 123, expected: 0b11111111 },
-        TestCaseTwoArgs { lhs: 0b00000000, rhs: 8, expected: 0b00000000 },
-        TestCaseTwoArgs { lhs: 0b00000000, rhs: 9, expected: 0b00000000 },
-        TestCaseTwoArgs { lhs: 0b00000000, rhs: 90, expected: 0b00000000 },
-        TestCaseTwoArgs { lhs: 0b00000000, rhs: 123, expected: 0b00000000 },
-    ];
-
     #[test]
     #[should_panic(expected: "Requested shift by more bits than input word size")]
     fn test_i8_panic() {
-        for case in test_cases_panic.span() {
-            assert_eq!(__llvm_ashr_i8_i8(*case.lhs, *case.rhs), *case.expected);
-        }
+        let case = TestCaseTwoArgs { lhs: 0b11111111, rhs: 8, expected: 0b00000000 };
+        assert_eq!(__llvm_ashr_i8_i8(case.lhs, case.rhs), case.expected);
     }
 }
