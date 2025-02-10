@@ -30,5 +30,6 @@ pub mod urem;
 pub mod srem;
 pub mod abs;
 pub mod ashr;
+pub mod sext;
 
 mod test_case;
