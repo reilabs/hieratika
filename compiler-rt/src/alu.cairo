@@ -35,5 +35,8 @@ pub mod zext;
 pub mod ucmp;
 pub mod umax;
 pub mod umin;
+pub mod scmp;
+pub mod smax;
+pub mod smin;
 
 mod test_case;
