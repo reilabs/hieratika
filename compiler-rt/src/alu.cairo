@@ -32,5 +32,8 @@ pub mod abs;
 pub mod ashr;
 pub mod sext;
 pub mod zext;
+pub mod ucmp;
+pub mod umax;
+pub mod umin;
 
 mod test_case;
