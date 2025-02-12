@@ -12,7 +12,7 @@ mod tests {
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 265] = [
         // Due to Cairo's casting limitation, negative numbers are represented as bit patterns.
-       
+
         // Random test cases
         TestCaseTwoArgs{lhs: 74, rhs: 109, expected:  negative_one},
         TestCaseTwoArgs{lhs: 0b10010111, rhs: 12, expected:  negative_one}, // lhs = -105
@@ -270,7 +270,7 @@ mod tests {
         TestCaseTwoArgs{lhs: 115, rhs: 79, expected: 1},
         TestCaseTwoArgs{lhs: 0b11100010, rhs: 91, expected:  negative_one}, // lhs = -30
         TestCaseTwoArgs{lhs: 59, rhs: 83, expected:  negative_one},
-       
+
         // Edge cases
         TestCaseTwoArgs{lhs: 0b10000000, rhs: 127, expected:  negative_one}, // lhs = -128
         TestCaseTwoArgs{lhs: 127, rhs: 0, expected: 1},
