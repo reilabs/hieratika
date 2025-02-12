@@ -38,5 +38,15 @@ pub mod umin;
 pub mod scmp;
 pub mod smax;
 pub mod smin;
+pub mod icmp_eq;
+pub mod icmp_ne;
+pub mod icmp_ugt;
+pub mod icmp_uge;
+pub mod icmp_ult;
+pub mod icmp_ule;
+pub mod icmp_sgt;
+pub mod icmp_sge;
+pub mod icmp_slt;
+pub mod icmp_sle;
 
 mod test_case;
