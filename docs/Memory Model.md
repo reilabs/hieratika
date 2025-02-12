@@ -59,8 +59,9 @@ other words, there needs to exist a `load` and `store` for every type.
 The problem with _this_, however, is that the space of types is _infinite_. To that end, the
 hieratika compiler decomposes loads and stores of aggregate types (structures, arrays, and so on)
 into loads and stores to primitives at the correct offsets. The `load` and `store` polyfills are
-hence defined for each of the following primitive types: `bool` (`i1`), `i8`, `i16`, `i32`, `i64`,
-`i128`, `f32` (`float`), `f64` (`double`), and `ptr`. These families of polyfills are as follows:
+hence defined for each of the following primitive types: `bool` (`i1`), `i8`, `i16`, `i24`, `i32`,
+`i40`, `i48`, `i64`, `i128`, `f16`, `f32` (`float`), `f64` (`double`), `f128` (`fp128`) and `ptr`.
+These families of polyfills are as follows:
 
 - `fn load<T>(address: ptr, offset_bits: usize) -> T`: This polyfill takes an `address`, as well as
   a `offset` from that address in bits, and loads a value of type `T` from the specified location.
