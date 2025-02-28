@@ -52,6 +52,11 @@ pub enum Error {
     #[error("Invalid Pass Ordering: {_0}")]
     InvalidPassOrdering(String),
 
+    /// Emitted when user code declares a known polyfill name with an incorrect
+    /// type.
+    #[error("Polyfill {_0} declared with incorrect type {_1} where {_2} was expected")]
+    InvalidPolyfillDeclaration(String, String, String),
+
     /// Emitted when code tries to convert between types in a way that is
     /// invalid.
     #[error("Could not convert types: {_0}")]
@@ -85,6 +90,10 @@ pub enum Error {
     /// Emitted when a global value that is not `constant` is discovered.
     #[error("The global with name `{_0}` is non-constant, but we only support constant globals")]
     NonConstantGlobal(String),
+
+    /// Emitted when user code attempts to redefine a polyfill.
+    #[error("User code attempted to redefine the reserved polyfill name {_0}")]
+    RedefinedPolyfill(String),
 
     /// Emitted when a mismatch is found between types.
     #[error("{_0} != {_1} but were expected to be equal")]

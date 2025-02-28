@@ -11,7 +11,7 @@ use downcast_rs::Downcast;
 
 use crate::{
     context::SourceContext,
-    pass::{ConcretePass, PassKey},
+    pass::{ConcretePass, PassKey, PassOps},
 };
 
 /// Pass data is output by any given pass
@@ -117,6 +117,56 @@ where
     type Pass: ConcretePass;
 }
 
+/// An empty pass data that complies with the required [`PassData`] interface.
+///
+/// Some passes do not return any data, but due to the bounds required between
+/// passes and their data we cannot trivially just use `()` or similar types. To
+/// that end, this type exists to represent that empty case.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EmptyPassData<T> {
+    /// Ensures that we actually use the type parameter `T`.
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> EmptyPassData<T> {
+    /// Constructs a new instance of the empty pass data.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> EmptyPassData<T>
+where
+    T: PassOps,
+{
+    /// Constructs a new dynamic instance of the empty pass data.
+    #[must_use]
+    pub fn new_dyn() -> Box<dyn PassDataOps> {
+        Box::new(EmptyPassData::<T>::new())
+    }
+}
+
+/// A blanket impl that allows it to be used with any pass.
+impl<T> PassDataOps for EmptyPassData<T> where T: PassOps {}
+
+/// A blanket impl that allows it to be used with any pass.
+impl<T> ConcretePassData for EmptyPassData<T>
+where
+    T: ConcretePass,
+{
+    type Pass = T;
+}
+
+/// A simple empty default for the empty pass data.
+impl<T> Default for EmptyPassData<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Pass return data that returns a dynamic [`PassData`].
 pub type DynPassReturnData = PassReturnData<PassData>;
 
@@ -205,10 +255,23 @@ impl<T> PassDataMap<T> {
     }
 
     /// Gets a reference to the last-written data for the pass given by the
-    /// provided `key` if it exists. exists, and returns `None` otherwise.
+    /// provided `key` if it exists, and returns `None` otherwise.
     #[must_use]
     pub fn get_key(&self, key: PassKey) -> Option<&T> {
         self.mapping.get(&key)
+    }
+
+    /// Gets a reference to the last-written data for the pass given by the
+    /// provided `key`.
+    ///
+    /// # Panics
+    ///
+    /// - If no data exists for the pass described by `key`.
+    #[must_use]
+    pub fn expect_key(&self, key: PassKey) -> &T {
+        self.mapping
+            .get(&key)
+            .unwrap_or_else(|| panic!("Pass data was not found for the pass with key {key:?}"))
     }
 
     /// Writes the provided `data` into the container associating it with the
@@ -230,7 +293,25 @@ impl PassDataMap<PassData> {
     /// The data returned is returned as the concrete type.
     #[must_use]
     pub fn get<P: ConcretePass>(&self) -> Option<&P::Data> {
-        self.mapping.get(&P::key())?.view_as::<P::Data>()
+        self.get_key(P::key())?.view_as::<P::Data>()
+    }
+
+    /// Gets a reference to the last-written data for the pass `P`.
+    ///
+    /// # Panics
+    ///
+    /// - If no data exists for the pass `P`.
+    #[must_use]
+    pub fn expect<P: ConcretePass>(&self) -> &P::Data {
+        // This unwrap is safe as retrieving data from that pass has a static guarantee
+        // that it is the correct type.
+        self.get_key(P::key())
+            .unwrap_or_else(|| {
+                let data_name = std::any::type_name::<P::Data>();
+                panic!("{data_name} was not available")
+            })
+            .view_as::<P::Data>()
+            .unwrap_or_else(|| unreachable!("Statically-constrained type was not correct"))
     }
 
     /// Writes the provided `data` into the container associating it with the
@@ -240,12 +321,12 @@ impl PassDataMap<PassData> {
     /// question.
     pub fn put<P: ConcretePass>(&mut self, data: P::Data) {
         let data = Box::new(data);
-        self.mapping.insert(P::key(), data);
+        self.put_key(P::key(), data);
     }
 
     /// Clears the data for the pass `P` if it exists.
     pub fn clear<P: ConcretePass>(&mut self) {
-        self.mapping.remove(&P::key());
+        self.clear_key(P::key());
     }
 }
 

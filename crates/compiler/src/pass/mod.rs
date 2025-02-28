@@ -33,10 +33,12 @@
 //! tracked by [#56](https://github.com/reilabs/hieratika/issues/56).
 
 pub mod analysis;
+pub mod check;
 pub mod data;
 
 use std::{
     any::{Any, TypeId},
+    collections::HashSet,
     fmt::Debug,
 };
 
@@ -44,6 +46,7 @@ use downcast_rs::Downcast;
 use hieratika_errors::compile::llvm::{Error, Result};
 
 use crate::{
+    CompilerConfig,
     context::SourceContext,
     pass::data::{ConcretePassData, DynPassDataMap, DynPassReturnData},
 };
@@ -91,7 +94,7 @@ where
     /// potentially-modified context and any data returned by the pass.
     ///
     /// It takes a map of `pass_data` that allows the running pass to get at the
-    /// data required by
+    /// data required by each pass, as well as the compiler's configuration.
     ///
     /// # Errors
     ///
@@ -100,6 +103,7 @@ where
         &mut self,
         context: SourceContext,
         pass_data: &DynPassDataMap,
+        compiler_config: &CompilerConfig,
     ) -> Result<DynPassReturnData>;
 
     /// Gets a slice containing the keys of the passes whose output this pass
@@ -257,7 +261,11 @@ impl PassManager {
     /// # Errors
     ///
     /// - [`Error`] if any pass fails.
-    pub fn run(&mut self, mut context: SourceContext) -> Result<PassManagerReturnData> {
+    pub fn run(
+        &mut self,
+        mut source_ctx: SourceContext,
+        compiler_config: &CompilerConfig,
+    ) -> Result<PassManagerReturnData> {
         let mut pass_data_map = DynPassDataMap::new();
 
         for pass in &mut self.pass_ordering {
@@ -266,7 +274,7 @@ impl PassManager {
             let DynPassReturnData {
                 source_context,
                 data,
-            } = pass.run(context, &pass_data_map)?;
+            } = pass.run(source_ctx, &pass_data_map, compiler_config)?;
 
             // After this pass runs, we have to ensure that anything that it invalidates has
             // the data removed from the pass data mapping.
@@ -279,10 +287,10 @@ impl PassManager {
             pass_data_map.put_key(pass.key_dyn(), data);
 
             // Our context gets overwritten with the new context.
-            context = source_context;
+            source_ctx = source_context;
         }
 
-        let result = PassManagerReturnData::new(context, pass_data_map);
+        let result = PassManagerReturnData::new(source_ctx, pass_data_map);
         Ok(result)
     }
 
@@ -303,20 +311,37 @@ impl PassManager {
     ///   generated from the provided `passes`. This will usually occur due to
     ///   circular dependencies between passes.
     pub fn generate_pass_ordering(passes: Vec<Pass>) -> Result<Vec<Pass>> {
-        // TODO Actually implement this (#56). The current constraint is silly for the
-        // future but sane for now as we only have the one pass.
+        // TODO Actually implement this (#56). For now we care that the
+        // manually-specified order satisfies the pass dependencies.
         //
         // In future it should actually construct a topological ordering of passes based
         // on their declared dependencies and invalidations, only returning an error if
         // there is an unbreakable topological cycle.
-        let no_deps = passes.iter().all(|p| p.depends().is_empty());
-        if no_deps {
-            Ok(passes)
-        } else {
-            Err(Error::InvalidPassOrdering(
-                "Passes had dependencies where they should not".to_string(),
-            ))?
+        //
+        // Alternatively, it should have passes declare what structures they change,
+        // which is a much less brittle methodology than manual declarations of
+        // dependencies and invalidations.
+        let mut valid: HashSet<PassKey> = HashSet::new();
+        for pass in &passes {
+            // We start by checking if the pass' dependencies are satisfied
+            let satisfied = pass.depends().iter().all(|k| valid.contains(k));
+            if !satisfied {
+                Err(Error::InvalidPassOrdering(
+                    "Passes had dependencies where they should not".to_string(),
+                ))?;
+            }
+
+            // Next we remove any invalidated data from the valid set
+            pass.invalidates().iter().for_each(|key| {
+                valid.remove(key);
+            });
+
+            // Then add the pass itself
+            valid.insert(pass.key_dyn());
         }
+
+        // If we get here, then the pass ordering is valid as specified by the user.
+        Ok(passes)
     }
 }
 
@@ -332,7 +357,10 @@ impl Default for PassManager {
     ///
     /// - [`analysis::module_map::BuildModuleMap`]
     fn default() -> Self {
-        Self::new(vec![analysis::module_map::BuildModuleMap::new_dyn()])
-            .expect("Default pass ordering was invalid")
+        Self::new(vec![
+            analysis::module_map::BuildModuleMap::new_dyn(),
+            check::polyfill_redefinitions::DisallowPolyfillRedefinitions::new_dyn(),
+        ])
+        .expect("Default pass ordering was invalid")
     }
 }
