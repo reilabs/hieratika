@@ -16,8 +16,56 @@ runtime. Encapsulated in the `__crt0_init()` function to be implemented as part 
   guest code later.
 
 Only after this work has been done do we jump to the designated `main` symbol of the guest code.
-This `main` must be able to be defined in either the guest language (and hence exposed in LLVM IR),
-or defined in Cairo itself.
+This `main` must be able to be defined in the guest language (and hence exposed in LLVM IR).
+
+It looks something like this:
+
+```
+init:
+  __crt0_init()
+  __hieratika_main()
+```
+
+### Hieratika's Main Function
+
+As our platform is quite different to the operating systems and bare-metal platforms that are
+usually targeted by Rust code, we can be more flexible with what we accept and return as part of it.
+
+Our main function is to be defined as a function with a signature that approximates the following,
+and is to be implemented in the guest language. We may extend this to support writing `main`
+functions in the Cairo language in the future.
+
+```rust
+#[no_mangle]
+fn hieratika_main(inputs: FeltArray) -> FeltArray {
+    // ...
+}
+```
+
+Note that `FeltArray` is currently a stand-in type for whatever type best approximates an LLVM
+`array` type, which will likely need to carry its length auxiliary to it. This could be something
+like LLVM's `[0 x i252]`—as zero-length arrays are fine in LLVM and just mean we can index
+arbitrarily into the memory represented by their pointer—combined with a `i32` for its length.
+
+Effectively, we want `Array` to be something similar to the following:
+
+```rust
+#[repr("C")]
+pub struct FeltArray {
+    /// A raw pointer to the first element in the backing array.
+    array: *mut Felt252,
+
+    /// The number of elements accessible through the pointer `array`.
+    length: usize
+}
+```
+
+In other words, it is a pointer to the first element of an array, and the number of elements in the
+array. This means that it is possible to define in _multiple_ guest languages, and **not** only
+limited to Rust.
+
+For now, we just assume that such a `hieratika_main` function occurs somewhere in our linker
+context, and hence can be called by our initialization / startup code.
 
 ## Allocator
 
@@ -122,11 +170,11 @@ It would function as follows:
 While this approach is quite nasty, it is guaranteed to work. It operates as follows.
 
 1. All functions are re-written by the compiler to take a fixed initial parameter, which is the
-   allocator state. This is implicitly `ptr` but should likely be distinguished at the level of
-   `LLVMType` for clarity.
+   allocator state. This is implicitly `ptr` but should likely be distinguished from other pointers
+   at the level of `LLVMType` for clarity.
 2. The allocator is passed through every function, making it available where it is needed inside the
    polyfills to call the [above](#allocator)-mentioned base functions.
 
 Some particular nastiness here is that when calling Cairo code from Hieratika, the Cairo functions
-would also be required to handle this parameter explicitly, unless we also wanted to perform
+would also likely be required to handle this parameter explicitly, unless we also wanted to perform
 re-writing on the Cairo side.
