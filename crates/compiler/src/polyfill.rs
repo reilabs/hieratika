@@ -54,15 +54,18 @@
 // NOTE: When adding new polyfills, you will need to alter the expected number
 // of polyfills in the tests.
 
-use std::{
-    collections::HashMap,
-    fmt::{Display, Formatter},
-};
+use std::fmt::{Display, Formatter};
 
+use bimap::BiHashMap;
 use hieratika_errors::compile::llvm::{Error, Result};
+use hieratika_mangler::mapping::mangle_type;
 use itertools::Itertools;
 
-use crate::llvm::typesystem::LLVMType;
+use crate::{
+    llvm::typesystem::LLVMType,
+    messages::POLYFILL_REPLACED_IN_MAPPING,
+    obj_gen::data::ObjectContext,
+};
 
 /// Generates a binary operation with the provided `name` and with a type
 /// equivalent to  `a -> a -> a`.
@@ -70,7 +73,7 @@ macro_rules! binop {
     ($name:ident, $tys:ident) => {
         fn $name(&mut self) {
             for typ in Self::$tys() {
-                self.mk(stringify!($name), &[typ.clone(), typ.clone()], typ.clone());
+                self.mk(stringify!($name), &[typ.clone(), typ.clone()], &typ);
             }
         }
     };
@@ -85,12 +88,13 @@ macro_rules! unary_intrinsic {
             for typ in Self::$tys() {
                 let name = format!("{base_name}.{typ}");
                 let arg_types = &[typ.clone()];
-                let return_type = typ.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &typ);
 
-                let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &typ);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     };
@@ -106,12 +110,13 @@ macro_rules! binary_intrinsic {
             for typ in Self::$tys() {
                 let name = format!("{base_name}.{typ}");
                 let arg_types = &[typ.clone(), typ.clone()];
-                let return_type = typ.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &typ);
 
-                let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &typ);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     };
@@ -122,11 +127,13 @@ macro_rules! binary_intrinsic {
                 let name = format!("{base_name}.{}.{typ}", $fixed_ret.clone());
                 let arg_types = &[typ.clone(), typ.clone()];
                 let return_type = $fixed_ret;
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-                let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     };
@@ -134,7 +141,7 @@ macro_rules! binary_intrinsic {
 
 /// A mapping between a specifically-typed opcode instance and the corresponding
 /// polyfill name.
-pub type PolyMapping = HashMap<LLVMOperation, String>;
+pub type PolyMapping = BiHashMap<LLVMOperation, String>;
 
 /// An opcode instance with its types fully specified, used to map specific
 /// instances of opcodes or intrinsics to the specific output polyfill name.
@@ -154,11 +161,11 @@ impl LLVMOperation {
     /// Creates an opcode representing the operation with the given `name`,
     /// parameter types `ops`, and return-type `ret`.
     #[must_use]
-    pub fn of(name: &str, ops: &[LLVMType], ret: LLVMType) -> Self {
+    pub fn of(name: &str, ops: &[LLVMType], ret: &LLVMType) -> Self {
         Self {
             opcode_name:   name.to_string(),
             operand_types: ops.to_vec(),
-            return_type:   ret,
+            return_type:   ret.clone(),
         }
     }
 }
@@ -242,7 +249,7 @@ impl PolyfillMap {
             return_type:   return_type.clone(),
         };
 
-        self.mapping.get(&op)
+        self.mapping.get_by_left(&op)
     }
 
     /// Queries for the polyfill name that corresponds to the provided
@@ -283,6 +290,13 @@ impl PolyfillMap {
         self.get_polyfill(name, param_types, return_type)
             .unwrap_or_else(|| panic!("{name} polyfill was not present"))
     }
+
+    /// Gets the type and input name specification for the provided output
+    /// polyfill `name`.
+    #[must_use]
+    pub fn get_operation_spec(&self, name: &str) -> Option<&LLVMOperation> {
+        self.mapping.get_by_right(name)
+    }
 }
 
 /// Functionality useful for testing and experimenting with this container.
@@ -297,12 +311,6 @@ impl PolyfillMap {
         let mapping = PolyMapping::new();
         Self { mapping }
     }
-
-    /// Adds a specified `operation` and polyfill name pair to the map for
-    /// testing purposes.
-    pub fn insert(&mut self, operation: LLVMOperation, poly_name: &str) {
-        self.mapping.insert(operation, poly_name.to_string());
-    }
 }
 
 /// The definition of the [unary operations](https://llvm.org/docs/LangRef.html#unary-operations).
@@ -313,7 +321,7 @@ impl PolyfillMap {
 
     fn fneg(&mut self) {
         for typ in Self::float_types() {
-            self.mk("fneg", &[typ.clone()], typ.clone());
+            self.mk("fneg", &[typ.clone()], &typ);
         }
     }
 }
@@ -390,13 +398,13 @@ impl PolyfillMap {
     fn alloc(&mut self) {
         // The first argument is the size of the allocation in bits, while the second
         // argument is the number of instances of that size to allocate.
-        self.mk("alloc", &[LLVMType::i64, LLVMType::i64], LLVMType::ptr);
+        self.mk("alloc", &[LLVMType::i64, LLVMType::i64], &LLVMType::ptr);
     }
 
     fn alloca(&mut self) {
         // The first argument is the size of the allocation in bits, while the second
         // argument is the number of instances of that size to allocate.
-        self.mk("alloca", &[LLVMType::i64, LLVMType::i64], LLVMType::ptr);
+        self.mk("alloca", &[LLVMType::i64, LLVMType::i64], &LLVMType::ptr);
     }
 
     fn load(&mut self) {
@@ -408,7 +416,7 @@ impl PolyfillMap {
         // Our load function takes the pointer to load and an offset in bits from
         // that pointer, and returns the result of loading from that pointer.
         for typ in Self::numptr_types() {
-            self.mk("load", &[LLVMType::ptr, LLVMType::i64], typ);
+            self.mk("load", &[LLVMType::ptr, LLVMType::i64], &typ);
         }
     }
 
@@ -425,7 +433,7 @@ impl PolyfillMap {
             self.mk(
                 "store",
                 &[typ, LLVMType::ptr, LLVMType::i64],
-                LLVMType::void,
+                &LLVMType::void,
             );
         }
     }
@@ -435,7 +443,7 @@ impl PolyfillMap {
             self.mk(
                 "cmpxchg",
                 &[LLVMType::ptr, typ.clone(), typ.clone()],
-                LLVMType::make_struct(false, &[typ.clone(), LLVMType::bool]),
+                &LLVMType::make_struct(false, &[typ.clone(), LLVMType::bool]),
             );
         }
     }
@@ -448,7 +456,7 @@ impl PolyfillMap {
         for op in numptr_ops {
             for typ in Self::numptr_types() {
                 let op_name = format!("{op_name}_{op}");
-                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], typ.clone());
+                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], &typ);
             }
         }
 
@@ -461,7 +469,7 @@ impl PolyfillMap {
         for op in int_ops {
             for typ in Self::integer_types() {
                 let op_name = format!("{op_name}_{op}");
-                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], typ.clone());
+                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], &typ);
             }
         }
 
@@ -470,7 +478,7 @@ impl PolyfillMap {
         for op in float_ops {
             for typ in Self::float_types() {
                 let op_name = format!("{op_name}_{op}");
-                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], typ.clone());
+                self.mk(&op_name, &[LLVMType::ptr, typ.clone()], &typ);
             }
         }
     }
@@ -485,7 +493,7 @@ impl PolyfillMap {
         self.mk(
             "getelementptr",
             &[LLVMType::ptr, LLVMType::i64],
-            LLVMType::ptr,
+            &LLVMType::ptr,
         );
     }
 
@@ -505,9 +513,13 @@ impl PolyfillMap {
     fn trunc_op(&mut self) {
         for source_ty in Self::integer_types().iter().rev() {
             for target_ty in Self::integer_types().iter().take_while(|ty| *ty != source_ty) {
-                let op = LLVMOperation::of("trunc", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("trunc", &[source_ty.clone()], target_ty);
+                let source_ty = Self::mangle(source_ty);
+                let target_ty = Self::mangle(target_ty);
                 let name = format!("__llvm_trunc_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -519,9 +531,13 @@ impl PolyfillMap {
                 .skip_while(|ty| *ty != &source_ty)
                 .skip(1)
             {
-                let op = LLVMOperation::of("zext", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("zext", &[source_ty.clone()], target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(target_ty);
                 let name = format!("__llvm_zext_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -533,9 +549,13 @@ impl PolyfillMap {
                 .skip_while(|ty| *ty != &source_ty)
                 .skip(1)
             {
-                let op = LLVMOperation::of("sext", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("sext", &[source_ty.clone()], target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(target_ty);
                 let name = format!("__llvm_sext_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -543,9 +563,13 @@ impl PolyfillMap {
     fn fptrunc(&mut self) {
         for source_ty in Self::float_types().iter().rev() {
             for target_ty in Self::float_types().iter().take_while(|ty| *ty != source_ty) {
-                let op = LLVMOperation::of("fptrunc", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("fptrunc", &[source_ty.clone()], target_ty);
+                let source_ty = Self::mangle(source_ty);
+                let target_ty = Self::mangle(target_ty);
                 let name = format!("__llvm_fptrunc_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -553,9 +577,13 @@ impl PolyfillMap {
     fn fpext(&mut self) {
         for source_ty in Self::float_types() {
             for target_ty in Self::float_types().iter().skip_while(|ty| *ty != &source_ty).skip(1) {
-                let op = LLVMOperation::of("fpext", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("fpext", &[source_ty.clone()], target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(target_ty);
                 let name = format!("__llvm_fpext_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -563,9 +591,13 @@ impl PolyfillMap {
     fn fptoui(&mut self) {
         for source_ty in Self::float_types() {
             for target_ty in Self::integer_types() {
-                let op = LLVMOperation::of("fptoui", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("fptoui", &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
                 let name = format!("__llvm_fptoui_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -573,9 +605,13 @@ impl PolyfillMap {
     fn fptosi(&mut self) {
         for source_ty in Self::float_types() {
             for target_ty in Self::integer_types() {
-                let op = LLVMOperation::of("fptosi", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("fptosi", &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
                 let name = format!("__llvm_fptosi_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -583,9 +619,13 @@ impl PolyfillMap {
     fn uitofp(&mut self) {
         for source_ty in Self::integer_types() {
             for target_ty in Self::float_types() {
-                let op = LLVMOperation::of("uitofp", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("uitofp", &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
                 let name = format!("__llvm_uitofp_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -593,9 +633,13 @@ impl PolyfillMap {
     fn sitofp(&mut self) {
         for source_ty in Self::integer_types() {
             for target_ty in Self::float_types() {
-                let op = LLVMOperation::of("sitofp", &[source_ty.clone()], target_ty.clone());
+                let op = LLVMOperation::of("sitofp", &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
                 let name = format!("__llvm_sitofp_{source_ty}_to_{target_ty}");
-                self.mapping.insert(op, name);
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -603,18 +647,26 @@ impl PolyfillMap {
     fn ptrtoint(&mut self) {
         for target_ty in Self::integer_types() {
             let source_ty = LLVMType::ptr;
-            let op = LLVMOperation::of("ptrtoint", &[source_ty.clone()], target_ty.clone());
+            let op = LLVMOperation::of("ptrtoint", &[source_ty.clone()], &target_ty);
+            let source_ty = Self::mangle(&source_ty);
+            let target_ty = Self::mangle(&target_ty);
             let name = format!("__llvm_ptrtoint_{source_ty}_to_{target_ty}");
-            self.mapping.insert(op, name);
+            self.mapping
+                .insert_no_overwrite(op, name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
     fn inttoptr(&mut self) {
         for source_ty in Self::integer_types() {
             let target_ty = LLVMType::ptr;
-            let op = LLVMOperation::of("inttoptr", &[source_ty.clone()], target_ty.clone());
+            let op = LLVMOperation::of("inttoptr", &[source_ty.clone()], &target_ty);
+            let source_ty = Self::mangle(&source_ty);
+            let target_ty = Self::mangle(&target_ty);
             let name = format!("__llvm_inttoptr_{source_ty}_to_{target_ty}");
-            self.mapping.insert(op, name);
+            self.mapping
+                .insert_no_overwrite(op, name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -643,7 +695,7 @@ impl PolyfillMap {
         for op in ops {
             let name = format!("icmp_{op}");
             for typ in Self::intptr_types() {
-                self.mk(&name, &[typ.clone(), typ.clone()], LLVMType::bool);
+                self.mk(&name, &[typ.clone(), typ.clone()], &LLVMType::bool);
             }
         }
     }
@@ -657,7 +709,7 @@ impl PolyfillMap {
         for op in ops {
             let name = format!("fcmp_{op}");
             for typ in Self::float_types() {
-                self.mk(&name, &[typ.clone(), typ.clone()], LLVMType::bool);
+                self.mk(&name, &[typ.clone(), typ.clone()], &LLVMType::bool);
             }
         }
     }
@@ -754,11 +806,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{typ}");
             let arg_types = &[LLVMType::ptr, LLVMType::ptr, typ.clone(), LLVMType::bool];
             let return_type = LLVMType::void;
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -772,11 +826,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{typ}");
             let arg_types = &[LLVMType::ptr, LLVMType::i8, typ.clone(), LLVMType::bool];
             let return_type = LLVMType::void;
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -787,11 +843,13 @@ impl PolyfillMap {
                 let name = format!("{base_name}.{}.{}", &base_ty, &exponent_ty);
                 let arg_types = &[base_ty.clone(), exponent_ty.clone()];
                 let return_type = base_ty.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-                let polyfill_name = Self::polyfill_name(base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -802,11 +860,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{typ}");
             let arg_types = &[typ.clone()];
             let return_type = LLVMType::make_struct(false, &[typ.clone(), typ.clone()]);
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -817,11 +877,13 @@ impl PolyfillMap {
                 let name = format!("{base_name}.{}.{}", &base_ty, &exponent_ty);
                 let arg_types = &[base_ty.clone(), exponent_ty.clone()];
                 let return_type = base_ty.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-                let polyfill_name = Self::polyfill_name(base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -832,11 +894,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}.{}", &typ, LLVMType::i32);
             let arg_types = &[typ.clone(), LLVMType::i32];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -846,11 +910,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}.{}", &typ, LLVMType::i32);
             let arg_types = &[typ.clone()];
             let return_type = LLVMType::make_struct(false, &[typ.clone(), LLVMType::i32]);
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -860,11 +926,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone(), typ.clone()];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -875,11 +943,13 @@ impl PolyfillMap {
                 let name = format!("{base_name}.{}.{}", &target_typ, &source_typ);
                 let arg_types = &[source_typ.clone()];
                 let return_type = target_typ.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-                let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -956,11 +1026,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), LLVMType::bool];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -970,11 +1042,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone(), typ.clone()];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -997,11 +1071,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone()];
             let return_type = LLVMType::make_struct(false, &[typ.clone(), LLVMType::bool]);
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1023,11 +1099,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone()];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1053,11 +1131,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone(), LLVMType::i32];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1081,11 +1161,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone(), typ.clone(), typ.clone()];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1102,11 +1184,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[typ.clone()];
             let return_type = LLVMType::f16;
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1116,11 +1200,13 @@ impl PolyfillMap {
             let name = format!("{base_name}.{}", &typ);
             let arg_types = &[LLVMType::f16];
             let return_type = typ.clone();
-            let op = LLVMOperation::of(&name, arg_types, return_type);
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-            let polyfill_name = Self::polyfill_name(base_name, arg_types);
+            let polyfill_name = Self::polyfill_name(base_name, arg_types, &return_type);
 
-            self.mapping.insert(op, polyfill_name);
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
         }
     }
 
@@ -1139,11 +1225,13 @@ impl PolyfillMap {
                 let name = format!("{base_name}.{}.{}", &target_type, &source_type);
                 let arg_types = &[source_type.clone()];
                 let return_type = target_type.clone();
-                let op = LLVMOperation::of(&name, arg_types, return_type);
+                let op = LLVMOperation::of(&name, arg_types, &return_type);
 
-                let polyfill_name = Self::polyfill_name(&base_name, arg_types);
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
 
-                self.mapping.insert(op, polyfill_name);
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
             }
         }
     }
@@ -1156,26 +1244,44 @@ impl PolyfillMap {
 
 /// Useful static functions for dealing with polyfills.
 impl PolyfillMap {
-    pub fn mk(&mut self, name: &str, params: &[LLVMType], ret: LLVMType) {
-        self.mapping.insert(
-            LLVMOperation::of(name, params, ret),
-            Self::polyfill_name(name, params),
-        );
+    /// Inserts a polyfill into the map with an autogenerated name.
+    ///
+    /// # Panics
+    ///
+    /// - If the polyfill configuration replaces another polyfill when inserting
+    ///   into the polyfill mapping.
+    pub fn mk(&mut self, name: &str, params: &[LLVMType], ret: &LLVMType) {
+        let op = LLVMOperation::of(name, params, ret);
+        let generated_name = Self::polyfill_name(name, params, ret);
+        self.mapping
+            .insert_no_overwrite(op.clone(), generated_name.clone())
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Polyfill {op} with generated name {generated_name} replaced another in the \
+                     mapping"
+                )
+            });
     }
 
     /// Generates the name for a polyfill for the provided `func_name` called
-    /// with the provided `types`.
+    /// with the provided argument `types` and `return_type`.
+    ///
+    /// # Panics
+    ///
+    /// - If any of the provided types cannot be converted to FLO types.
     #[must_use]
-    pub fn polyfill_name(func_name: &str, types: &[LLVMType]) -> String {
-        let types_str = if types.is_empty() {
-            "void".to_string()
+    pub fn polyfill_name(func_name: &str, types: &[LLVMType], return_type: &LLVMType) -> String {
+        let types = if types.is_empty() {
+            &[LLVMType::void]
         } else {
-            types.iter().map(std::string::ToString::to_string).join("_")
+            types
         };
+        let types_str = types.iter().map(Self::mangle).join("_");
+        let return_str = Self::mangle(return_type);
 
         let func_name_no_dots = func_name.replace('.', "_").replace("llvm_", "");
 
-        format!("__llvm_{func_name_no_dots}_{types_str}")
+        format!("__llvm_{func_name_no_dots}_{types_str}_{return_str}")
     }
 
     /// Gets the types that we want to generate integer operations over.
@@ -1225,6 +1331,20 @@ impl PolyfillMap {
         num_types.push(LLVMType::ptr);
         num_types
     }
+
+    /// Converts the provided type to the mangled representation of that type.
+    ///
+    /// # Panics
+    ///
+    /// - If `typ` cannot be represented in the FLO type system.
+    /// - If `typ` cannot be mangled.
+    #[must_use]
+    pub fn mangle(typ: &LLVMType) -> String {
+        let flo_type = ObjectContext::flo_type_of(typ)
+            .unwrap_or_else(|_| panic!("Attempted to convert non-FLO type {typ} to mangled form"));
+        mangle_type(&flo_type)
+            .unwrap_or_else(|_| panic!("Attempted to mangle non-manglable type {flo_type:?}"))
+    }
 }
 
 impl Default for PolyfillMap {
@@ -1235,6 +1355,9 @@ impl Default for PolyfillMap {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+    use regex::bytes::Regex;
+
     use crate::{llvm::typesystem::LLVMType, polyfill::PolyfillMap};
 
     #[test]
@@ -1249,7 +1372,7 @@ mod test {
         assert!(polyfill.is_some());
         let name = polyfill.unwrap();
 
-        assert_eq!(name, "__llvm_uadd_with_overflow_i64_i64");
+        assert_eq!(name, "__llvm_uadd_with_overflow_l_l_Slcs");
     }
 
     #[test]
@@ -1257,5 +1380,20 @@ mod test {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
         assert_eq!(count, 1559);
+    }
+
+    #[test]
+    fn polyfills_contain_no_invalid_chars() {
+        let allowed_chars = Regex::new("^[0-9a-zA-Z_]+$").expect("Static regex did not compile");
+        let polyfill_names = PolyfillMap::new().iter().map(|(_, v)| v.to_string()).collect_vec();
+
+        // Yes, this could be written as `iter().all(...)` but it makes debugging easier
+        // if we can see which one failed.
+        for name in polyfill_names {
+            assert!(
+                allowed_chars.is_match(name.as_bytes()),
+                "{name} is an invalid polyfill name"
+            );
+        }
     }
 }

@@ -105,6 +105,7 @@
 #![expect(clippy::module_name_repetitions)] // Allows for better API naming
 #![expect(clippy::multiple_crate_versions)] // Enforced by our dependencies
 
+pub mod config;
 pub mod constant;
 pub mod context;
 pub mod llvm;
@@ -118,6 +119,7 @@ use hieratika_errors::compile::llvm::{Error, Result};
 use hieratika_flo::FlatLoweredObject;
 
 use crate::{
+    config::CompilerConfig,
     constant::{TARGET_DATA_LAYOUT, TARGET_TRIPLE},
     context::SourceContext,
     llvm::data_layout::DataLayout,
@@ -164,22 +166,21 @@ pub struct Compiler {
     /// The passes that this compiler is configured to run.
     pub passes: PassManager,
 
-    /// The mapping between LLVM names and polyfill names for the compiler to
-    /// use during compilation.
-    pub polyfill_map: PolyfillMap,
+    /// The auxiliary configuration for the compiler's behavior.
+    pub config: CompilerConfig,
 }
 
 /// The basic operations required of the compiler.
 impl Compiler {
     /// Constructs a new compiler instance, wrapping the provided `context`
     /// describing the LLVM module to compile, the `passes` to run, and the
-    /// `polyfill_map` from LLVM names to polyfill names.
+    /// provided `config`.
     #[must_use]
-    pub fn new(context: SourceContext, passes: PassManager, polyfill_map: PolyfillMap) -> Self {
+    pub fn new(context: SourceContext, passes: PassManager, config: CompilerConfig) -> Self {
         Self {
             context,
             passes,
-            polyfill_map,
+            config,
         }
     }
 
@@ -202,7 +203,8 @@ impl Compiler {
         self.is_compatible_target()?;
 
         // First we have to run all the passes and collect their data.
-        let PassManagerReturnData { context, data } = self.passes.run(self.context)?;
+        let PassManagerReturnData { context, data } =
+            self.passes.run(self.context, &self.config)?;
 
         // After that, we can grab the module name out of the pass data.
         let mod_name = data
@@ -212,7 +214,7 @@ impl Compiler {
             .clone();
 
         // Then we can put our builder together and start the code generation process.
-        let builder = ObjectGenerator::new(&mod_name, data, context, self.polyfill_map)?;
+        let builder = ObjectGenerator::new(&mod_name, data, context, self.config.polyfills)?;
         builder.run()
     }
 
@@ -346,7 +348,9 @@ impl CompilerBuilder {
         Compiler::new(
             self.context,
             self.passes.unwrap_or_default(),
-            self.polyfill_map.unwrap_or_default(),
+            CompilerConfig {
+                polyfills: self.polyfill_map.unwrap_or_default(),
+            },
         )
     }
 }

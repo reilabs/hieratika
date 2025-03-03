@@ -18,6 +18,11 @@ pub const MISSING_MODULE_MAP: &str =
 /// element.
 pub const STRUCT_TYPE_WITH_NO_MEMBERS: &str = "Struct type had no members but must have at least 1";
 
+/// An error message for when a polyfill is inadvertently replaced while
+/// constructing the polyfill mapping.
+pub const POLYFILL_REPLACED_IN_MAPPING: &str =
+    "A polyfill was replaced when constructing the polyfill mapping";
+
 /// Asserts that the provided `instruction` is an instruction of the `expected`
 /// opcode.
 ///

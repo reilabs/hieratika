@@ -17,6 +17,7 @@ use inkwell::{
 };
 
 use crate::{
+    CompilerConfig,
     context::SourceContext,
     llvm::{
         TopLevelEntryKind,
@@ -265,6 +266,7 @@ impl PassOps for BuildModuleMap {
         &mut self,
         context: SourceContext,
         _pass_data: &DynPassDataMap,
+        _compiler_config: &CompilerConfig,
     ) -> Result<DynPassReturnData> {
         let analysis_result = context.analyze_module(|module| self.map_module(module))?;
         Ok(DynPassReturnData::new(context, Box::new(analysis_result)))
@@ -432,6 +434,7 @@ mod test {
     use inkwell::{GlobalVisibility, module::Linkage};
 
     use crate::{
+        CompilerConfig,
         context::SourceContext,
         llvm::{
             TopLevelEntryKind,
@@ -453,6 +456,12 @@ mod test {
             .expect("Unable to construct testing source context")
     }
 
+    /// A utility function to make it easy to provide a default compiler config
+    /// for testing.
+    fn c_cfg() -> CompilerConfig {
+        CompilerConfig::default()
+    }
+
     #[test]
     fn generates_random_names_for_anon_modules() {
         let map_1 = ModuleMap::new("", DataLayout::new("").unwrap());
@@ -467,7 +476,7 @@ mod test {
         let ctx = get_test_context();
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
-        let dyn_return_data = pass.run(ctx, &data)?;
+        let dyn_return_data = pass.run(ctx, &data, &c_cfg())?;
 
         // We should be able to get the pass data as the correct associated type.
         assert!(
@@ -487,7 +496,7 @@ mod test {
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
-        let dyn_return_data = pass.run(ctx, &data)?;
+        let dyn_return_data = pass.run(ctx, &data, &c_cfg())?;
         let map = dyn_return_data
             .data
             .view_as::<<BuildModuleMap as ConcretePass>::Data>()
@@ -508,7 +517,7 @@ mod test {
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
-        let dyn_return_data = pass.run(ctx, &data)?;
+        let dyn_return_data = pass.run(ctx, &data, &c_cfg())?;
         let map = dyn_return_data
             .data
             .view_as::<<BuildModuleMap as ConcretePass>::Data>()
@@ -572,7 +581,7 @@ mod test {
         let data = DynPassDataMap::new();
         let mut pass = BuildModuleMap::new_dyn();
 
-        let dyn_return_data = pass.run(ctx, &data)?;
+        let dyn_return_data = pass.run(ctx, &data, &c_cfg())?;
         let map = dyn_return_data
             .data
             .view_as::<<BuildModuleMap as ConcretePass>::Data>()
