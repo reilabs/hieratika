@@ -1,4 +1,5 @@
 pub mod icmp_sgt_i8;
+pub mod icmp_sgt_i16;
 
 use crate::alu::scmp::scmp;
 use core::num::traits::{BitSize, Bounded, OverflowingSub};

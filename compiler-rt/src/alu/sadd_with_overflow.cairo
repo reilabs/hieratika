@@ -1,4 +1,5 @@
 pub mod sadd_with_overflow_i8;
+pub mod sadd_with_overflow_i16;
 
 use crate::utils::{assert_fits_in_type, OverflowDirection};
 use crate::alu::shl::shl;

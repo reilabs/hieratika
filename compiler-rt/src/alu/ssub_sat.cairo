@@ -1,4 +1,5 @@
 pub mod ssub_sat_i8;
+pub mod ssub_sat_i16;
 
 use crate::alu::ssub_with_overflow::signed_subtract_with_overflow;
 use crate::alu::shl::shl;

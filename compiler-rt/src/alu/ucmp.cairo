@@ -1,4 +1,5 @@
 pub mod ucmp_i8;
+pub mod ucmp_i16;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};

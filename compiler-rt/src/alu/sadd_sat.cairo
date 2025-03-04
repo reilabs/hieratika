@@ -1,4 +1,5 @@
 pub mod sadd_sat_i8;
+pub mod sadd_sat_i16;
 
 use crate::alu::sadd_with_overflow::signed_addition_with_overflow;
 use crate::alu::shl::shl;

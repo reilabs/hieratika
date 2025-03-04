@@ -1,4 +1,5 @@
 pub mod sub_i8;
+pub mod sub_i16;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, WrappingSub};
