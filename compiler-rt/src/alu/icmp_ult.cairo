@@ -1,5 +1,6 @@
 pub mod icmp_ult_i8;
 pub mod icmp_ult_i16;
+pub mod icmp_ult_i64;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};

@@ -1,5 +1,6 @@
 pub mod ushl_sat_i8;
 pub mod ushl_sat_i16;
+pub mod ushl_sat_i64;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

@@ -1,5 +1,6 @@
 pub mod usub_with_overflow_i8;
 pub mod usub_with_overflow_i16;
+pub mod usub_with_overflow_i64;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, OverflowingSub};

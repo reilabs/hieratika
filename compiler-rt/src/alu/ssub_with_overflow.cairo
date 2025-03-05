@@ -1,5 +1,6 @@
 pub mod ssub_with_overflow_i8;
 pub mod ssub_with_overflow_i16;
+pub mod ssub_with_overflow_i64;
 
 use crate::utils::{assert_fits_in_type, OverflowDirection};
 use crate::alu::shl::shl;
