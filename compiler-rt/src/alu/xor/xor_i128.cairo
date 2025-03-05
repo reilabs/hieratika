@@ -1,12 +1,12 @@
 use crate::alu::xor::xor;
 
-pub fn __llvm_xor_i128_i128(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_xor_o_o_o(lhs: u128, rhs: u128) -> u128 {
     xor::<u128>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_xor_i128_i128;
+    use super::__llvm_xor_o_o_o;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 43] = [
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_i128() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_xor_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_xor_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }

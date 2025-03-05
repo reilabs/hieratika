@@ -1,6 +1,6 @@
 use crate::alu::sadd_with_overflow::sadd_with_overflow;
 
-pub fn __llvm_sadd_with_overflow_i8_i8(lhs: u128, rhs: u128) -> (u128, bool) {
+pub fn __llvm_sadd_with_overflow_b_b_Sbcs(lhs: u128, rhs: u128) -> (u128, bool) {
     // Due to Cairo limitation in iN<->uN casting and not enough operations implemented on iN,
     // we cannot use i8 as the concrete type. The operation is performed using unsigned
     // types and overflow is manually detected.
@@ -9,7 +9,7 @@ pub fn __llvm_sadd_with_overflow_i8_i8(lhs: u128, rhs: u128) -> (u128, bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_sadd_with_overflow_i8_i8;
+    use super::__llvm_sadd_with_overflow_b_b_Sbcs;
     use crate::alu::test_case::TestCaseTwoArgsTwoExpected;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgsTwoExpected; 260] = [
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn test_i8() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sadd_with_overflow_i8_i8(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_sadd_with_overflow_b_b_Sbcs(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }
