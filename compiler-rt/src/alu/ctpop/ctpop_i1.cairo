@@ -1,4 +1,4 @@
-pub fn __llvm_ctpop_i1(value: u128) -> u128 {
+pub fn __llvm_ctpop_c_c(value: u128) -> u128 {
     if value > 1 {
         panic!("value = {:?} does not fit in i1", value)
     }
@@ -9,7 +9,7 @@ pub fn __llvm_ctpop_i1(value: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_ctpop_i1;
+    use super::__llvm_ctpop_c_c;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 2] = [
@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ctpop_i1(*case.arg), *case.expected);
+            assert_eq!(__llvm_ctpop_c_c(*case.arg), *case.expected);
         }
     }
 }

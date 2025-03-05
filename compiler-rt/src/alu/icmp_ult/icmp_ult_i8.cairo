@@ -1,12 +1,12 @@
 use crate::alu::icmp_ult::icmp_ult;
 
-pub fn __llvm_icmp_ult_i8_i8(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_icmp_ult_b_b_c(lhs: u128, rhs: u128) -> u128 {
     icmp_ult::<u8>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_icmp_ult_i8_i8;
+    use super::__llvm_icmp_ult_b_b_c;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 260] = [
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn test_i8() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_icmp_ult_i8_i8(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_icmp_ult_b_b_c(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }

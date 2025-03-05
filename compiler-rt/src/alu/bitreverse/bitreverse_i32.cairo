@@ -1,12 +1,12 @@
 use crate::alu::bitreverse::bitreverse;
 
-pub fn __llvm_bitreverse_i32(value: u128) -> u128 {
+pub fn __llvm_bitreverse_i_i(value: u128) -> u128 {
     bitreverse::<u32>(value)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_bitreverse_i32;
+    use super::__llvm_bitreverse_i_i;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 512] = [
@@ -528,7 +528,7 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_bitreverse_i32(*case.arg), *case.expected);
+            assert_eq!(__llvm_bitreverse_i_i(*case.arg), *case.expected);
         }
     }
 }

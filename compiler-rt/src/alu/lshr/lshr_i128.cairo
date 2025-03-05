@@ -1,12 +1,12 @@
 use crate::alu::lshr::lshr;
 
-pub fn __llvm_lshr_i128_i128(n: u128, shift: u128) -> u128 {
+pub fn __llvm_lshr_o_o_o(n: u128, shift: u128) -> u128 {
     lshr::<u128>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_lshr_i128_i128;
+    use super::__llvm_lshr_o_o_o;
     use crate::alu::test_case::TestCaseTwoArgs;
     // Tests are split to multiple chunks due to gas limit being exceeded
     // if they are in a one giant array
@@ -339,49 +339,49 @@ mod tests {
     #[test]
     fn test_i128_shifts_ones_1() {
         for case in test_cases_shifts_ones_1.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_ones_2() {
         for case in test_cases_shifts_ones_2.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_ones_3() {
         for case in test_cases_shifts_ones_3.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_1() {
         for case in test_cases_shifts_zeros_1.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_2() {
         for case in test_cases_shifts_zeros_2.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_3() {
         for case in test_cases_shifts_zeros_3.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shift_mixed() {
         for case in test_cases_shift_mixed.span() {
-            assert_eq!(__llvm_lshr_i128_i128(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }
