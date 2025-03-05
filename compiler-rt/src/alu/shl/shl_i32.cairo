@@ -1,12 +1,12 @@
 use crate::alu::shl::shl;
 
-pub fn __llvm_shl_i32_i32(n: u128, shift: u128) -> u128 {
+pub fn __llvm_shl_i_i_i(n: u128, shift: u128) -> u128 {
     shl::<u32>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_shl_i32_i32;
+    use super::__llvm_shl_i_i_i;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 73] = [
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_shl_i32_i32(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_shl_i_i_i(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }

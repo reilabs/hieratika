@@ -1,12 +1,12 @@
 use crate::alu::ctlz::ctlz;
 
-pub fn __llvm_ctlz_i32(value: u128, _is_zero_poison: u128) -> u128 {
+pub fn __llvm_ctlz_i_c_i(value: u128, _is_zero_poison: u128) -> u128 {
     ctlz::<u32>(value)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_ctlz_i32;
+    use super::__llvm_ctlz_i_c_i;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 1024] = [
@@ -1040,7 +1040,7 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ctlz_i32(*case.arg, 0), *case.expected);
+            assert_eq!(__llvm_ctlz_i_c_i(*case.arg, 0), *case.expected);
         }
     }
 }

@@ -1,12 +1,12 @@
 use crate::alu::and::and;
 
-pub fn __llvm_and_i16_i16(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_and_z_z_z(lhs: u128, rhs: u128) -> u128 {
     and::<u16>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_and_i16_i16;
+    use super::__llvm_and_z_z_z;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 43] = [
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_i16() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_and_i16_i16(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_and_z_z_z(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }
