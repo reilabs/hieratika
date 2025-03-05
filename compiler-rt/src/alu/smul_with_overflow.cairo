@@ -1,4 +1,5 @@
 pub mod smul_with_overflow_i8;
+pub mod smul_with_overflow_i16;
 
 use crate::utils::{assert_fits_in_type, extend_sign};
 use crate::alu::shl::shl;

@@ -1,4 +1,5 @@
 pub mod scmp_i8;
+pub mod scmp_i16;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

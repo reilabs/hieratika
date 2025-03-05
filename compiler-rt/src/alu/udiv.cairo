@@ -1,4 +1,5 @@
 pub mod udiv_i8;
+pub mod udiv_i16;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, Bounded};

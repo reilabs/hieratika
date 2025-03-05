@@ -1,4 +1,5 @@
 pub mod uadd_sat_i8;
+pub mod uadd_sat_i16;
 
 use crate::alu::uadd_with_overflow::uadd_with_overflow;
 use core::num::traits::{BitSize, Bounded, OverflowingAdd};

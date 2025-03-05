@@ -1,7 +1,10 @@
-pub mod zext_i8_i128;
-pub mod zext_i8_i64;
-pub mod zext_i8_i32;
 pub mod zext_i8_i16;
+pub mod zext_i8_i32;
+pub mod zext_i8_i64;
+pub mod zext_i8_i128;
+pub mod zext_i16_i32;
+pub mod zext_i16_i64;
+pub mod zext_i16_i128;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};

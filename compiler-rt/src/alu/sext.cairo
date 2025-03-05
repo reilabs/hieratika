@@ -1,7 +1,10 @@
-pub mod sext_i8_i128;
-pub mod sext_i8_i64;
-pub mod sext_i8_i32;
 pub mod sext_i8_i16;
+pub mod sext_i8_i32;
+pub mod sext_i8_i64;
+pub mod sext_i8_i128;
+pub mod sext_i16_i32;
+pub mod sext_i16_i64;
+pub mod sext_i16_i128;
 
 use crate::utils::{assert_fits_in_type, extend_sign};
 use core::num::traits::{BitSize, Bounded};

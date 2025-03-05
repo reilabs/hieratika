@@ -15,7 +15,6 @@
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    cairo.url = "github:cairo-nix/cairo-nix";
   };
 
   # The results of our flake.
@@ -26,7 +25,6 @@
     crane,
     fenix,
     naersk,
-    cairo,
   }:
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -113,6 +111,7 @@
         devshellPackages = [
           pkgs.nodejs_22
           pkgs.cargo-deny
+          pkgs.cairo-lang
         ];
       in {
         packages = {

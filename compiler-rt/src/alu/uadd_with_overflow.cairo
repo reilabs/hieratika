@@ -1,4 +1,5 @@
 pub mod uadd_with_overflow_i8;
+pub mod uadd_with_overflow_i16;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, OverflowingAdd};
