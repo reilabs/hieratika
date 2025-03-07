@@ -36,7 +36,7 @@ are as follows:
 
 [Polyfills](../crates/compiler/src/polyfill.rs) are pieces of functionality with _known names_ that
 are implemented directly in Cairo to provide common runtime operations to the compiled code. They
-range from simple things like `__llvm_add_i8_i8` (add two `i8`s together) to far more complex things
+range from simple things like `__llvm_add_b_b_b` (add two `i8`s together) to far more complex things
 like `atomicrmw`. This memory model design is concerned with the core memory polyfills. These need
 to be able to allocate memory, both on the heap and on the "stack", while also being able to
 manipulate that memory.
@@ -44,31 +44,32 @@ manipulate that memory.
 Hieratika defines two polyfills and two _sets of_ polyfills for interacting with memory. The two
 polyfills are as follows:
 
-- `fn alloc(size_bits: usize, count: usize) -> ptr`: This polyfill allocates a contiguous region of
-  `size * count` bits of memory, and returns the pointer to the start of that memory region. This
-  can be thought of as a heap allocation.
-- `fn alloca(size_bits: usize, count: usize) -> ptr`: This polyfill allocates a contiguous region of
-  `size * count` bits of memory, and returns the pointer to the start of that memory region. This
-  can be thought of as a local allocation. Said allocations go out of scope once the function
-  containing the allocation returns. Due to the memory model, however, they are never deallocated,
-  and this is purely an illustrative difference to `alloc` above.
+- `fn __llvm_alloc_l_l_p(size_bits: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
+  region of `size * count` bits of memory, and returns the pointer to the start of that memory
+  region. This can be thought of as a heap allocation.
+- `fn __llvm_alloca_l_l_p(size_bits: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
+  region of `size * count` bits of memory, and returns the pointer to the start of that memory
+  region. This can be thought of as a local allocation. Said allocations go out of scope once the
+  function containing the allocation returns. Due to the memory model, however, they are never
+  deallocated, and this is purely an illustrative difference to `alloc` above.
 
 Hieratika also needs to be able to `load` from and `store` to memory. Unfortunately, the tool's
 strongly-typed target (in the form of `FlatLowered`) means that types simply cannot be punned. In
 other words, there needs to exist a `load` and `store` for every type.
 
 The problem with _this_, however, is that the space of types is _infinite_. To that end, the
-hieratika compiler decomposes loads and stores of aggregate types (structures, arrays, and so on)
+Hieratika compiler decomposes loads and stores of aggregate types (structures, arrays, and so on)
 into loads and stores to primitives at the correct offsets. The `load` and `store` polyfills are
 hence defined for each of the following primitive types: `bool` (`i1`), `i8`, `i16`, `i24`, `i32`,
 `i40`, `i48`, `i64`, `i128`, `f16`, `f32` (`float`), `f64` (`double`), `f128` (`fp128`) and `ptr`.
 These families of polyfills are as follows:
 
-- `fn load<T>(address: ptr, offset_bits: usize) -> T`: This polyfill takes an `address`, as well as
-  a `offset` from that address in bits, and loads a value of type `T` from the specified location.
-- `fn store<T>(value: T, address: ptr, offset_bits: usize) -> ()`: This polyfill takes a value of
-  type `T`, an `address` and an `offset` from that address in bits, and stores the provided `value`
-  at the specified location.
+- `fn __llvm_load_p_l_T<T>(address: Address, offset_bits: i64) -> T`: This polyfill takes an
+  `address`, as well as a `offset` from that address in bits, and loads a value of type `T` from the
+  specified location.
+- `fn __llvm_store_T_p_l_v<T>(value: T, address: Address, offset_bits: i64) -> ()`: This polyfill
+  takes a value of type `T`, an `address` and an `offset` from that address in bits, and stores the
+  provided `value` at the specified location.
 
 For now, if any of these polyfills fails to operate correctly (such as encountering a load from a
 non-allocated memory region), they panic.
