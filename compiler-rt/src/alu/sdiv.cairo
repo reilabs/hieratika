@@ -1,5 +1,6 @@
 pub mod sdiv_i8;
 pub mod sdiv_i16;
+pub mod sdiv_i32;
 pub mod sdiv_i64;
 
 use crate::utils::{assert_fits_in_type, negate_twos_complement};

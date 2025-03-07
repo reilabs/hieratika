@@ -1,5 +1,6 @@
 pub mod ashr_i8;
 pub mod ashr_i16;
+pub mod ashr_i32;
 pub mod ashr_i64;
 
 use crate::utils::assert_fits_in_type;
