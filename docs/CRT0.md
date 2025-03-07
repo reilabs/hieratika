@@ -145,12 +145,12 @@ dictionary, instead relying on a multi-level structure to reduce lookup times. N
 
 The above-listed functions will be used to implement the aforementioned memory-related polyfills,
 marshaling from or to the actual data type in question. As an example, consider
-`fn __load_i8(address: Address) -> i8`, which would do the following:
+`fn __load_p_l_b(address: Address, offset_bits: i64) -> i8`, which would do the following:
 
 1. Acquire the `AllocatorState` however is relevant.
 2. Get the allocation size of an `i8`.
 3. Load a number of bytes equal to the allocation size from the address:
-   `load(&mut state, address, byte_size)` to yield an array of bytes.
+   `load(&mut state, address + offset, byte_size)` to yield an array of bytes.
 4. Marshal those bytes into the value of the `i8` type.
 
 ### Exposing the Allocator
