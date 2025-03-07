@@ -1,12 +1,12 @@
 use crate::alu::sext::sext;
 
-pub fn __llvm_sext_z_o(value: u128) -> u128 {
+pub fn __llvm_sext_z_to_o(value: u128) -> u128 {
     sext::<u16, u128>(value)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_sext_z_o;
+    use super::__llvm_sext_z_to_o;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 7] = [
@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn test_i16_i128() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sext_z_o(*case.arg), *case.expected);
+            assert_eq!(__llvm_sext_z_to_o(*case.arg), *case.expected);
         }
     }
 }
