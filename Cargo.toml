@@ -11,6 +11,7 @@ members = [
   "crates/flo",
   "crates/test-utils",
   "crates/mangler",
+  "crates/lifter",
 ]
 
 # Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
@@ -61,6 +62,7 @@ hieratika-test-utils = { path = "crates/test-utils" }
 miette = { version = "7.4.0", features = ["fancy"] }
 starknet-types-core = "0.1.7"
 thiserror = "2.0.8"
+hieratika-lifter = { path = "crates/lifter" }
 tracing = "0.1.40"
 
 [profile.release]

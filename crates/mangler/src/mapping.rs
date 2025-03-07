@@ -1,11 +1,11 @@
 //! This file contains the functionality for mapping types to mangled
 //! identifiers.
 
-use hieratika_flo::types::{ArrayType, StructType, Type};
+use hieratika_flo::types::{ArrayType, EnumType, StructType, Type};
 
 use crate::{
     Result,
-    constants::{BEGIN_ARRAY, BEGIN_SNAPSHOT, BEGIN_STRUCT, END_STRUCT},
+    constants::{BEGIN_ARRAY, BEGIN_ENUM, BEGIN_SNAPSHOT, BEGIN_STRUCT, END_ENUM, END_STRUCT},
     util,
 };
 
@@ -76,9 +76,15 @@ pub fn mangle_params(param_types: &[Type]) -> Result<String> {
 ///   [`Type::Unspecified`] and hence cannot be mangled.
 pub fn mangle_type(typ: &Type) -> Result<String> {
     let str = match typ {
+        // Note; the following are reserved:
+        // - $    => [section separator]
+        // - m    => snapshot
+        // - S, s => Struct.
+        // - A    => Array
+        // - G, g => Enum
         Type::Void => "v",
         Type::Bool => "c",
-        Type::Enum => "e",
+        Type::IntegerEnum => "e",
         Type::Unsigned8 => "B",
         Type::Unsigned16 => "H",
         Type::Unsigned32 => "I",
@@ -101,6 +107,9 @@ pub fn mangle_type(typ: &Type) -> Result<String> {
         Type::Snapshot(snap) => &mangle_snapshot(snap.as_ref())?,
         Type::Array(array_ty) => &mangle_array(array_ty)?,
         Type::Struct(struct_ty) => &mangle_struct(struct_ty)?,
+        Type::Enum(enum_ty) => &mangle_enum(enum_ty)?,
+        Type::OpaqueSierraType(_) => Err(util::invalid_input_err(typ))?,
+        Type::OpaqueSierraConstant(_) => Err(util::invalid_input_err(typ))?,
         Type::Unspecified => Err(util::invalid_input_err(typ))?,
     };
 
@@ -116,7 +125,7 @@ pub fn mangle_type(typ: &Type) -> Result<String> {
 /// use hieratika_flo::types::Type;
 /// use hieratika_mangler::mapping::mangle_snapshot;
 ///
-/// assert_eq!(mangle_snapshot(&Type::Enum).unwrap(), "me");
+/// assert_eq!(mangle_snapshot(&Type::IntegerEnum).unwrap(), "me");
 /// ```
 ///
 /// # Errors
@@ -215,4 +224,62 @@ pub fn mangle_struct(struct_ty: &StructType) -> Result<String> {
         .collect::<Result<Vec<_>>>()?
         .join("");
     Ok(format!("{BEGIN_STRUCT}{elems_string}{END_STRUCT}"))
+}
+
+/// Maps from the provided `enum_ty` to the corresponding mangling expression.
+///
+/// A enum type mangle takes the form of the [`BEGIN_ENUM`] constant,
+/// followed by the concatenation of the mangle expression for each of the
+/// possible ordered enum variants, followed by the [`END_STRUCT`] constant.
+///
+/// If a enum variant contains another enum, the start and end markers must be
+/// balanced, with an end marker referring to the closest preceding begin
+/// marker.
+///
+/// ```
+/// use hieratika_flo::types::{ArrayType, EnumType, PoisonType, Type};
+/// use hieratika_mangler::mapping::mangle_enum;
+///
+/// let inner_array = ArrayType {
+///     member_type: Box::new(Type::Signed128),
+///     length:      10,
+///     diagnostics: Vec::new(),
+///     location:    None,
+///     poison:      PoisonType::None,
+/// };
+///
+/// let inner_enum = EnumType {
+///     variants:    vec![Type::Bool, Type::Signed8],
+///     diagnostics: Vec::new(),
+///     location:    None,
+///     poison:      PoisonType::None,
+/// };
+///
+/// let outer_struct = EnumType {
+///     variants:    vec![
+///         Type::Bool,
+///         Type::Unsigned32,
+///         Type::Array(inner_array),
+///         Type::Enum(inner_enum),
+///     ],
+///     diagnostics: Vec::new(),
+///     location:    None,
+///     poison:      PoisonType::None,
+/// };
+///
+/// assert_eq!(mangle_enum(&outer_struct).unwrap(), "GcIAo10Gcbgg");
+/// ```
+///
+/// # Errors
+///
+/// - [`crate::Error::InvalidInput`] if any of the enum's element types cannot
+///   be mangled.
+pub fn mangle_enum(enum_ty: &EnumType) -> Result<String> {
+    let elems_string = enum_ty
+        .variants
+        .iter()
+        .map(mangle_type)
+        .collect::<Result<Vec<_>>>()?
+        .join("");
+    Ok(format!("{BEGIN_ENUM}{elems_string}{END_ENUM}"))
 }

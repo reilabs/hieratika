@@ -8,8 +8,8 @@ use std::{
 
 use hieratika_errors::compile::cairo::Result;
 
-use super::{target_dir, write_to_file};
-use crate::CrateLowered;
+use super::target_dir;
+use crate::CairoFlatLowered;
 
 /// This function returns the root directory where all flo files are exported.
 fn get_flo_folder() -> PathBuf {
@@ -38,24 +38,6 @@ fn get_flo_path(full_function_name: &str) -> PathBuf {
     let flo_folder = get_flo_folder();
     let flo_filename = get_flo_filename(full_function_name);
     flo_folder.join(flo_filename)
-}
-
-/// This function exports all flo objects in `crate_lowered` to files.
-///
-/// Each filename matches the function name it's being exported. In case of
-/// error, the status of files exported is undefined.
-///
-/// # Errors
-///
-/// - [`hieratika_errors::compile::cairo::Error::FileIO`] if there is any error
-///   exporting `.lowered` files.
-pub fn save_flo(crate_lowered: &CrateLowered) -> Result<()> {
-    for (function_name, lowered) in crate_lowered {
-        let path = get_flo_path(function_name);
-        let flo = format!("{lowered:?}");
-        write_to_file(&path, flo.as_bytes())?;
-    }
-    Ok(())
 }
 
 /// Deletes all the `.lowered` files exported in the folder `target/cairo/flo`.

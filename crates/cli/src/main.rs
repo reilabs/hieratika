@@ -11,10 +11,8 @@ use anyhow::Result;
 use args::{BuildArgs, Command, CompilerType};
 use clap::Parser;
 use exitcode::{OK, SOFTWARE};
-use hieratika_cairoc::{
-    export::lowered::{clean_all, save_flo},
-    generate_flat_lowered,
-};
+use hieratika_cairoc::export::lowered::clean_all;
+use hieratika_lifter::compile_single_cairo_file_to_flo;
 
 use crate::args::Arguments;
 mod args;
@@ -53,8 +51,9 @@ fn run(args: Arguments) -> Result<()> {
 fn run_build_command(args: &BuildArgs) -> Result<()> {
     match args.compiler_type {
         CompilerType::Cairo => {
-            let (files, _) = generate_flat_lowered(&args.path)?;
-            save_flo(&files)?;
+            let flo = compile_single_cairo_file_to_flo(&args.input)?;
+            flo.write_to_file(&args.output.to_str().expect("invalid output path"))
+                .expect("compilation error");
         }
     }
     Ok(())
