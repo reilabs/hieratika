@@ -1,5 +1,6 @@
 pub mod urem_i8;
 pub mod urem_i16;
+pub mod urem_i64;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, Bounded};
