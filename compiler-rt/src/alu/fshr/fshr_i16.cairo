@@ -1,12 +1,12 @@
 use crate::alu::fshr::fshr;
 
-pub fn __llvm_fshr_i16_i16_i16(a: u128, b: u128, shift: u128) -> u128 {
+pub fn __llvm_fshr_z_z_z_z(a: u128, b: u128, shift: u128) -> u128 {
     fshr::<u16>(a, b, shift)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_fshr_i16_i16_i16;
+    use super::__llvm_fshr_z_z_z_z;
     use crate::alu::test_case::TestCaseThreeArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseThreeArgs; 132] = [
@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn test_i16() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_fshr_i16_i16_i16(*case.a, *case.b, *case.c), *case.expected);
+            assert_eq!(__llvm_fshr_z_z_z_z(*case.a, *case.b, *case.c), *case.expected);
         }
     }
 }

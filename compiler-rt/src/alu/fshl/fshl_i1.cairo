@@ -1,4 +1,4 @@
-pub fn __llvm_fshl_i1_i1_i1(a: u128, b: u128, shift: u128) -> u128 {
+pub fn __llvm_fshl_c_c_c_c(a: u128, b: u128, shift: u128) -> u128 {
     if a > 1 {
         panic!("a = {:?} does not fit in i1", a)
     }
@@ -14,7 +14,7 @@ pub fn __llvm_fshl_i1_i1_i1(a: u128, b: u128, shift: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_fshl_i1_i1_i1;
+    use super::__llvm_fshl_c_c_c_c;
     use crate::alu::test_case::TestCaseThreeArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseThreeArgs; 12] = [
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_fshl_i1_i1_i1(*case.a, *case.b, *case.c), *case.expected);
+            assert_eq!(__llvm_fshl_c_c_c_c(*case.a, *case.b, *case.c), *case.expected);
         }
     }
 }

@@ -1,12 +1,12 @@
 use crate::alu::ssub_with_overflow::ssub_with_overflow;
 
-pub fn __llvm_ssub_with_overflow_i8_i8(lhs: u128, rhs: u128) -> (u128, bool) {
+pub fn __llvm_ssub_with_overflow_b_b_Sbcs(lhs: u128, rhs: u128) -> (u128, bool) {
     ssub_with_overflow::<u8>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_ssub_with_overflow_i8_i8;
+    use super::__llvm_ssub_with_overflow_b_b_Sbcs;
     use crate::alu::test_case::TestCaseTwoArgsTwoExpected;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgsTwoExpected; 260] = [
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn test_i8() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ssub_with_overflow_i8_i8(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_ssub_with_overflow_b_b_Sbcs(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }

@@ -1,12 +1,12 @@
 use crate::alu::abs::abs;
 
-pub fn __llvm_abs_i8_i8(arg: u128, _is_int_min_poison: u128) -> u128 {
+pub fn __llvm_abs_b_b_b(arg: u128, _is_int_min_poison: u128) -> u128 {
     abs::<u8>(arg)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_abs_i8_i8;
+    use super::__llvm_abs_b_b_b;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 160] = [
@@ -182,7 +182,7 @@ mod tests {
         // As per `docs/ALU Design.md`, poison values are not supported.
         let unused = 0;
         for case in test_cases.span() {
-            assert_eq!(__llvm_abs_i8_i8(*case.arg, unused), *case.expected);
+            assert_eq!(__llvm_abs_b_b_b(*case.arg, unused), *case.expected);
         }
     }
 }

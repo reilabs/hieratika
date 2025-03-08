@@ -1,12 +1,12 @@
 use crate::alu::ushl_sat::ushl_sat;
 
-pub fn __llvm_ushl_sat_i8_i8(n: u128, shift: u128) -> u128 {
+pub fn __llvm_ushl_sat_b_b_b(n: u128, shift: u128) -> u128 {
     ushl_sat::<u8>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_ushl_sat_i8_i8;
+    use super::__llvm_ushl_sat_b_b_b;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 64] = [
@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn test_i8() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ushl_sat_i8_i8(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_ushl_sat_b_b_b(*case.lhs, *case.rhs), *case.expected);
         }
     }
 
@@ -118,6 +118,6 @@ mod tests {
     #[should_panic(expected: "Requested shift by more bits than input word size")]
     fn test_i8_panic() {
         let case = TestCaseTwoArgs { lhs: 0b11111111, rhs: 8, expected: 0b00000000 };
-        assert_eq!(__llvm_ushl_sat_i8_i8(case.lhs, case.rhs), case.expected);
+        assert_eq!(__llvm_ushl_sat_b_b_b(case.lhs, case.rhs), case.expected);
     }
 }

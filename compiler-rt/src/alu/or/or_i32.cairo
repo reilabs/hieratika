@@ -1,12 +1,12 @@
 use crate::alu::or::or;
 
-pub fn __llvm_or_i32_i32(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_or_i_i_i(lhs: u128, rhs: u128) -> u128 {
     or::<u32>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_or_i32_i32;
+    use super::__llvm_or_i_i_i;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 43] = [
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_or_i32_i32(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_or_i_i_i(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }

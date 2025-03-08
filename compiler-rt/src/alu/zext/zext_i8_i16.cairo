@@ -1,12 +1,12 @@
 use crate::alu::zext::zext;
 
-pub fn __llvm_zext_i8_i16(value: u128) -> u128 {
+pub fn __llvm_zext_b_to_z(value: u128) -> u128 {
     zext::<u16>(value)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_zext_i8_i16;
+    use super::__llvm_zext_b_to_z;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseOneArg; 2] = [
@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn test_i8_i16() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_zext_i8_i16(*case.arg), *case.expected);
+            assert_eq!(__llvm_zext_b_to_z(*case.arg), *case.expected);
         }
     }
 }

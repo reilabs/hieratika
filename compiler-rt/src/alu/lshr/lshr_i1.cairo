@@ -1,6 +1,6 @@
 use crate::alu::lshr::lshr;
 
-pub fn __llvm_lshr_i1_i1(n: u128, shift: u128) -> u128 {
+pub fn __llvm_lshr_c_c_c(n: u128, shift: u128) -> u128 {
     if n > 1 {
         panic!("n = {:?} does not fit in i1", n)
     }
@@ -16,7 +16,7 @@ pub fn __llvm_lshr_i1_i1(n: u128, shift: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::__llvm_lshr_i1_i1;
+    use super::__llvm_lshr_c_c_c;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
     pub const test_cases: [TestCaseTwoArgs; 4] = [
@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_lshr_i1_i1(*case.lhs, *case.rhs), *case.expected);
+            assert_eq!(__llvm_lshr_c_c_c(*case.lhs, *case.rhs), *case.expected);
         }
     }
 }
