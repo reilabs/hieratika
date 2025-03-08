@@ -24,8 +24,9 @@ are as follows:
 - These metadata bits are _not_ part of contiguous memory. The 28 bits of flags are excluded to form
   a contiguous, byte-addressable space that is semantically uniform while the underlying
   representation consists of 28-byte chunks encoded into felts.
-- The memory subsystem will allow accessing memory at any byte offset of any allocated pointer.
-- Reading from uninitialized memory is well-defined and will return zero bytes.
+- The memory subsystem will allow accessing memory at any byte offset from any allocated pointer.
+- Reading from uninitialized memory is well-defined and will return bytes with all bytes zet to
+  zero.
 - Allocations will be handled by the [memory subsystem](#the-memory-subsystem), which will handle
   making allocations contiguously or on felt boundaries as needed.
 - The memory model provides no means to perform deallocation, in keeping with Cairo's write-once
