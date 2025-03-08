@@ -1,5 +1,6 @@
 pub mod umul_with_overflow_i8;
 pub mod umul_with_overflow_i16;
+pub mod umul_with_overflow_i32;
 pub mod umul_with_overflow_i64;
 
 use crate::utils::expect_into;
