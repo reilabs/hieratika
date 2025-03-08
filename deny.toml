@@ -71,6 +71,7 @@ feature-depth = 1
 # output a note when they are encountered.
 ignore = [
   { id = "RUSTSEC-2024-0388", reason = "In our submodule dependency on Cairo, and hence out of our control" },
+  { id = "RUSTSEC-2024-0436", reason = "In our submodule dependency on Cairo, and hence out of our control" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
