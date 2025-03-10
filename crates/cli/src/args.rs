@@ -35,7 +35,10 @@ pub struct BuildArgs {
     pub compiler_type: CompilerType,
 
     /// The path to the project or file to compile.
-    pub path: PathBuf,
+    pub input: PathBuf,
+
+    /// The path to the file to be written.
+    pub output: PathBuf,
 }
 
 /// The compiler to use.
