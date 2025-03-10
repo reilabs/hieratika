@@ -1,5 +1,6 @@
 pub mod icmp_ule_i8;
 pub mod icmp_ule_i16;
+pub mod icmp_ule_i32;
 pub mod icmp_ule_i64;
 
 use crate::utils::assert_fits_in_type;

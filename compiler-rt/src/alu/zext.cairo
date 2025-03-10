@@ -5,6 +5,8 @@ pub mod zext_i8_i128;
 pub mod zext_i16_i32;
 pub mod zext_i16_i64;
 pub mod zext_i16_i128;
+pub mod zext_i32_i64;
+pub mod zext_i32_i128;
 pub mod zext_i64_i128;
 
 use crate::utils::assert_fits_in_type;
