@@ -263,6 +263,12 @@ impl LLVMType {
         }
     }
 
+    /// Gets the size of `self` in bytes under the provided data layout.
+    #[must_use]
+    pub fn size_of_bytes(&self, data_layout: &DataLayout) -> usize {
+        self.size_of(data_layout) / BYTE_SIZE_BITS
+    }
+
     /// Gets the maximum number of bits that may be overwritten by storing
     /// `self`.
     ///
@@ -271,7 +277,16 @@ impl LLVMType {
     pub fn store_size_of(&self, data_layout: &DataLayout) -> usize {
         let min_size_bits = self.size_of(data_layout);
 
-        ((min_size_bits + 7) / 8) * 8
+        ((min_size_bits + 7) / BYTE_SIZE_BITS) * BYTE_SIZE_BITS
+    }
+
+    /// Gets the maximum number of bytes that may be overwritten by storing
+    /// `self`.
+    ///
+    /// This is always a multiple of eight.
+    #[must_use]
+    pub fn store_size_of_bytes(&self, data_layout: &DataLayout) -> usize {
+        self.store_size_of(data_layout) / BYTE_SIZE_BITS
     }
 
     /// Returns the offset in bits between successive objects of the
@@ -285,6 +300,13 @@ impl LLVMType {
             self.store_size_of(data_layout),
             self.align_of(AlignType::ABI, data_layout),
         )
+    }
+
+    /// Returns the offset in bytes between successive objects of the
+    /// specified type, including the alignment padding.
+    #[must_use]
+    pub fn alloc_size_of_bytes(&self, data_layout: &DataLayout) -> usize {
+        self.alloc_size_of(data_layout) / BYTE_SIZE_BITS
     }
 
     /// Gets the alignment of `self` in bits under the provided data layout.
@@ -354,6 +376,12 @@ impl LLVMType {
             LLVMType::Function(function_type) => function_type.align_of(align_type, data_layout),
             LLVMType::Metadata => 0,
         }
+    }
+
+    /// Gets the alignment of `self` in bytes under the provided data layout.
+    #[must_use]
+    pub fn align_of_bytes(&self, align_type: AlignType, data_layout: &DataLayout) -> usize {
+        self.align_of(align_type, data_layout) / BYTE_SIZE_BITS
     }
 }
 

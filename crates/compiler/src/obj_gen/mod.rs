@@ -850,7 +850,7 @@ impl ObjectGenerator {
                 // We then need variables describing the size of the allocation to create, and
                 // how many of these allocations.
                 let alloc_size = bb.simple_assign_new_const(ConstantValue {
-                    value: pointer_target_type.alloc_size_of(self.get_data_layout()) as u128,
+                    value: pointer_target_type.alloc_size_of_bytes(self.get_data_layout()) as u128,
                     typ:   Type::Unsigned64,
                 });
                 let alloc_count = bb.simple_assign_new_const(ConstantValue {
@@ -1294,20 +1294,21 @@ impl ObjectGenerator {
             };
 
             let actual_offset = if let Some(const_value) = const_value {
-                // Type sizes should never exceed u32::MAX by construction.
+                // Type sizes should never exceed u32::MAX bits by construction, and so they
+                // definitely should not exceed it in bytes.
                 #[expect(clippy::cast_possible_wrap)]
-                let offset_bits = const_value * typ.alloc_size_of(data_layout) as i64;
+                let offset_bytes = const_value * typ.alloc_size_of_bytes(data_layout) as i64;
 
                 // In this case, it is a constant that we can compute at compile time.
                 bb.simple_assign_new_const(ConstantValue {
-                    value: u128::from_le_bytes(i128::from(offset_bits).to_le_bytes()),
+                    value: u128::from_le_bytes(i128::from(offset_bytes).to_le_bytes()),
                     typ:   Type::Signed64,
                 })
             } else {
                 // In this case it is non-constant, so we have to defer the offset computation
                 // to runtime.
                 let type_size_felts_const = bb.simple_assign_new_const(ConstantValue {
-                    value: typ.alloc_size_of(data_layout) as u128,
+                    value: typ.alloc_size_of_bytes(data_layout) as u128,
                     typ:   Type::Signed64,
                 });
 
@@ -2939,7 +2940,7 @@ impl ObjectGenerator {
                     "Alloca instruction encountered without a specified type to allocate",
                 )
             })?)?;
-        let type_size = allocated_type.alloc_size_of(self.get_data_layout());
+        let type_size = allocated_type.alloc_size_of_bytes(self.get_data_layout());
 
         // We also need to know the allocation count, which inkwell always fills in with
         // the default of 1 for us if not otherwise specified.
