@@ -2,16 +2,16 @@
 //! Not meant to be used outside of the allocator.
 
 use core::num::traits::OverflowingMul;
-use crate::crt0::allocator::{Address, ByteCount, SIZEOF_CELL};
+use crate::crt0::allocator::{Address, ByteCount, CellCount, SIZEOF_CELL};
 
 /// Calculate base address of the cell given an arbitrary address.
-pub fn cells_base_address(address: Address) -> u128 {
+pub fn cells_base_address(address: Address) -> Address {
     address - address % SIZEOF_CELL
 }
 
 /// Calculate how many memory cells will a given amount of bytes occupy,
 /// depending on the size of the data and the address data is loaded from or stored to.
-pub fn cells_count_from_bytes(address: Address, bytes_count: ByteCount) -> u128 {
+pub fn cells_count_from_bytes(address: Address, bytes_count: ByteCount) -> CellCount {
     let is_start_on_cell_boundary = address % SIZEOF_CELL == 0;
     let is_end_on_cell_boundary = (address + bytes_count) % SIZEOF_CELL == 0;
 

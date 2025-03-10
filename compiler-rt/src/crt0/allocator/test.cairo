@@ -1,5 +1,6 @@
-use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState, Address, SIZEOF_CELL};
-use crate::crt0::allocator::utils;
+use crate::crt0::allocator::{
+    Allocator, AllocatorOps, AllocatorState, Address, ByteCount, SIZEOF_CELL, utils,
+};
 
 #[cfg(test)]
 mod allocate {
@@ -49,7 +50,7 @@ mod allocate {
     /// exceeding the gas limit of 4294967295. The allocation size has been discovered
     /// experimentally. This value assumes that the tests does nothing more than the instantiation
     /// of the allocator and a single allocation of that many bytes.
-    const MAX_ALLOCATION: u128 = 0x990ae4;
+    const MAX_ALLOCATION: ByteCount = 0xc4acec;
 
     #[test]
     #[available_gas(4294967295)]
