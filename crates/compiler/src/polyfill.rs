@@ -1403,6 +1403,15 @@ mod test {
         assert_eq!(count, 1561);
     }
 
+    #[ignore]
+    #[test]
+    fn print_all_polyfills() {
+        let polyfills = PolyfillMap::new();
+        polyfills
+            .iter()
+            .for_each(|(llvmop, name)| println!("{name} | {llvmop}"));
+    }
+
     #[test]
     fn polyfills_contain_no_invalid_chars() {
         let allowed_chars = Regex::new("^[0-9a-zA-Z_]+$").expect("Static regex did not compile");
