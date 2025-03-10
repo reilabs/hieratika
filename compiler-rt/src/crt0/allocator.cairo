@@ -74,21 +74,17 @@ use core::cmp::min;
 #[cairofmt::skip]
 /// A type for address in the memory pool managed by the allocator.
 ///
-/// The `Address` type is decided to be `u128` for the following reasons:
-/// - `u128` is the common largest native type of Cairo and Rust. Cairo supports `u256`, `u384` and
-///   `u512`, but they're complex types, built around `struct`s.
-/// - `u128` has all the necessary arithmetic operations implemented. Cairo supports `felt252`
-///    natively, which is larger than `u128`, but does not implement [operations that are necessary
-///    for address calculations](https://github.com/reilabs/hieratika/issues/38#issuecomment-2471249442).
-/// - addresses will be returned and accepted by polyfills. The [current polyfill design](./ALU%20Design.md#Operands)
-///   assumes that all inputs and outputs are `u128`, so the address type cannot be larger than that.
-type Address = u128;
+/// The `Address` type is `u64`, as this is the largest pointer type supported by Rust.
+type Address = u64;
 
 /// A type for the amount of bytes to be allocated/stored/loaded.
 ///
 /// It is the same type as Address to keep compatibility with polyfills and to do native arithmetic
 /// on the Address type.
-type ByteCount = u128;
+type ByteCount = u64;
+
+/// A type for the number of cells that accommodate a given amount of bytes.
+type CellCount = ByteCount;
 
 /// A single memory cell is a felt, which is 252 bits (31.5 bytes) long.
 ///
@@ -408,7 +404,7 @@ impl Allocate of AllocatorPriv {
         }
 
         let cells_needed = utils::cells_count_from_bytes(current_allocation, byte_count);
-        let mut cells_allocated: u128 = 0;
+        let mut cells_allocated = 0;
 
         while cells_allocated < cells_needed {
             let key: felt252 = (current_allocation + cells_allocated * SIZEOF_CELL).into();
@@ -462,7 +458,7 @@ impl Ops of AllocatorOps<AllocatorState> {
         let cells_needed = utils::cells_count_from_bytes(address, byte_count);
         let offset_in_first_cell: Address = address % SIZEOF_CELL;
         let cell_base_addr = utils::cells_base_address(address);
-        let mut cells_read: u128 = 0;
+        let mut cells_read: CellCount = 0;
         let mut bytes_to_read = byte_count;
 
         // Buffer to store bytes of retrieved memory cells.
@@ -508,7 +504,7 @@ impl Ops of AllocatorOps<AllocatorState> {
             .try_into()
             .expect('store offset exceeds cell size');
         let cell_base_addr = utils::cells_base_address(address);
-        let mut cells_written: u128 = 0;
+        let mut cells_written: CellCount = 0;
 
         while cells_written < cells_needed && bytes_to_write > 0 {
             let key = (cell_base_addr + cells_written * SIZEOF_CELL);

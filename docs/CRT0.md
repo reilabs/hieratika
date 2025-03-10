@@ -78,7 +78,8 @@ implemented and tested in Cairo.
   and the current allocations.
 
   ```rust
-  type Address = u128;
+  /// The `Address` type is `u64`, as this is the largest pointer type supported by Rust.
+  type Address = u64;
 
   struct AllocatorState {
     /// The address at which the next requested allocation will begin.
@@ -93,17 +94,6 @@ implemented and tested in Cairo.
     allocated_addresses: HashMap<Address, FeltValue>
   }
   ```
-
-- The `Address` type is decided to be `u128` for the following reasons:
-
-  - `u128` is the common largest native type of Cairo and Rust. Cairo supports `u256`, `u384` and
-    `u512`, but they're complex types, built around `struct`s.
-  - `u128` has all the necessary arithmetic operations implemented. Cairo supports `felt252`
-    natively, which is larger than `u128`, but does not implement
-    [operations that are necessary for address calculations](https://github.com/reilabs/hieratika/issues/38#issuecomment-2471249442).
-  - Addresses will be returned and accepted by polyfills. The
-    [current polyfill design](./ALU%20Design.md#Operands) assumes that all inputs and outputs are
-    `u128`, so the address type cannot be larger than that.
 
 - There is a function that allocates the indicated number of bytes and returns the address of that
   allocation.
