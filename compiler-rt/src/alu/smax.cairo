@@ -2,6 +2,7 @@ pub mod smax_i8;
 pub mod smax_i16;
 pub mod smax_i32;
 pub mod smax_i64;
+pub mod smax_i128;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

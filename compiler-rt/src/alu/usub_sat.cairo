@@ -2,6 +2,7 @@ pub mod usub_sat_i8;
 pub mod usub_sat_i16;
 pub mod usub_sat_i32;
 pub mod usub_sat_i64;
+pub mod usub_sat_i128;
 
 use crate::alu::usub_with_overflow::usub_with_overflow;
 use core::num::traits::{BitSize, OverflowingSub};

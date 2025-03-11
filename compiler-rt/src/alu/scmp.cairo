@@ -2,6 +2,7 @@ pub mod scmp_i8;
 pub mod scmp_i16;
 pub mod scmp_i32;
 pub mod scmp_i64;
+pub mod scmp_i128;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

@@ -2,6 +2,7 @@ pub mod icmp_uge_i8;
 pub mod icmp_uge_i16;
 pub mod icmp_uge_i32;
 pub mod icmp_uge_i64;
+pub mod icmp_uge_i128;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};

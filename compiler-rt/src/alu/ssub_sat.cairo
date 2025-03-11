@@ -2,6 +2,7 @@ pub mod ssub_sat_i8;
 pub mod ssub_sat_i16;
 pub mod ssub_sat_i32;
 pub mod ssub_sat_i64;
+pub mod ssub_sat_i128;
 
 use crate::alu::ssub_with_overflow::signed_subtract_with_overflow;
 use crate::alu::shl::shl;

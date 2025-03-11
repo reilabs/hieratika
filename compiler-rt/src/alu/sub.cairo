@@ -2,6 +2,7 @@ pub mod sub_i8;
 pub mod sub_i16;
 pub mod sub_i32;
 pub mod sub_i64;
+pub mod sub_i128;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, WrappingSub};
