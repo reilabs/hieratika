@@ -1,8 +1,8 @@
 //! Private module containing helper functions from CRT0 memory allocator.
 //! Not meant to be used outside of the allocator.
 
-use core::num::traits::OverflowingMul;
 use crate::crt0::allocator::{Address, ByteCount, CellCount, SIZEOF_CELL};
+use crate::crt0::utils::buffer_to_t;
 
 /// Calculate base address of the cell given an arbitrary address.
 pub fn cells_base_address(address: Address) -> Address {
@@ -26,20 +26,6 @@ pub fn cells_count_from_bytes(address: Address, bytes_count: ByteCount) -> CellC
 /// Perform binary shift of an u256 value left.
 ///
 /// Cairo does not have << or >> operators so we must implement the shift manually.
-pub fn bitshift_left(value: u256, shift: usize) -> u256 {
-    let mut result = value;
-    // Perform the shift `shift`` number of times.
-    for _ in 0..shift {
-        let (r, _) = result.overflowing_mul(2);
-        result = r
-    };
-
-    result
-}
-
-/// Perform binary shift of an u256 value left.
-///
-/// Cairo does not have << or >> operators so we must implement the shift manually.
 pub fn bitshift_right(value: u256, shift: usize) -> u256 {
     let mut result = value;
     // Right logical shift by 1 bit is effectively integer division by 2, so we divide `shift`
@@ -54,19 +40,9 @@ pub fn bitshift_right(value: u256, shift: usize) -> u256 {
 /// Construct a memory cell from a buffer of up to SIZE_CELL bytes.
 /// Shorter buffers will be zero-padded, longer buffers will be read up to SIZEOF_CELL bytes.
 pub fn buffer_to_cell(buffer: @Array<u8>) -> felt252 {
-    // Felts don't implement BitOr, so use u256 (but up to 28 bytes) and cast later.
-    let mut value: u256 = 0;
-    let mut i: usize = 0;
-    for byte in buffer.span() {
-        value = value | bitshift_left((*byte).into(), i * 8);
-        i += 1;
-        if i.into() == SIZEOF_CELL {
-            break;
-        }
-    };
-
-    // Value was constructed from up to SIZEOF_CELL, so must fit.
-    value.try_into().unwrap()
+    // Felts don't implement BitOr and OverflowingMul, so use u256 (but up to 28 bytes) and cast
+    // later.
+    buffer_to_t::<u256>(buffer).try_into().unwrap()
 }
 
 /// Construct a memory buffer from a cell value.
