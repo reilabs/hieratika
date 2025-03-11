@@ -4,6 +4,7 @@ pub mod urem_i24;
 pub mod urem_i32;
 pub mod urem_i40;
 pub mod urem_i64;
+pub mod urem_i128;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, Bounded};

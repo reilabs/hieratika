@@ -4,6 +4,7 @@ pub mod srem_i24;
 pub mod srem_i32;
 pub mod srem_i40;
 pub mod srem_i64;
+pub mod srem_i128;
 
 use core::num::traits::{BitSize, Bounded};
 use crate::alu::sdiv::divide_with_remainder_signed;

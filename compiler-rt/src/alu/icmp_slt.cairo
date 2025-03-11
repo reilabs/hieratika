@@ -4,6 +4,7 @@ pub mod icmp_slt_i24;
 pub mod icmp_slt_i32;
 pub mod icmp_slt_i40;
 pub mod icmp_slt_i64;
+pub mod icmp_slt_i128;
 
 use crate::alu::scmp::scmp;
 use core::num::traits::{BitSize, Bounded, OverflowingSub};

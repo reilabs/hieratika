@@ -4,6 +4,7 @@ pub mod add_i24;
 pub mod add_i32;
 pub mod add_i40;
 pub mod add_i64;
+pub mod add_i128;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, WrappingAdd};

@@ -4,6 +4,7 @@ pub mod abs_i24;
 pub mod abs_i32;
 pub mod abs_i40;
 pub mod abs_i64;
+pub mod abs_i128;
 
 use crate::utils::{assert_fits_in_type, negate_twos_complement};
 use crate::alu::shl::shl;

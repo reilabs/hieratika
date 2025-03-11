@@ -4,6 +4,7 @@ pub mod smul_with_overflow_i24;
 pub mod smul_with_overflow_i32;
 pub mod smul_with_overflow_i40;
 pub mod smul_with_overflow_i64;
+pub mod smul_with_overflow_i128;
 
 use crate::utils::{assert_fits_in_type, extend_sign};
 use crate::alu::shl::shl;
