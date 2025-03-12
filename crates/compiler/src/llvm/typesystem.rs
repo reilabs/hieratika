@@ -205,7 +205,15 @@ impl LLVMType {
     pub fn is_integral(&self) -> bool {
         matches!(
             self,
-            Self::bool | Self::i8 | Self::i16 | Self::i32 | Self::i64 | Self::i128
+            Self::bool
+                | Self::i8
+                | Self::i16
+                | Self::i24
+                | Self::i32
+                | Self::i40
+                | Self::i48
+                | Self::i64
+                | Self::i128
         )
     }
 
