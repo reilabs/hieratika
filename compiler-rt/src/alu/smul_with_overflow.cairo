@@ -49,8 +49,15 @@ fn smul_with_overflow<
 
     // Perform the multiplication and check for overflow.
     let (result, overflow) = lhs.overflowing_mul(rhs);
+    if BitSize::<T>::bits() == 128 {
+        return (result, overflow);
+    }
 
     // Manual overflow detection.
+    // If lhs and rhs values were originally shorter than 128 bit, additional
+    // overflow verification is necessary, because overflowing_mul calculated
+    // overflow as if the values are truly u128.
+    //
     // If we detected overflow during multiplication, but sign extension bits
     // are equal to the sign bit, this is a false positive - return the result
     // and don't signal overflow.
