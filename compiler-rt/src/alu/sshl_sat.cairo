@@ -96,11 +96,19 @@ fn sshl_sat<
             min_value
         },
         (true, true) => {
-            let shifted_sign_bit_mask = shl::<u128>(1, bit_size - 1 + shift);
-            if extend_sign(shifted, shifted_sign_bit_mask) > extend_sign(min_value, sign_bit_mask) {
-                shifted
+            if bit_size + shift > 128 {
+                if shifted  < min_value {
+                    shifted
+                } else {
+                    min_value
+                }
             } else {
-                min_value
+                let shifted_sign_bit_mask = shl::<u128>(1, bit_size - 1 + shift);
+                if extend_sign(shifted, shifted_sign_bit_mask) > extend_sign(min_value, sign_bit_mask) {
+                    shifted
+                } else {
+                    min_value
+                }
             }
         },
     };
