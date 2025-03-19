@@ -1,6 +1,7 @@
 pub mod uadd_sat_i8;
 pub mod uadd_sat_i16;
 pub mod uadd_sat_i32;
+pub mod uadd_sat_i40;
 pub mod uadd_sat_i64;
 
 use crate::alu::uadd_with_overflow::uadd_with_overflow;

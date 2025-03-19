@@ -1,6 +1,7 @@
 pub mod sadd_with_overflow_i8;
 pub mod sadd_with_overflow_i16;
 pub mod sadd_with_overflow_i32;
+pub mod sadd_with_overflow_i40;
 pub mod sadd_with_overflow_i64;
 
 use crate::utils::{assert_fits_in_type, OverflowDirection};

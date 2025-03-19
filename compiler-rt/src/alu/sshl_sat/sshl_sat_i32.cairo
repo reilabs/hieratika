@@ -248,7 +248,7 @@ mod tests {
         TestCaseTwoArgs { lhs: 0b01010101010101010101010101010101, rhs: 30, expected: 0b01111111111111111111111111111111 },
         TestCaseTwoArgs { lhs: 0b01010101010101010101010101010101, rhs: 31, expected: 0b01111111111111111111111111111111 },
 
-        // A sample of possible shifts of 2^64 / 2 - 1 from 0 throughout the whole input value length.
+        // A sample of possible shifts of 2^32 / 2 - 1 from 0 throughout the whole input value length.
         TestCaseTwoArgs { lhs: 0b01111111111111111111111111111111, rhs: 0, expected: 0b01111111111111111111111111111111 },
         TestCaseTwoArgs { lhs: 0b01111111111111111111111111111111, rhs: 1, expected: 0b01111111111111111111111111111111 },
         TestCaseTwoArgs { lhs: 0b01111111111111111111111111111111, rhs: 2, expected: 0b01111111111111111111111111111111 },

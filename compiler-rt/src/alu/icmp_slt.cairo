@@ -1,6 +1,7 @@
 pub mod icmp_slt_i8;
 pub mod icmp_slt_i16;
 pub mod icmp_slt_i32;
+pub mod icmp_slt_i40;
 pub mod icmp_slt_i64;
 
 use crate::alu::scmp::scmp;

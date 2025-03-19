@@ -1,6 +1,7 @@
 pub mod sshl_sat_i8;
 pub mod sshl_sat_i16;
 pub mod sshl_sat_i32;
+pub mod sshl_sat_i40;
 pub mod sshl_sat_i64;
 
 use crate::utils::{assert_fits_in_type, extend_sign};

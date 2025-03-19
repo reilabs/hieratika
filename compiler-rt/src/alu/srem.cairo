@@ -1,6 +1,7 @@
 pub mod srem_i8;
 pub mod srem_i16;
 pub mod srem_i32;
+pub mod srem_i40;
 pub mod srem_i64;
 
 use core::num::traits::{BitSize, Bounded};
