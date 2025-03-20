@@ -136,6 +136,16 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &ValueType)> {
         self.table.iter().filter(|(id, _)| **id != POISON_ENTRY && **id != 0)
     }
+
+    /// Gets an immutable iterator over the _keys_ for the provided table.
+    #[must_use]
+    pub fn ids(&self) -> Vec<usize> {
+        self.table
+            .keys()
+            .copied()
+            .filter(|id| *id != POISON_ENTRY && *id != 0)
+            .collect()
+    }
 }
 
 impl<IdType, ValueType> Default for InternTable<IdType, ValueType>
