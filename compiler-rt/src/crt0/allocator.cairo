@@ -1,5 +1,4 @@
-use core::dict::Felt252Dict;
-use core::dict::Felt252DictEntryTrait;
+use core::dict::{Felt252Dict, Felt252DictEntryTrait};
 use core::cmp::min;
 #[cairofmt::skip]
 //! Memory allocator
