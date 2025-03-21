@@ -2,8 +2,7 @@ use core::num::traits::{
     BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
     OverflowingMul,
 };
-use core::traits::Rem;
-use core::traits::Div;
+use core::traits::{Div, Rem, BitOr, BitAnd};
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
@@ -12,7 +11,7 @@ use crate::utils::assert_fits_in_type;
 /// 40-bit integers are stored internally in a u128 value. Every time a `u40`
 /// integer is used, it's important to ensure the value in the field `data` fits
 /// within 40 bits.
-#[derive(Debug, Drop, PartialEq)]
+#[derive(Copy, Debug, Drop, PartialEq)]
 pub struct u40 {
     data: u128,
 }
@@ -21,6 +20,18 @@ impl U40IntegerOps of IntegerOps<u40> {
     fn new(value: u128) -> u40 {
         assert_fits_in_type::<u40>(value);
         u40 { data: value }
+    }
+}
+
+impl U8IntoU40 of Into<u8, u40> {
+    fn into(self: u8) -> u40 {
+        return u40 { data: self.into() };
+    }
+}
+
+impl U40TryIntoU8 of TryInto<u40, u8> {
+    fn try_into(self: u40) -> Option<u8> {
+        return self.data.try_into();
     }
 }
 
@@ -144,27 +155,40 @@ impl U40Div of Div<u40> {
     }
 }
 
+impl U40BitOr of BitOr<u40> {
+    fn bitor(lhs: u40, rhs: u40) -> u40 {
+        let result = lhs.data | rhs.data;
+        u40 { data: result & Bounded::<u40>::MAX.into() }
+    }
+}
+
+impl U40BitAnd of BitAnd<u40> {
+    fn bitand(lhs: u40, rhs: u40) -> u40 {
+        let result = lhs.data & rhs.data;
+        u40 { data: result & Bounded::<u40>::MAX.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u40;
     use crate::utils::assert_fits_in_type;
 
     use super::U40IntegerOps as U40Ops;
-
-    use core::num::traits::BitSize;
-    use core::num::traits::WrappingAdd;
-    use core::num::traits::WrappingSub;
-    use core::num::traits::WrappingMul;
-    use core::num::traits::OverflowingAdd;
-    use core::num::traits::OverflowingSub;
-    use core::num::traits::OverflowingMul;
-    use core::traits::Rem;
-    use core::traits::Div;
+    use core::num::traits::{
+        BitSize, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
+        OverflowingMul,
+    };
+    use core::traits::{Div, Rem, BitOr, BitAnd};
 
     #[test]
     fn test_u40() {
         assert_eq!(U40Ops::new(0).into(), 0_u128);
+        assert_eq!(U40Ops::new(0).try_into().unwrap(), 0_u8);
         assert_eq!(U40Ops::new(3).into(), 3_u128);
+        assert_eq!(U40Ops::new(3).try_into().unwrap(), 3_u8);
+        assert_eq!(0_u8.into(), U40Ops::new(0));
+        assert_eq!(3_u8.into(), U40Ops::new(3));
         assert_eq!(
             U40Ops::new(0b1111111111111111111111111111111111111111).into(),
             0b1111111111111111111111111111111111111111_u128,
@@ -292,5 +316,23 @@ mod tests {
         let rhs = U40Ops::new(3);
         let ratio = Div::div(lhs, rhs);
         assert_eq!(ratio.into(), 3_u128);
+    }
+
+    #[test]
+    fn test_bit_or_u40() {
+        let lhs = U40Ops::new(0b11110000101010101111);
+        let rhs = U40Ops::new(0b00001111010101010000);
+        assert_eq!(BitOr::bitor(lhs, rhs), U40Ops::new(0xfffff));
+    }
+
+    #[test]
+    fn test_bit_and_u40() {
+        let lhs = U40Ops::new(0b11110000101010101111);
+        let rhs = U40Ops::new(0b00001111010101010000);
+        assert_eq!(BitAnd::bitand(lhs, rhs), U40Ops::new(0));
+
+        let lhs = U40Ops::new(0b11110000101010101111);
+        let rhs = U40Ops::new(0b10101010101010101010);
+        assert_eq!(BitAnd::bitand(lhs, rhs), U40Ops::new(0b10100000101010101010));
     }
 }
