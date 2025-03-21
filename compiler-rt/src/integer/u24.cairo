@@ -12,7 +12,7 @@ use core::traits::{Div, Rem, BitOr, BitAnd};
 /// They are stored internally using a u128, so it is important to ensure that,
 /// at every use site, the actual value that is read and written fits within 24
 /// bits.
-#[derive(Debug, Drop, PartialEq)]
+#[derive(Copy, Debug, Drop, PartialEq)]
 pub struct u24 {
     data: u128,
 }
