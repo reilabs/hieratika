@@ -1,4 +1,9 @@
-use core::num::traits::{BitSize, Bounded, WrappingAdd, OverflowingAdd};
+use core::num::traits::{
+    BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
+    OverflowingMul,
+};
+use core::traits::Rem;
+use core::traits::Div;
 
 // The struct to represent 40bit integers.
 //
@@ -64,6 +69,72 @@ impl U40OverflowingAdd of OverflowingAdd<u40> {
     }
 }
 
+impl U40WrappingSub of WrappingSub<u40> {
+    fn wrapping_sub(self: u40, v: u40) -> u40 {
+        let (diff, _) = self.overflowing_sub(v);
+        return diff;
+    }
+}
+
+impl U40OverflowingSub of OverflowingSub<u40> {
+    fn overflowing_sub(self: u40, v: u40) -> (u40, bool) {
+        let lhs = self.data;
+        let rhs = Bounded::<u40>::MAX.into() - v.data + 1;
+        let diff = (lhs + rhs);
+        let diff_sat = diff & Bounded::<u40>::MAX.into();
+        let result = u40 { data: diff_sat };
+
+        if diff_sat == diff {
+            let is_overflow = true;
+            return (result, is_overflow);
+        }
+        let is_overflow = false;
+        return (result, is_overflow);
+    }
+}
+
+impl U40WrappingMul of WrappingMul<u40> {
+    fn wrapping_mul(self: u40, v: u40) -> u40 {
+        let (product, _) = self.overflowing_mul(v);
+        return product;
+    }
+}
+
+impl U40OverflowingMul of OverflowingMul<u40> {
+    fn overflowing_mul(self: u40, v: u40) -> (u40, bool) {
+        let lhs = self.data;
+        let rhs = v.data;
+        let product = (lhs * rhs);
+        let product_sat = product % (Bounded::<u40>::MAX.into() + 1);
+        let result = u40 { data: product_sat };
+
+        if product_sat == product {
+            let is_overflow = false;
+            return (result, is_overflow);
+        }
+        let is_overflow = true;
+        return (result, is_overflow);
+    }
+}
+
+impl U40Rem of Rem<u40> {
+    fn rem(lhs: u40, rhs: u40) -> u40 {
+        let lhs = lhs.data;
+        let rhs = rhs.data;
+        let remainder = lhs % rhs;
+        return u40 { data: remainder };
+    }
+}
+
+impl U40Div of Div<u40> {
+    fn div(lhs: u40, rhs: u40) -> u40 {
+        let lhs = lhs.data;
+        let rhs = rhs.data;
+        let ratio = lhs / rhs;
+        return u40 { data: ratio };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u40;
@@ -71,7 +142,13 @@ mod tests {
 
     use core::num::traits::BitSize;
     use core::num::traits::WrappingAdd;
+    use core::num::traits::WrappingSub;
+    use core::num::traits::WrappingMul;
     use core::num::traits::OverflowingAdd;
+    use core::num::traits::OverflowingSub;
+    use core::num::traits::OverflowingMul;
+    use core::traits::Rem;
+    use core::traits::Div;
 
     fn u40_new(value: u128) -> u40 {
         value.try_into().unwrap()
@@ -136,5 +213,77 @@ mod tests {
         let (sum, is_overflow) = lhs.overflowing_add(rhs);
         assert_eq!(sum.into(), 0_u128);
         assert_eq!(is_overflow, true);
+    }
+
+    #[test]
+    fn test_wrapping_sub_u40() {
+        let lhs = u40_new(8);
+        let rhs = u40_new(3);
+        let diff = lhs.wrapping_sub(rhs);
+        assert_eq!(diff.into(), 5_u128);
+
+        let lhs = u40_new(0);
+        let rhs = u40_new(1);
+        let diff = lhs.wrapping_sub(rhs);
+        assert_eq!(diff.into(), 0b1111111111111111111111111111111111111111_u128);
+    }
+
+    #[test]
+    fn test_overflowing_sub_u40() {
+        let lhs = u40_new(8);
+        let rhs = u40_new(3);
+        let (diff, is_overflow) = lhs.overflowing_sub(rhs);
+        assert_eq!(diff.into(), 5_u128);
+        assert_eq!(is_overflow, false);
+
+        let lhs = u40_new(0);
+        let rhs = u40_new(1);
+        let (diff, is_overflow) = lhs.overflowing_sub(rhs);
+        assert_eq!(diff.into(), 0b1111111111111111111111111111111111111111_u128);
+        assert_eq!(is_overflow, true);
+    }
+
+    #[test]
+    fn test_wrapping_mul_u40() {
+        let lhs = u40_new(8);
+        let rhs = u40_new(3);
+        let product = lhs.wrapping_mul(rhs);
+        assert_eq!(product.into(), 24_u128);
+
+        let lhs = u40_new(0b1111111111111111111111111111111111111111);
+        let rhs = u40_new(2);
+        let product = lhs.wrapping_mul(rhs);
+        assert_eq!(product.into(), 0b1111111111111111111111111111111111111110_u128);
+    }
+
+    #[test]
+    fn test_overflowing_mul_u40() {
+        let lhs = u40_new(8);
+        let rhs = u40_new(3);
+        let (product, is_overflow) = lhs.overflowing_mul(rhs);
+        assert_eq!(product.into(), 24_u128);
+        assert_eq!(is_overflow, false);
+
+        let lhs = u40_new(0b1111111111111111111111111111111111111111);
+        let rhs = u40_new(2);
+        let (product, is_overflow) = lhs.overflowing_mul(rhs);
+        assert_eq!(product.into(), 0b1111111111111111111111111111111111111110_u128);
+        assert_eq!(is_overflow, true);
+    }
+
+    #[test]
+    fn test_rem_u40() {
+        let lhs = u40_new(8);
+        let rhs = u40_new(3);
+        let remainder = Rem::rem(lhs, rhs);
+        assert_eq!(remainder.into(), 2_u128);
+    }
+
+    #[test]
+    fn test_div_u40() {
+        let lhs = u40_new(9);
+        let rhs = u40_new(3);
+        let ratio = Div::div(lhs, rhs);
+        assert_eq!(ratio.into(), 3_u128);
     }
 }

@@ -1,6 +1,7 @@
 pub mod ucmp_i8;
 pub mod ucmp_i16;
 pub mod ucmp_i32;
+pub mod ucmp_i40;
 pub mod ucmp_i64;
 
 use crate::utils::assert_fits_in_type;

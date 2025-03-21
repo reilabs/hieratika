@@ -1,6 +1,7 @@
 pub mod sub_i8;
 pub mod sub_i16;
 pub mod sub_i32;
+pub mod sub_i40;
 pub mod sub_i64;
 
 use crate::utils::expect_into;

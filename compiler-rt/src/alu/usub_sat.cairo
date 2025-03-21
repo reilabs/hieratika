@@ -1,6 +1,7 @@
 pub mod usub_sat_i8;
 pub mod usub_sat_i16;
 pub mod usub_sat_i32;
+pub mod usub_sat_i40;
 pub mod usub_sat_i64;
 
 use crate::alu::usub_with_overflow::usub_with_overflow;
