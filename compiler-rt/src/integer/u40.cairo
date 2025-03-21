@@ -2,8 +2,7 @@ use core::num::traits::{
     BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
     OverflowingMul,
 };
-use core::traits::Rem;
-use core::traits::Div;
+use core::traits::{Div, Rem, BitOr};
 
 // The struct to represent 40bit integers.
 //
@@ -13,6 +12,12 @@ use core::traits::Div;
 #[derive(Debug, Drop, PartialEq)]
 pub struct u40 {
     data: u128,
+}
+
+impl U8IntoU128 of Into<u8, u40> {
+    fn into(self: u8) -> u40 {
+        return u40 { data: self.into() };
+    }
 }
 
 impl U40IntoU128 of Into<u40, u128> {
@@ -135,20 +140,23 @@ impl U40Div of Div<u40> {
     }
 }
 
+impl U40BitOr of BitOr<u40> {
+    fn bitor(lhs: u40, rhs: u40) -> u40 {
+        let result = lhs.data | rhs.data;
+        u40 { data: result & Bounded::<u40>::MAX.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u40;
     use crate::utils::assert_fits_in_type;
 
-    use core::num::traits::BitSize;
-    use core::num::traits::WrappingAdd;
-    use core::num::traits::WrappingSub;
-    use core::num::traits::WrappingMul;
-    use core::num::traits::OverflowingAdd;
-    use core::num::traits::OverflowingSub;
-    use core::num::traits::OverflowingMul;
-    use core::traits::Rem;
-    use core::traits::Div;
+    use core::num::traits::{
+        BitSize, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
+        OverflowingMul,
+    };
+    use core::traits::{Div, Rem, BitOr};
 
     fn u40_new(value: u128) -> u40 {
         value.try_into().unwrap()
@@ -158,6 +166,8 @@ mod tests {
     fn test_u40() {
         assert_eq!(u40_new(0).into(), 0_u128);
         assert_eq!(u40_new(3).into(), 3_u128);
+        assert_eq!(0_u8.into(), u40_new(0));
+        assert_eq!(3_u8.into(), u40_new(3));
         assert_eq!(
             u40_new(0b1111111111111111111111111111111111111111).into(),
             0b1111111111111111111111111111111111111111_u128,
@@ -285,5 +295,12 @@ mod tests {
         let rhs = u40_new(3);
         let ratio = Div::div(lhs, rhs);
         assert_eq!(ratio.into(), 3_u128);
+    }
+
+    #[test]
+    fn test_bit_or_u40() {
+        let lhs = u40_new(0b11110000101010101111);
+        let rhs = u40_new(0b00001111010101010000);
+        assert_eq!(BitOr::bitor(lhs, rhs), u40_new(0xfffff));
     }
 }
