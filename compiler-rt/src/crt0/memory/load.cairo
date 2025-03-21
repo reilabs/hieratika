@@ -3,6 +3,7 @@ use core::num::traits::{BitSize, OverflowingMul};
 use core::traits::BitOr;
 use crate::crt0::utils::{BITS_IN_BYTE, buffer_to_t};
 use super::get_allocator;
+use crate::integer::u40::u40;
 
 fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
     ref allocator: AllocatorState, address: Address, offset: i64,
@@ -20,6 +21,7 @@ mod test {
     use super::AllocatorOps;
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorState};
+    use crate::integer::u40::u40;
 
     fn get_allocator() -> Box<AllocatorState> {
         let mut allocator = Allocator::new();
@@ -53,6 +55,13 @@ mod test {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u32>(ref allocator, 0, 0);
         assert_eq!(data1, 0x03020100);
+    }
+
+    #[test]
+    fn load_u40() {
+        let mut allocator = get_allocator().unbox();
+        let data1 = load::<u40>(ref allocator, 0, 0);
+        assert_eq!(data1, 0x0403020100_u128.try_into().unwrap());
     }
 
     #[test]
@@ -100,6 +109,11 @@ pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> i64 {
     // core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i64>.
     let mut allocator = get_allocator().unbox();
     load::<u64>(ref allocator, address, offset).try_into().unwrap()
+}
+
+pub fn __llvm_load_p_l_n(address: Address, offset: i64) -> u40 {
+    let mut allocator = get_allocator().unbox();
+    load::<u40>(ref allocator, address, offset)
 }
 
 pub fn __llvm_load_p_l_o(address: Address, offset: i64) -> i128 {

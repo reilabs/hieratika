@@ -14,7 +14,7 @@ pub struct u40 {
     data: u128,
 }
 
-impl U8IntoU128 of Into<u8, u40> {
+impl U8IntoU40 of Into<u8, u40> {
     fn into(self: u8) -> u40 {
         return u40 { data: self.into() };
     }
