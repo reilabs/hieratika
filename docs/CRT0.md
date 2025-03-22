@@ -99,7 +99,7 @@ implemented and tested in Cairo.
   allocation.
 
   ```rust
-  fn allocate(allocator: &mut AllocatorState, byte_count: usize) -> Address {
+  fn allocate(ref allocator: AllocatorState, byte_count: usize) -> Address {
     // ...
   }
   ```
@@ -108,7 +108,7 @@ implemented and tested in Cairo.
   them.
 
   ```rust
-  fn load(allocator: &mut AllocatorState, address: Address, byte_count: usize) -> [u8; byte_count] {
+  fn load(ref allocator: AllocatorState, address: Address, byte_count: usize) -> [u8; byte_count] {
     // ...
   }
   ```
@@ -116,7 +116,7 @@ implemented and tested in Cairo.
 - There is a function that stores the provided bytes into memory, beginning at the provided address.
 
   ```rust
-  fn store(allocator: &mut AllocatorState, data: &[u8]) {
+  fn store(ref allocator: AllocatorState, data: &[u8]) {
     // ...
   }
   ```

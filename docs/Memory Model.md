@@ -44,11 +44,11 @@ manipulate that memory.
 Hieratika defines two polyfills and two _sets of_ polyfills for interacting with memory. The two
 polyfills are as follows:
 
-- `fn __llvm_alloc_l_l_p(size_bits: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
-  region of `size * count` bits of memory, and returns the pointer to the start of that memory
+- `fn __llvm_alloc_l_l_p(size_bytes: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
+  region of `size * count` bytes of memory, and returns the pointer to the start of that memory
   region. This can be thought of as a heap allocation.
-- `fn __llvm_alloca_l_l_p(size_bits: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
-  region of `size * count` bits of memory, and returns the pointer to the start of that memory
+- `fn __llvm_alloca_l_l_p(size_bytes: i64, count: i64) -> ptr`: This polyfill allocates a contiguous
+  region of `size * count` bytes of memory, and returns the pointer to the start of that memory
   region. This can be thought of as a local allocation. Said allocations go out of scope once the
   function containing the allocation returns. Due to the memory model, however, they are never
   deallocated, and this is purely an illustrative difference to `alloc` above.
@@ -64,11 +64,11 @@ hence defined for each of the following primitive types: `bool` (`i1`), `i8`, `i
 `i40`, `i48`, `i64`, `i128`, `f16`, `f32` (`float`), `f64` (`double`), `f128` (`fp128`) and `ptr`.
 These families of polyfills are as follows:
 
-- `fn __llvm_load_p_l_T<T>(address: Address, offset_bits: i64) -> T`: This polyfill takes an
-  `address`, as well as a `offset` from that address in bits, and loads a value of type `T` from the
-  specified location.
-- `fn __llvm_store_T_p_l_v<T>(value: T, address: Address, offset_bits: i64) -> ()`: This polyfill
-  takes a value of type `T`, an `address` and an `offset` from that address in bits, and stores the
+- `fn __llvm_load_p_l_T<T>(address: Address, offset_bytes: i64) -> T`: This polyfill takes an
+  `address`, as well as a `offset` from that address in bytes, and loads a value of type `T` from
+  the specified location.
+- `fn __llvm_store_T_p_l_v<T>(value: T, address: Address, offset_bytes: i64) -> ()`: This polyfill
+  takes a value of type `T`, an `address` and an `offset` from that address in bytes, and stores the
   provided `value` at the specified location.
 
 For now, if any of these polyfills fails to operate correctly (such as encountering a load from a
