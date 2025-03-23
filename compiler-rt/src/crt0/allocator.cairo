@@ -74,13 +74,13 @@ use core::cmp::min;
 /// A type for address in the memory pool managed by the allocator.
 ///
 /// The `Address` type is `u64`, as this is the largest pointer type supported by Rust.
-type Address = u64;
+pub type Address = u64;
 
 /// A type for the amount of bytes to be allocated/stored/loaded.
 ///
 /// It is the same type as Address to keep compatibility with polyfills and to do native arithmetic
 /// on the Address type.
-type ByteCount = u64;
+pub type ByteCount = u64;
 
 /// A type for the number of cells that accommodate a given amount of bytes.
 type CellCount = ByteCount;
@@ -97,7 +97,7 @@ const SIZEOF_CELL: ByteCount = 28;
 
 /// The internal state of the memory allocator.
 #[derive(Destruct)]
-struct AllocatorState {
+pub struct AllocatorState {
     /// The address at which the next requested allocation will begin.
     next_allocation: Address,
     /// `true` if the current allocation occupies less than a full memory cell,
