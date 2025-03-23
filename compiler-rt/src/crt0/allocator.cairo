@@ -1,5 +1,4 @@
-use core::dict::Felt252Dict;
-use core::dict::Felt252DictEntryTrait;
+use core::dict::{Felt252Dict, Felt252DictEntryTrait};
 use core::cmp::min;
 #[cairofmt::skip]
 //! Memory allocator
@@ -144,7 +143,7 @@ impl New of Allocator {
 
 /// Trait specifying the public interface accessible on the allocator object.
 pub trait AllocatorOps<T> {
-    /// Allocate the indicated number of bytes and returns the address of that allocation.
+    /// Allocate the indicated number of bytes and return the address of that allocation.
     ///
     /// An allocation cannot fail. The returned address is always valid for loads and stores.
     /// The returned address is only valid for the same allocator instance that returned it.
@@ -170,7 +169,7 @@ pub trait AllocatorOps<T> {
     /// ```
     fn allocate(ref self: T, byte_count: ByteCount) -> Address;
 
-    /// Load the indicated number of bytes from the provided address and returns them.
+    /// Load the indicated number of bytes from the provided address and return them.
     ///
     /// `address` must contain a valid address returned by `allocate()` of the same allocator
     /// instance. The address can also be calculated from the address returned by
