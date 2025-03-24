@@ -25,11 +25,13 @@ use crate::{
         DataSymbol,
         Diagnostic,
         DiagnosticId,
+        EnumMatchArm,
+        EnumMatchArmId,
         FunctionSymbol,
         Location,
         LocationId,
-        MatchArm,
-        MatchArmId,
+        MultiConditionalArm,
+        MultiConditionalArmId,
         PoisonType,
         Signature,
         Statement,
@@ -100,8 +102,12 @@ pub struct FlatLoweredObject {
     pub statements: InternTable<StatementId, Statement>,
 
     /// Stores any possible arm that can be taken when a [`Block`] is exited
-    /// using type [`MatchArm`].
-    pub match_arms: InternTable<MatchArmId, MatchArm>,
+    /// using type [`MultiConditionalArm`].
+    pub multi_conditional_arms: InternTable<MultiConditionalArmId, MultiConditionalArm>,
+
+    /// Stores any possible arm that can be taken when a [`Block`] is exited
+    /// using type [`EnumMatchArm`].
+    pub enum_match_arm: InternTable<EnumMatchArmId, EnumMatchArm>,
 
     /// Stores an entry for each variable in the program, no matter its
     /// lifetime.
@@ -169,7 +175,8 @@ impl FlatLoweredObject {
             // Intern tables.
             blocks: InternTable::new(),
             statements: InternTable::new(),
-            match_arms: InternTable::new(),
+            multi_conditional_arms: InternTable::new(),
+            enum_match_arm: InternTable::new(),
             variables,
             diagnostics: InternTable::new(),
             locations: InternTable::new(),
