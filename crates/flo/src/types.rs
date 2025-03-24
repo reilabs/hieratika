@@ -427,6 +427,26 @@ pub enum BlockRef {
     /// of the compiler.
     Builtin(String),
 
+    /// Specifies a block in the local translation unit, but which requires
+    /// relocation before being used. These can only exist in the process
+    /// of generating block references.
+    ///
+    /// Encountering this object outside of object-format translation is
+    /// a compile-time error.
+    Relocation(BlockId),
+
+    /// Specifies a block that is to be resolved symbolically, like Builtin
+    /// and External, but which may or may not be in the local translation unit.
+    ///
+    /// This occurs when symbol resolution is not yet complete, such as when a
+    /// translation unit spans multiple object files in an language we're
+    /// lifting from.
+    ///
+    /// **These should not exist in finalized FLOs.**
+    /// They exist as an intermediate step when e.g. lifting other code
+    /// representations to FLO.
+    SymbolicRelocation(String),
+
     /// **For Internal Use:** Indicates that this `BlockRef`'s target is
     /// unspecified, e.g. as part of a poisoned [`Variable`].
     ///
@@ -502,7 +522,7 @@ pub enum Type {
     Bool,
 
     // Integer-backed types.
-    Enum,
+    IntegerEnum,
 
     // Integer types.
     Unsigned8,
@@ -533,9 +553,17 @@ pub enum Type {
     Pointer,
     Snapshot(Box<Type>),
 
-    /// Composite types.
+    // Composite types.
     Array(ArrayType),
     Struct(StructType),
+
+    // Variant types.
+    Enum(EnumType),
+
+    // Interfacing types -- these types are passed through in order to allow
+    // interfacing with Cairo code more easily/directly.
+    OpaqueSierraType(RawSierraType),
+    OpaqueSierraConstant(i128),
 
     /// **For Internal Use:** Indicates that this Variable's type is
     /// unspecified, e.g. as part of a poisoned [`Variable`].
@@ -552,8 +580,26 @@ impl Type {
     /// Construct or Destructure.
     #[must_use]
     pub fn is_composite(&self) -> bool {
-        matches!(self, Type::Array(_)) || matches!(self, Type::Struct(_))
+        matches!(self, Type::Array(_))
+            || matches!(self, Type::Struct(_))
+            || matches!(self, Type::Enum(_))
     }
+}
+
+/// Information about a raw/opaque Sierra type -- used to define types that will
+/// be emitted directly into sierra; or for passing opaque types though FLO
+/// code.
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+pub struct RawSierraType {
+    /// The Sierra base name for the given type.
+    /// This will be passed along directly into the emitted sierra.
+    pub generic_type: String,
+
+    /// Any arguments to be passed to the type in Sierra.
+    pub generic_arguments: Vec<Type>,
+
+    /// The storage size for the given type, in felts.
+    pub storage_size: usize,
 }
 
 /// Represents a fixed-size, contiguous array of a single element type.
@@ -595,6 +641,27 @@ pub type ArrayTypeId = InternIdentifier;
 pub struct StructType {
     /// The types of each member of this composite type, in order.
     pub members: Vec<Type>,
+
+    /// Any diagnostics associated with this type.
+    pub diagnostics: Vec<DiagnosticId>,
+
+    /// The source location associated with this type, if available.
+    pub location: Option<LocationId>,
+
+    /// Indicates whether this is a _poison value_.
+    ///
+    /// This is typically [`None`], indicating that this value is unpoisoned.
+    pub poison: PoisonType,
+}
+
+/// Represents a collection that can be any of several possible variants.
+///
+/// To support languages with strict typing, `CompositeTypeIds` can be treated
+/// as unique type identifiers, and compared.
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+pub struct EnumType {
+    /// The types of each variant of this union type, in order.
+    pub variants: Vec<Type>,
 
     /// Any diagnostics associated with this type.
     pub diagnostics: Vec<DiagnosticId>,

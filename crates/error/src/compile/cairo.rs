@@ -26,8 +26,20 @@ pub enum Error {
     #[error(transparent)]
     ProjectNotCreated(#[from] ProjectError),
 
-    #[error("Failure during compilation of Cairo project.")]
+    #[error("Failure during compilation of Cairo project")]
     DiagnosticsError,
+
+    #[error("Encountered an unsupported type")]
+    UnsupportedTypeError,
+
+    #[error("Cairo FlatLowered had an unexpected reference")]
+    InvalidFlatLoweredReference,
+
+    #[error("Invalid constant found in FlatLowered file")]
+    InvalidFlatLoweredConstant,
+
+    #[error("FlatLowered constant couldn't be represented in u128")]
+    UnsupportedFlatLoweredConstantSize,
 }
 
 impl From<std::io::Error> for WithBacktrace<Error> {
