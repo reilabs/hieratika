@@ -16,7 +16,9 @@ use crate::integer::{u24::u24, u40::u40};
 ///
 /// This is a generic implementation for every data type. Its specialized versions are defined in
 /// this file.
-fn store<T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, +TryInto<T, u8>>(
+pub fn store<
+    T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, +TryInto<T, u8>,
+>(
     ref allocator: AllocatorState, value: T, address: Address, offset: i64,
 ) {
     let store_address: Address = address + offset.try_into().expect('offset does not fit in u64');

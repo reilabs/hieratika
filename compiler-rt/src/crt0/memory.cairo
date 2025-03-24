@@ -22,3 +22,4 @@ pub mod alloc;
 pub mod alloca;
 pub mod load;
 pub mod store;
+pub mod cmpxchg;
