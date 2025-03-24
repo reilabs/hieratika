@@ -18,3 +18,6 @@ result
 package-lock.json
 .husky/_
 compiler-rt/target
+
+# Heiratika itself
+*.flo

@@ -117,6 +117,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 
 [[package]]
+name = "ariadne"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31beedec3ce83ae6da3a79592b3d8d7afd146a5b15bb9bb940279aced60faa89"
+dependencies = [
+ "unicode-width",
+ "yansi",
+]
+
+[[package]]
 name = "ark-ec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1440,6 +1450,7 @@ dependencies = [
  "cairo-lang-sierra-generator",
  "cairo-lang-utils",
  "hieratika-errors",
+ "hieratika-flo",
  "itertools 0.14.0",
  "rayon",
 ]
@@ -1454,6 +1465,7 @@ dependencies = [
  "exitcode",
  "hieratika-cairoc",
  "hieratika-compiler",
+ "hieratika-lifter",
  "indoc",
 ]
 
@@ -1508,6 +1520,28 @@ dependencies = [
  "bimap",
  "serde",
  "serde-lexpr",
+]
+
+[[package]]
+name = "hieratika-lifter"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "bimap",
+ "cairo-lang-compiler",
+ "cairo-lang-defs",
+ "cairo-lang-diagnostics",
+ "cairo-lang-filesystem",
+ "cairo-lang-lowering",
+ "cairo-lang-semantic",
+ "cairo-lang-utils",
+ "clap",
+ "hieratika-cairoc",
+ "hieratika-compiler",
+ "hieratika-errors",
+ "hieratika-flo",
+ "itertools 0.14.0",
+ "tracing",
 ]
 
 [[package]]
