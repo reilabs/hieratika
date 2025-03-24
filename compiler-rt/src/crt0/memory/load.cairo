@@ -17,7 +17,7 @@ use crate::integer::{u24::u24, u40::u40};
 ///
 /// This is a generic implementation for every data type. Its specialized versions
 /// are defined in this file.
-fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
+pub fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
     ref allocator: AllocatorState, address: Address, offset: i64,
 ) -> T {
     let load_address: Address = address + offset.try_into().expect('offset does not fit in u64');
