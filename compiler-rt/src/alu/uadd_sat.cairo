@@ -1,5 +1,6 @@
 pub mod uadd_sat_i8;
 pub mod uadd_sat_i16;
+pub mod uadd_sat_i24;
 pub mod uadd_sat_i32;
 pub mod uadd_sat_i40;
 pub mod uadd_sat_i64;

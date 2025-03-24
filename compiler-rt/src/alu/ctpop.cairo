@@ -1,6 +1,7 @@
 pub mod ctpop_i1;
 pub mod ctpop_i8;
 pub mod ctpop_i16;
+pub mod ctpop_i24;
 pub mod ctpop_i32;
 pub mod ctpop_i40;
 pub mod ctpop_i64;

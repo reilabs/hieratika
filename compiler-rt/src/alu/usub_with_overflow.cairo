@@ -1,5 +1,6 @@
 pub mod usub_with_overflow_i8;
 pub mod usub_with_overflow_i16;
+pub mod usub_with_overflow_i24;
 pub mod usub_with_overflow_i32;
 pub mod usub_with_overflow_i40;
 pub mod usub_with_overflow_i64;

@@ -2,6 +2,7 @@ use core::num::traits::OverflowingMul;
 pub mod shl_i1;
 pub mod shl_i8;
 pub mod shl_i16;
+pub mod shl_i24;
 pub mod shl_i32;
 pub mod shl_i40;
 pub mod shl_i64;

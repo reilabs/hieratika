@@ -1,5 +1,6 @@
 pub mod umax_i8;
 pub mod umax_i16;
+pub mod umax_i24;
 pub mod umax_i32;
 pub mod umax_i40;
 pub mod umax_i64;
