@@ -6,7 +6,7 @@ pub mod smul_with_overflow_i40;
 pub mod smul_with_overflow_i64;
 pub mod smul_with_overflow_i128;
 
-use crate::utils::{assert_fits_in_type, extend_sign};
+use crate::utils::{assert_fits_in_type, extend_sign_256};
 use crate::alu::shl::shl;
 use core::num::traits::{BitSize, Bounded, OverflowingMul};
 
@@ -14,7 +14,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingMul};
 //
 // This is a generic implementation for every data type. Its specialized version
 // is defined and tested in the smul_with_overflow/smul_with_overflow_<type>.cairo file.
-fn smul_with_overflow<
+pub fn smul_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //
@@ -29,6 +29,7 @@ fn smul_with_overflow<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
+    impl TInto_256: Into<T, u256>,
     impl TDestruct: Destruct<T>,
     impl TOverflowingMul: OverflowingMul<T>,
 >(
@@ -39,19 +40,18 @@ fn smul_with_overflow<
     assert_fits_in_type::<T>(rhs);
 
     // Generate masks used for sign extension.
-    let sign_bit_mask = shl::<u128>(1, BitSize::<T>::bits().into() - 1);
+    let sign_bit_mask: u256 = shl::<u128>(1, BitSize::<T>::bits().into() - 1).into();
     let value_mask = sign_bit_mask - 1;
     let sign_ext_bit_mask = ~value_mask;
 
     // Extend signs of operands if necessary.
-    let lhs = extend_sign(lhs, sign_bit_mask);
-    let rhs = extend_sign(rhs, sign_bit_mask);
+    let lhs: u256 = lhs.into();
+    let rhs: u256 = rhs.into();
+    let lhs = extend_sign_256(lhs, sign_bit_mask);
+    let rhs = extend_sign_256(rhs, sign_bit_mask);
 
     // Perform the multiplication and check for overflow.
-    let (result, overflow) = lhs.overflowing_mul(rhs);
-    if BitSize::<T>::bits() == 128 {
-        return (result, overflow);
-    }
+    let (result, overflow): (u256, bool) = lhs.overflowing_mul(rhs);
 
     // Manual overflow detection.
     // If lhs and rhs values were originally shorter than 128 bit, additional
@@ -70,12 +70,14 @@ fn smul_with_overflow<
             masked_bits == 0
         }
     };
-    let truncated_result = result & Bounded::<T>::MAX.into();
+    // Because `result` is truncated to the least significant T bits using bitwise AND, it is safe
+    // to call `try_into().unwrap()` to downcast from u256 to u128 without risking any panic.
+    let truncated_result: u128 = (result & Bounded::<T>::MAX.into()).try_into().unwrap();
     if overflow && extension_bits_equal {
         return (truncated_result, false);
     }
     // Overflow occurs if the result does not fit in the concrete type.
-    let does_result_fit_in_t = truncated_result & value_mask == result;
+    let does_result_fit_in_t = truncated_result.into() & value_mask == result;
 
     (truncated_result, !does_result_fit_in_t)
 }

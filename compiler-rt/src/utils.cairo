@@ -67,3 +67,15 @@ pub fn extend_sign(value: u128, sign_bit_mask: u128) -> u128 {
         value
     }
 }
+
+pub fn extend_sign_256(value: u256, sign_bit_mask: u256) -> u256 {
+    let sign_bit = (value & sign_bit_mask) != 0;
+    let value_mask = sign_bit_mask - 1;
+    let sign_ext_bit_mask = ~value_mask;
+
+    if sign_bit {
+        sign_ext_bit_mask | value
+    } else {
+        value
+    }
+}
