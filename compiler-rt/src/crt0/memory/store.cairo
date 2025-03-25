@@ -24,6 +24,7 @@ fn store<T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, 
     allocator.store(store_address, @buffer);
 }
 
+#[cfg(test)]
 mod test {
     use super::store;
     use crate::crt0::allocator::{Allocator, AllocatorOps, ByteCount};

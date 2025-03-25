@@ -17,6 +17,7 @@ fn alloc(ref allocator: AllocatorState, size_bytes: i64, count: i64) -> Address 
     allocator.allocate(size_bytes * count)
 }
 
+#[cfg(test)]
 mod test {
     use super::alloc;
     use crate::crt0::allocator::Allocator;

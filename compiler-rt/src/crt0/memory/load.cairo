@@ -26,6 +26,7 @@ fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestr
     buffer_to_t::<T>(@data)
 }
 
+#[cfg(test)]
 mod test {
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState};
