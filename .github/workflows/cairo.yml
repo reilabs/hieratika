@@ -19,6 +19,17 @@ jobs:
       - run: scarb fmt --check
         working-directory: compiler-rt/
 
+  build-check:
+    name: "Analyze the current package and report errors, but don't build Sierra files"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: "2.10.1"
+      - run: scarb --profile release check
+        working-directory: compiler-rt/
+
   tests:
     name: "Test Cairo Code"
     strategy:
