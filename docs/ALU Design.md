@@ -451,15 +451,13 @@ relevant part of the LLVM Language Reference Manual.
   - `__llvm_xor_o_o_o`
 - [`cmpxchg`](https://llvm.org/docs/LangRef.html#cmpxchg-instruction):
   - `__llvm_cmpxchg_p_b_b_Sbcs`
-  - `__llvm_cmpxchg_p_p_p_Sbcs`
   - `__llvm_cmpxchg_p_z_z_Szcs`
-  - `__llvm_cmpxchg_p_p_p_Szcs`
+  - `__llvm_cmpxchg_p_x_x_Sxcs`
   - `__llvm_cmpxchg_p_i_i_Sics`
-  - `__llvm_cmpxchg_p_p_p_Sics`
+  - `__llvm_cmpxchg_p_n_n_Sncs`
+  - `__llvm_cmpxchg_p_k_k_Skcs`
   - `__llvm_cmpxchg_p_l_l_Slcs`
-  - `__llvm_cmpxchg_p_p_p_Slcs`
   - `__llvm_cmpxchg_p_o_o_Socs`
-  - `__llvm_cmpxchg_p_p_p_Socs`
 - [`trunc .. to`](https://llvm.org/docs/LangRef.html#trunc-to-instruction):
   - `_llvm_trunc_o_to_l`
   - `_llvm_trunc_o_to_i`
