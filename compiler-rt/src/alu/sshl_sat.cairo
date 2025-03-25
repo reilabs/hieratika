@@ -6,9 +6,10 @@ pub mod sshl_sat_i40;
 pub mod sshl_sat_i64;
 pub mod sshl_sat_i128;
 
-use crate::utils::{assert_fits_in_type, extend_sign};
+use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;
-use core::num::traits::{BitSize, Bounded};
+use crate::alu::smul_with_overflow::smul_with_overflow;
+use core::num::traits::{BitSize, Bounded, OverflowingSub, OverflowingMul};
 
 // Perform the `sshl_sat` operation.
 //
@@ -44,7 +45,10 @@ fn sshl_sat<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
+    impl TInto_256: Into<T, u256>,
     impl TDestruct: Destruct<T>,
+    impl TOverflowingSub: OverflowingSub<T>,
+    impl OverflowingMul: OverflowingMul<T>,
 >(
     n: u128, shift: u128,
 ) -> u128 {
@@ -70,48 +74,32 @@ fn sshl_sat<
         return n;
     }
 
-    let shifted = shl::<u128>(n, shift);
-
     // Check if the shifted value is negative
-    let sign_bit_mask = shl::<u128>(1, bit_size - 1);
-    let is_shifted_negative = (shifted & sign_bit_mask) != 0;
+    let sign_bit_mask = shl::<T>(1, bit_size - 1);
     let is_n_negative = (n & sign_bit_mask) != 0;
 
     // Min/max values of iN
     let max_value = sign_bit_mask - 1;
     let min_value = sign_bit_mask;
-    #[cairofmt::skip]
-    let result = match (is_n_negative, is_shifted_negative) {
-        (false, false) => {
-            if shifted > max_value {
-                max_value
-            } else {
-                shifted
-            }
-        },
-        (false, true) => {
-            max_value
-        },
-        (true, false) => {
-            min_value
-        },
-        (true, true) => {
-            if bit_size + shift > 128 {
-                if shifted  < min_value {
-                    shifted
-                } else {
-                    min_value
-                }
-            } else {
-                let shifted_sign_bit_mask = shl::<u128>(1, bit_size - 1 + shift);
-                if extend_sign(shifted, shifted_sign_bit_mask) > extend_sign(min_value, sign_bit_mask) {
-                    shifted
-                } else {
-                    min_value
-                }
-            }
-        },
+
+    // Cairo does not have << or >> operators so we must implement the shift manually.
+    let mut result = n;
+    let mut is_overflowed = false;
+    // Perform the shift `shift` number of times.
+    for _ in 0..shift {
+        let (product, overflowed) = smul_with_overflow::<T>(result, 2);
+        is_overflowed = overflowed || is_overflowed;
+        result = product;
     };
 
-    result & Bounded::<T>::MAX.into()
+    if is_overflowed {
+        if is_n_negative {
+            return min_value;
+        } else {
+            return max_value;
+        }
+    }
+
+    // Make sure the result is limited only to the bit width of the concrete type.
+    return result & Bounded::<T>::MAX.into();
 }
