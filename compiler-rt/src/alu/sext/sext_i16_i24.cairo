@@ -1,0 +1,28 @@
+use crate::alu::sext::sext;
+use crate::integer::u24::u24;
+
+pub fn __llvm_sext_z_to_x(value: u128) -> u128 {
+    sext::<u16, u24>(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::__llvm_sext_z_to_x;
+    use crate::alu::test_case::TestCaseOneArg;
+    #[cairofmt::skip]
+    pub const test_cases: [TestCaseOneArg; 7] = [
+        TestCaseOneArg { arg: 0b0000000000000000, expected: 0b000000000000000000000000 },
+        TestCaseOneArg { arg: 0b0000000100000000, expected: 0b000000000000000100000000 },
+        TestCaseOneArg { arg: 0b0100000100000000, expected: 0b000000000100000100000000 },
+        TestCaseOneArg { arg: 0b1000000000000000, expected: 0b111111111000000000000000 },
+        TestCaseOneArg { arg: 0b1000000100000000, expected: 0b111111111000000100000000 },
+        TestCaseOneArg { arg: 0b1100000100000000, expected: 0b111111111100000100000000 },
+        TestCaseOneArg { arg: 0b1111111100000000, expected: 0b111111111111111100000000 },
+    ];
+    #[test]
+    fn test_i16_i24() {
+        for case in test_cases.span() {
+            assert_eq!(__llvm_sext_z_to_x(*case.arg), *case.expected);
+        }
+    }
+}

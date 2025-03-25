@@ -1,5 +1,6 @@
 pub mod smax_i8;
 pub mod smax_i16;
+pub mod smax_i24;
 pub mod smax_i32;
 pub mod smax_i40;
 pub mod smax_i64;
