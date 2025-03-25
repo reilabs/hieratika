@@ -18,6 +18,7 @@ mod tests {
         TestCaseOneArg { arg: 0b1100000100000000, expected: 0b11111111111111111100000100000000 },
         TestCaseOneArg { arg: 0b1111111100000000, expected: 0b11111111111111111111111100000000 },
     ];
+
     #[test]
     fn test_i16_i32() {
         for case in test_cases.span() {

@@ -57,7 +57,7 @@ mod tests {
     ];
 
     #[test]
-    fn test_i16() {
+    fn test_i24() {
         for case in test_cases.span() {
             assert_eq!(__llvm_shl_x_x_x(*case.lhs, *case.rhs), *case.expected);
         }

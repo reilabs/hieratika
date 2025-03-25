@@ -16,7 +16,7 @@ mod tests {
         TestCaseOneArg { arg: 0b1111111111111111111111111111111111111111, expected: 0b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111 },
     ];
     #[test]
-    fn test_i40() {
+    fn test_i40_i128() {
         for case in test_cases.span() {
             assert_eq!(__llvm_zext_n_to_o(*case.arg), *case.expected);
         }

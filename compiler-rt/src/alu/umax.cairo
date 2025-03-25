@@ -3,6 +3,7 @@ pub mod umax_i16;
 pub mod umax_i24;
 pub mod umax_i32;
 pub mod umax_i40;
+pub mod umax_i48;
 pub mod umax_i64;
 pub mod umax_i128;
 

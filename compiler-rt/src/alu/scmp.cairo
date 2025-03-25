@@ -3,6 +3,7 @@ pub mod scmp_i16;
 pub mod scmp_i24;
 pub mod scmp_i32;
 pub mod scmp_i40;
+pub mod scmp_i48;
 pub mod scmp_i64;
 pub mod scmp_i128;
 

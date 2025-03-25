@@ -3,6 +3,7 @@ pub mod ashr_i16;
 pub mod ashr_i24;
 pub mod ashr_i32;
 pub mod ashr_i40;
+pub mod ashr_i48;
 pub mod ashr_i64;
 pub mod ashr_i128;
 

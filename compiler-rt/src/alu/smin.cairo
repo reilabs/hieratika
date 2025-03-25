@@ -3,6 +3,7 @@ pub mod smin_i16;
 pub mod smin_i24;
 pub mod smin_i32;
 pub mod smin_i40;
+pub mod smin_i48;
 pub mod smin_i64;
 pub mod smin_i128;
 

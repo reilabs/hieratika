@@ -3,6 +3,7 @@ pub mod mul_i16;
 pub mod mul_i24;
 pub mod mul_i32;
 pub mod mul_i40;
+pub mod mul_i48;
 pub mod mul_i64;
 pub mod mul_i128;
 
