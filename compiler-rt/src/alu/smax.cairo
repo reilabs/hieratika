@@ -15,7 +15,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the smax/smax_<type>.cairo files.
-fn smax<
+pub fn smax<
     T,
     // The trait bounds are chosen so that:
     //

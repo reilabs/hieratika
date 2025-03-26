@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, WrappingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the sub/sub_<type>.cairo files.
-fn sub<
+pub fn sub<
     T,
     // The trait bounds are chosen so that:
     //

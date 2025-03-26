@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, OverflowingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the usub_sat/usub_sat_<type>.cairo files.
-fn usub_sat<
+pub fn usub_sat<
     T,
     // The trait bounds are chosen so that:
     //

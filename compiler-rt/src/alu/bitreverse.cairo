@@ -16,7 +16,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the bitreverse/bitreverse_<type>.cairo files.
-fn bitreverse<
+pub fn bitreverse<
     T,
     // The trait bounds are chosen so that:
     //

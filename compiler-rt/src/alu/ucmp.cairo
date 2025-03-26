@@ -15,7 +15,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the ucmp/ucmp_<type>.cairo files.
-fn ucmp<
+pub fn ucmp<
     T,
     // The trait bounds are chosen so that:
     //

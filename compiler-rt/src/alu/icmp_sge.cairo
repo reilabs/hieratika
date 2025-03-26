@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the icmp_sge/icmp_sge_<type>.cairo files.
-fn icmp_sge<
+pub fn icmp_sge<
     T,
     // The trait bounds are chosen so that:
     //

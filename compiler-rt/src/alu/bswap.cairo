@@ -14,7 +14,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the bswap/bswap_<type>.cairo files.
-fn bswap<
+pub fn bswap<
     T,
     // The trait bounds are chosen so that:
     //

@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, WrappingAdd};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the add/add_i<type>.cairo files.
-fn add<
+pub fn add<
     T,
     // The trait bounds are chosen so that:
     //
