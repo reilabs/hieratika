@@ -124,17 +124,11 @@ mod test {
 }
 
 pub fn __llvm_store_b_p_l_v(value: u8, address: Address, offset: i64) {
-    // This must be <u8> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i8>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
 
 pub fn __llvm_store_z_p_l_v(value: u16, address: Address, offset: i64) {
-    // This must be <u16> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i16>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
@@ -145,17 +139,11 @@ pub fn __llvm_store_x_p_l_v(value: u24, address: Address, offset: i64) {
 }
 
 pub fn __llvm_store_i_p_l_v(value: u32, address: Address, offset: i64) {
-    // This must be <u32> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i32>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
 
 pub fn __llvm_store_n_p_l_v(value: u40, address: Address, offset: i64) {
-    // This must be <u64> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i64>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
@@ -166,9 +154,6 @@ pub fn __llvm_store_l_p_l_v(value: u64, address: Address, offset: i64) {
 }
 
 pub fn __llvm_store_o_p_l_v(value: u128, address: Address, offset: i64) {
-    // This must be <u128> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i128>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
