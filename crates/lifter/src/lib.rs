@@ -58,8 +58,11 @@ mod test {
     }
 
     #[test]
-    fn flo_example_run() {
+    fn lift_cairo_examples() {
         let filename = "../../cairo/examples/complex_input.cairo";
+        let _flo = compile_single_cairo_file_to_flo(Path::new(&filename)).unwrap();
+
+        let filename = "../../cairo/examples/fib.cairo";
         let _flo = compile_single_cairo_file_to_flo(Path::new(&filename)).unwrap();
     }
 }

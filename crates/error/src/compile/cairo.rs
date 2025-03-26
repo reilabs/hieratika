@@ -40,6 +40,12 @@ pub enum Error {
 
     #[error("FlatLowered constant couldn't be represented in u128")]
     UnsupportedFlatLoweredConstantSize,
+
+    #[error("FlatLowered doesn't yet support a necessary cairo feature")]
+    UnsupportedCairoFeature,
+
+    #[error("Cairo code seems to contain an empty match; code likely contains unresolved generics")]
+    MatchWithoutArms,
 }
 
 impl From<std::io::Error> for WithBacktrace<Error> {

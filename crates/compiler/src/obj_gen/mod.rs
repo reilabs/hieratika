@@ -584,7 +584,7 @@ impl ObjectGenerator {
 
             // Once we have the match arms, that is all we need to generate the body of this
             // function, which is simply a match as a terminator instruction.
-            bb.end_with_match(&match_arms, None, None);
+            bb.end_with_multi_condition(&match_arms, None, None);
             Ok(())
         })?;
 
@@ -2504,7 +2504,7 @@ impl ObjectGenerator {
 
             // Finally, we build the match itself into the first block of the function
             // implementing the phi, using those newly-created match arms.
-            bb.end_with_match(branches.as_slice(), None, None);
+            bb.end_with_multi_condition(branches.as_slice(), None, None);
 
             Ok(())
         })?;
@@ -3144,7 +3144,7 @@ impl ObjectGenerator {
         // Finally we can end the block properly, and in this case we have no default
         // block as the only way we could reach one is under undefined behavior, and in
         // this case FLO will generate a panicking arm for us anyway.
-        bb.end_with_match(&match_arms, None, None);
+        bb.end_with_multi_condition(&match_arms, None, None);
 
         Ok(())
     }
@@ -3319,7 +3319,7 @@ impl ObjectGenerator {
 
         // Once we have the match arms, we can actually terminate our current block
         // quite simply.
-        bb.end_with_match(&match_arms, Some(default_dest_id), None);
+        bb.end_with_multi_condition(&match_arms, Some(default_dest_id), None);
 
         // With nothing to return, we are done.
         Ok(())

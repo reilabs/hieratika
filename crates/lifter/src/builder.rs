@@ -5,11 +5,11 @@ use cairo_lang_compiler::db::RootDatabase;
 use cairo_lang_defs::ids::TopLevelLanguageElementId;
 use cairo_lang_lowering::{db::LoweringGroup, lower::MultiLowering, objects as cfl_objects};
 use cairo_lang_semantic as cfl_semantic;
-use cairo_lang_semantic::db::SemanticGroup;
+use cairo_lang_semantic::{MatchArmSelector, db::SemanticGroup};
 use cairo_lang_utils::{Intern, LookupIntern};
 use hieratika_cairoc::CairoFlatLowered;
 use hieratika_errors::compile::cairo::{Error, Result};
-use hieratika_flo::{FlatLoweredObject, types as flo};
+use hieratika_flo::{FlatLoweredObject, types as flo, types::PoisonType};
 
 /// Object that helps to build a Hieratika FLO from Cairo `MultiFlat`
 /// 'objects'.
@@ -201,16 +201,57 @@ impl FlatLoweredTranslator<'_> {
         }
 
         // 2) we need to relocate the To and From on any BlockExits
+        //
+        // NOTE: We perform these relocations in-place, which only works
+        // because we don't re-use them, a facet of how we generate things locally.
+        // This isn't a safe technique in the general case.
+        //
         for block_id in self.flo.blocks.ids() {
             let mut block = self.flo.blocks.get(block_id);
-            if let BlockExit::Goto { from, to } = block.exit {
-                // Relocate the From and To to be FLO references, rather than CFL ones...
-                let from = *self.corresponding_flo_block(BlockId(from))?;
-                let to = *self.corresponding_flo_block(BlockId(to))?;
-                block.exit = BlockExit::Goto { from, to };
+            match block.exit {
+                // GOTOs have a block FROM and TO that need to be relocated.
+                BlockExit::Goto { from, to } => {
+                    // Relocate the From and To to be FLO references, rather than CFL ones...
+                    let from = *self.corresponding_flo_block(BlockId(from))?;
+                    let to = *self.corresponding_flo_block(BlockId(to))?;
+                    block.exit = BlockExit::Goto { from, to };
 
-                // ... and update the relevant block.
-                self.flo.blocks.swap(block_id, &block);
+                    // ... and update the relevant block.
+                    self.flo.blocks.swap(block_id, &block);
+                }
+
+                // Match statement have a block target that needs to be relocated.
+                BlockExit::EnumMatch {
+                    match_variable,
+                    arms,
+                    default_target,
+                    from,
+                } => {
+                    // First, we'll relocate each of our match arms' targets.
+                    for arm_id in arms.clone() {
+                        let mut arm = self.flo.enum_match_arm.get(arm_id);
+
+                        arm.target_block =
+                            *self.corresponding_flo_block(BlockId(arm.target_block))?;
+                        self.flo.enum_match_arm.swap(arm_id, &arm);
+                    }
+
+                    // Next, we relocate the source for our match operation, and our default target.
+                    let from = *self.corresponding_flo_block(BlockId(from))?;
+                    let default_target = *self.corresponding_flo_block(BlockId(default_target))?;
+                    block.exit = BlockExit::EnumMatch {
+                        match_variable,
+                        arms,
+                        default_target,
+                        from,
+                    };
+
+                    // Finally, update the relevant block.
+                    self.flo.blocks.swap(block_id, &block);
+                }
+
+                // Other block types don't require relocations.
+                _ => {}
             }
         }
 
@@ -345,7 +386,7 @@ impl FlatLoweredTranslator<'_> {
 
     // Returns a BlockExit equivalent to the provided CFL BlockEnd.
     fn equivalent_block_exit(
-        &self,
+        &mut self,
         cfl_end: &cfl_objects::FlatBlockEnd,
         from_block_id: cfl_objects::BlockId,
     ) -> Result<flo::BlockExit> {
@@ -356,10 +397,12 @@ impl FlatLoweredTranslator<'_> {
             FlatBlockEnd::NotSet => Ok(BlockExit::Unspecified),
             FlatBlockEnd::Return(vec, _location_id) => Ok(self.equivalent_return(vec)),
             FlatBlockEnd::Panic(var_usage) => Ok(Self::equivalent_panic(var_usage)),
-            FlatBlockEnd::Goto(block_id, var_remapping) => {
-                self.equivalent_goto(*block_id, from_block_id, var_remapping)
-            }
-            FlatBlockEnd::Match { info } => self.equivalent_match(info),
+            FlatBlockEnd::Goto(block_id, var_remapping) => Ok(Self::equivalent_goto(
+                *block_id,
+                from_block_id,
+                var_remapping,
+            )),
+            FlatBlockEnd::Match { info } => self.equivalent_match(info, from_block_id),
         }
     }
 
@@ -382,30 +425,83 @@ impl FlatLoweredTranslator<'_> {
 
     /// Returns the equivalent `BlockExit` for a CFL Goto.
     fn equivalent_goto(
-        &self,
         cfl_target_block_id: cfl_objects::BlockId,
         cfl_from_block_id: cfl_objects::BlockId,
         _cfl_var_remapping: &cfl_objects::VarRemapping,
-    ) -> Result<flo::BlockExit> {
-        // TODO(ktemkin): This chould be marked explicitly as a relocation; for now,
+    ) -> flo::BlockExit {
+        // TODO(ktemkin): This could be marked explicitly as a relocation; for now,
         // we're putting it in directly and assuming all GOTOs will be
         // relocated.
-        let to: flo::BlockId = self.equivalent_block_id(cfl_target_block_id)?;
-        let from: flo::BlockId = self.equivalent_block_id(cfl_from_block_id)?;
+        let to: flo::BlockId = cfl_target_block_id.0;
+        let from: flo::BlockId = cfl_from_block_id.0;
 
-        Ok(flo::BlockExit::Goto { to, from })
+        flo::BlockExit::Goto { to, from }
     }
 
     /// Returns the equivalent `BlockExit` for a CFL Match.
-    fn equivalent_match(&self, _cfl_match: &cfl_objects::MatchInfo) -> Result<flo::BlockExit> {
-        // TODO(ktemkin): This is left unimplemented for the first iteration of this PR,
-        // as the implementation requires compiler changes that simplify match handling
-        // in general,
-        //
-        // This will follow in a second PR once this PR is approved, to keep changes
-        // isolated.
-        //
-        todo!();
+    fn equivalent_match(
+        &mut self,
+        cfl_match: &cfl_objects::MatchInfo,
+        from_block_id: cfl_objects::BlockId,
+    ) -> Result<flo::BlockExit> {
+        let match_variables = cfl_match.inputs();
+        let cfl_match_arms = cfl_match.arms();
+
+        // For now, we only support matching over a single variable.
+        if match_variables.len() != 1 {
+            return Err(Error::UnsupportedCairoFeature.into());
+        }
+
+        // We don't support CFL matchers with no arms.
+        if cfl_match_arms.is_empty() {
+            return Err(Error::MatchWithoutArms.into());
+        }
+
+        // Get the variable that is used as the base for our match.
+        let match_variable = *self.corresponding_flo_variable_id(&match_variables[0].var_id)?;
+
+        // Convert each of the match arms into a CFL representation.
+        let mut flo_arms: Vec<flo::EnumMatchArmId> = vec![];
+        for cfl_arm in cfl_match.arms() {
+            // First, we'll need to convert the relevant match arm into a value we can place
+            // into an integer.
+            let numeric_arm = match cfl_arm.clone().arm_selector {
+                // If this selects between variants, convert the variant ID into our relevant index.
+                MatchArmSelector::VariantId(variant) => variant.idx,
+                MatchArmSelector::Value(value) => value.value,
+            };
+
+            // Next, we'll need to identify the block we want to jump to.
+            let target_block = cfl_arm.block_id.0;
+
+            // Finally, create the equivalent CFL arm for the relevant variable.
+            let flo_arm = flo::EnumMatchArm {
+                value: numeric_arm as u128,
+                target_block,
+                poison: PoisonType::None,
+                diagnostics: vec![],
+                location: None,
+            };
+            let flo_arm_id = self.flo.enum_match_arm.insert(&flo_arm);
+            flo_arms.push(flo_arm_id);
+        }
+
+        // Cairo enforces the requirement that the enum arms be contiguous, and uses the
+        // last enum arm value as its 'default case', rather than explicitly
+        // supporting it. That means our default will never be reached -- but
+        // we'll still need to provide one. For clarity, we'll use the same
+        // one that Cairo does.
+        let last_arm_id = *flo_arms.last().unwrap();
+        let last_arm = self.flo.enum_match_arm.get(last_arm_id);
+        let default_target = last_arm.target_block;
+
+        // Finally, return the equivalent match.
+        Ok(flo::BlockExit::EnumMatch {
+            match_variable,
+            arms: flo_arms,
+            default_target,
+            from: from_block_id.0,
+        })
     }
 
     /// Returns the equivalent statement to the provided CFL constant
@@ -848,24 +944,6 @@ impl FlatLoweredTranslator<'_> {
         })
     }
 
-    /// Returns a `BlockRef` equivalent to the given CFL `BlockId`
-    /// This will always be a relocation that must be resolved with
-    /// `translate_relocations`.
-    #[expect(dead_code)]
-    fn equivalent_block_ref(&self, cfl_block_id: cfl_objects::BlockId) -> Result<flo::BlockRef> {
-        Ok(flo::BlockRef::Relocation(
-            self.equivalent_block_id(cfl_block_id)?,
-        ))
-    }
-
-    /// Returns the CFL `BlockId` equivalent to an already-mapped CFL `BlockId`.
-    fn equivalent_block_id(&self, block_id: cfl_objects::BlockId) -> Result<flo::BlockId> {
-        Ok(*self
-            .equivalent_blocks
-            .get_by_left(&block_id)
-            .ok_or(Error::InvalidFlatLoweredReference)?)
-    }
-
     /// Generates a FLO type equivalent to the provided tuple.
     fn equivalent_flo_type_for_tuple(
         &mut self,
@@ -914,9 +992,7 @@ impl FlatLoweredTranslator<'_> {
 
     /// Finds the FLO `VariableId` for a given Cairo `VariableId`.
     ///
-    /// The block must have already been translated; if translation isn't
-    /// complete, see `equivalent_block_ref`, which can generate a
-    /// relocation.
+    /// The block must have already been translated.
     fn corresponding_flo_block(&self, cfl_block_id: cfl_objects::BlockId) -> Result<&flo::BlockId> {
         self.equivalent_blocks
             .get_by_left(&cfl_block_id)
