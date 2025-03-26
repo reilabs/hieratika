@@ -121,9 +121,26 @@ pub enum BlockExit {
     /// provided ID.
     Goto { to: BlockId, from: BlockId },
 
-    /// Indicates that we should iterate through a list of [`MatchArm`]s, and
-    /// continue to the [`Block`] associated with the first matching predicate.
-    Match(Vec<MatchArmId>),
+    /// Indicates that we should iterate through a list of
+    /// [`MultiConditionalArm`]s, and continue to the [`Block`] associated
+    /// with the first matching predicate.
+    MultiConditional(Vec<MultiConditionalArmId>),
+
+    /// Indicates that we should jump to a different location depending on which
+    /// variant of an enum is present.
+    EnumMatch {
+        /// The variable to be matched against.
+        match_variable: VariableId,
+
+        /// All possible match targets.
+        arms: Vec<EnumMatchArmId>,
+
+        /// The default target; to be taken if no other target is.
+        default_target: BlockId,
+
+        /// The block this exit is being taken from.
+        from: BlockId,
+    },
 
     /// **For Internal Use:** Indicates that this `BlockExit` is unspecified,
     /// e.g. as part of a poisoned [`Block`].
@@ -723,14 +740,42 @@ pub struct Location {
 /// [`crate::flo::FlatLoweredObject`]'s interning tables.
 pub type LocationId = InternIdentifier;
 
-/// Represents a single arm of a Match statement, assuming that
-/// [`crate::flo::FlatLoweredObject`] of the relevant match condition has
+/// Represents a single arm of an enum-match; which jumps to a different
+/// location depending on which form of a concrete enum is present.
+/// true.
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
+pub struct EnumMatchArm {
+    /// The value to match against in the provided enum. This often encodes the
+    /// particular enum variant to be matched against.
+    #[serde(with = "serdes::u128")]
+    pub value: u128,
+
+    /// The target for the 'jump' if the match condition is met.
+    pub target_block: BlockId,
+
+    /// Indicates whether this arm is a _poison value_.
+    ///
+    /// This is typically [`None`], indicating that this value is unpoisoned.
+    pub poison: PoisonType,
+
+    /// Any diagnostics associated with this `MultiConditionalArm`.
+    pub diagnostics: Vec<DiagnosticId>,
+
+    /// The source location associated with this `MultiConditionalArm`, if
+    /// available.
+    pub location: Option<LocationId>,
+}
+
+pub type EnumMatchArmId = InternIdentifier;
+
+/// Represents a single arm of an if-else tree, assuming that
+/// [`crate::flo::FlatLoweredObject`] the relevant condition has
 /// already been evaluated and stored in a [`Variable`] of type Bool.
 ///
 /// Directs control flow to the provided Block if the relevant [`Variable`] is
 /// true.
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]
-pub struct MatchArm {
+pub struct MultiConditionalArm {
     /// A variable of type Bool that determines whehter this arm will be taken.
     ///
     /// If this variable evaluates to `true`, control flow will continue to
@@ -745,16 +790,17 @@ pub struct MatchArm {
     /// This is typically [`None`], indicating that this value is unpoisoned.
     pub poison: PoisonType,
 
-    /// Any diagnostics associated with this `MatchArm`.
+    /// Any diagnostics associated with this `MultiConditionalArm`.
     pub diagnostics: Vec<DiagnosticId>,
 
-    /// The source location associated with this `MatchArm`, if available.
+    /// The source location associated with this `MultiConditionalArm`, if
+    /// available.
     pub location: Option<LocationId>,
 }
 
 /// A reference to an object of type [Diagnostic] in one of the
 /// [`crate::flo::FlatLoweredObject`]'s interning tables.
-pub type MatchArmId = InternIdentifier;
+pub type MultiConditionalArmId = InternIdentifier;
 
 /// A simple constant with a fixed type.
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq, Hash)]

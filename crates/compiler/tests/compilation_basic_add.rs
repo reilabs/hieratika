@@ -33,16 +33,16 @@ fn compiles_add() -> miette::Result<()> {
     // like a match.
     assert!(matches!(
         hieratika_rust_test_input.exit,
-        BlockExit::Match(_)
+        BlockExit::MultiConditional(_)
     ));
 
     // That match can end up in one of two places, so let's start by grabbing it.
     let exit = &hieratika_rust_test_input.exit;
     let target_block_ids = match exit {
-        BlockExit::Match(arms) => arms
+        BlockExit::MultiConditional(arms) => arms
             .iter()
             .map(|arm_id| {
-                let arm = flo.match_arms.get(*arm_id);
+                let arm = flo.multi_conditional_arms.get(*arm_id);
                 arm.target_block
             })
             .collect_vec(),

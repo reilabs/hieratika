@@ -5,8 +5,9 @@ use crate::types::{
     Block,
     BlockExit,
     Diagnostic,
+    EnumMatchArm,
     Location,
-    MatchArm,
+    MultiConditionalArm,
     PoisonType,
     Statement,
     StructType,
@@ -71,7 +72,8 @@ macro_rules! make_enum_default_poisonable {
 
 // Make our poison-having types poisonable.
 make_struct_poisonable!(Block);
-make_struct_poisonable!(MatchArm);
+make_struct_poisonable!(MultiConditionalArm);
+make_struct_poisonable!(EnumMatchArm);
 make_struct_poisonable!(Variable);
 make_struct_poisonable!(Diagnostic);
 make_struct_poisonable!(Location);

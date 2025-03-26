@@ -21,9 +21,9 @@ use crate::{
         GetBlockAddressStatement,
         Location,
         LocationId,
-        MatchArm,
-        MatchArmId,
         MemoryOrdering,
+        MultiConditionalArm,
+        MultiConditionalArmId,
         PoisonType,
         ReinterpretBitsStatement,
         Signature,
@@ -117,7 +117,7 @@ impl<'a> BlockBuilder<'a> {
         self.block.exit = exit.clone();
     }
 
-    /// Terminates the block with an If-style Phi-expression.
+    /// Terminates the block with an If-style Phi-expression
     pub fn end_with_if(
         &mut self,
         condition: VariableId,
@@ -126,7 +126,7 @@ impl<'a> BlockBuilder<'a> {
         location: Option<LocationId>,
     ) {
         // Create a matcher that jumps to the True target if the condition is true...
-        let match_then = self.context.match_arms.insert(&MatchArm {
+        let match_then = self.context.multi_conditional_arms.insert(&MultiConditionalArm {
             condition,
             target_block: target_true,
             poison: PoisonType::None,
@@ -136,7 +136,7 @@ impl<'a> BlockBuilder<'a> {
 
         // ... and a match target that jumps to the False target unconditionally.
         // This will execute iff the true branch is taken.
-        let match_else = self.context.match_arms.insert(&MatchArm {
+        let match_else = self.context.multi_conditional_arms.insert(&MultiConditionalArm {
             condition: self.context.fixed_true,
             target_block: target_false,
             poison: PoisonType::None,
@@ -146,7 +146,7 @@ impl<'a> BlockBuilder<'a> {
 
         // Create a Phi statement from the matcher, and set it as the block exit.
         let phi = vec![match_then, match_else];
-        self.set_exit(&BlockExit::Match(phi));
+        self.set_exit(&BlockExit::MultiConditional(phi));
     }
 
     /// Ends the block with a return.
@@ -169,9 +169,9 @@ impl<'a> BlockBuilder<'a> {
     /// * `default_next_block` - the block to go to if no block is taken
     /// * `location` - the location annotation for the default case; unused if
     ///   no default branch is provided
-    pub fn end_with_match(
+    pub fn end_with_multi_condition(
         &mut self,
-        arms: &[MatchArmId],
+        arms: &[MultiConditionalArmId],
         default_next_block: Option<BlockId>,
         default_location: Option<LocationId>,
     ) {
@@ -180,7 +180,7 @@ impl<'a> BlockBuilder<'a> {
         // If we have a default case...
         if let Some(default_goto) = default_next_block {
             // ... convert it to an always-true match arm...
-            let match_default = self.context.match_arms.insert(&MatchArm {
+            let match_default = self.context.multi_conditional_arms.insert(&MultiConditionalArm {
                 condition:    self.context.fixed_true,
                 target_block: default_goto,
                 poison:       PoisonType::None,
@@ -192,7 +192,7 @@ impl<'a> BlockBuilder<'a> {
             arms.push(match_default);
         }
 
-        self.set_exit(&BlockExit::Match(arms));
+        self.set_exit(&BlockExit::MultiConditional(arms));
     }
 
     /// Completes construction of the relevant object, adding it in context and
@@ -1106,12 +1106,12 @@ impl BlockBuilder<'_> {
         jump_target: BlockId,
         diagnostics: &[DiagnosticId],
         location: Option<LocationId>,
-    ) -> MatchArmId {
+    ) -> MultiConditionalArmId {
         // Ensure we have a Bool for our condition.
         let variable_type = self.context.variables.get(condition).typ;
         assert!(matches!(variable_type, Type::Bool));
 
-        self.context.match_arms.insert(&MatchArm {
+        self.context.multi_conditional_arms.insert(&MultiConditionalArm {
             condition,
             target_block: jump_target,
             poison: PoisonType::None,
@@ -1135,7 +1135,7 @@ impl BlockBuilder<'_> {
         &mut self,
         condition: VariableId,
         jump_target: BlockId,
-    ) -> MatchArmId {
+    ) -> MultiConditionalArmId {
         self.add_match_arm(condition, jump_target, &[], None)
     }
 
