@@ -1,5 +1,6 @@
 pub mod umin_i8;
 pub mod umin_i16;
+pub mod umin_i24;
 pub mod umin_i32;
 pub mod umin_i40;
 pub mod umin_i64;

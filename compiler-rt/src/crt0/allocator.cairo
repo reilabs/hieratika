@@ -1,5 +1,4 @@
-use core::dict::Felt252Dict;
-use core::dict::Felt252DictEntryTrait;
+use core::dict::{Felt252Dict, Felt252DictEntryTrait};
 use core::cmp::min;
 #[cairofmt::skip]
 //! Memory allocator
@@ -75,13 +74,13 @@ use core::cmp::min;
 /// A type for address in the memory pool managed by the allocator.
 ///
 /// The `Address` type is `u64`, as this is the largest pointer type supported by Rust.
-type Address = u64;
+pub type Address = u64;
 
 /// A type for the amount of bytes to be allocated/stored/loaded.
 ///
 /// It is the same type as Address to keep compatibility with polyfills and to do native arithmetic
 /// on the Address type.
-type ByteCount = u64;
+pub type ByteCount = u64;
 
 /// A type for the number of cells that accommodate a given amount of bytes.
 type CellCount = ByteCount;
@@ -98,7 +97,7 @@ const SIZEOF_CELL: ByteCount = 28;
 
 /// The internal state of the memory allocator.
 #[derive(Destruct)]
-struct AllocatorState {
+pub struct AllocatorState {
     /// The address at which the next requested allocation will begin.
     next_allocation: Address,
     /// `true` if the current allocation occupies less than a full memory cell,
@@ -144,7 +143,7 @@ impl New of Allocator {
 
 /// Trait specifying the public interface accessible on the allocator object.
 pub trait AllocatorOps<T> {
-    /// Allocate the indicated number of bytes and returns the address of that allocation.
+    /// Allocate the indicated number of bytes and return the address of that allocation.
     ///
     /// An allocation cannot fail. The returned address is always valid for loads and stores.
     /// The returned address is only valid for the same allocator instance that returned it.
@@ -170,7 +169,7 @@ pub trait AllocatorOps<T> {
     /// ```
     fn allocate(ref self: T, byte_count: ByteCount) -> Address;
 
-    /// Load the indicated number of bytes from the provided address and returns them.
+    /// Load the indicated number of bytes from the provided address and return them.
     ///
     /// `address` must contain a valid address returned by `allocate()` of the same allocator
     /// instance. The address can also be calculated from the address returned by

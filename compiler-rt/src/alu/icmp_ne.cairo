@@ -1,5 +1,6 @@
 pub mod icmp_ne_i8;
 pub mod icmp_ne_i16;
+pub mod icmp_ne_i24;
 pub mod icmp_ne_i32;
 pub mod icmp_ne_i40;
 pub mod icmp_ne_i64;

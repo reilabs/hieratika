@@ -1,5 +1,6 @@
 pub mod icmp_sge_i8;
 pub mod icmp_sge_i16;
+pub mod icmp_sge_i24;
 pub mod icmp_sge_i32;
 pub mod icmp_sge_i40;
 pub mod icmp_sge_i64;

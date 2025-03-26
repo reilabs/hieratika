@@ -1,5 +1,6 @@
 pub mod sdiv_i8;
 pub mod sdiv_i16;
+pub mod sdiv_i24;
 pub mod sdiv_i32;
 pub mod sdiv_i40;
 pub mod sdiv_i64;

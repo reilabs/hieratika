@@ -1,5 +1,6 @@
 pub mod ucmp_i8;
 pub mod ucmp_i16;
+pub mod ucmp_i24;
 pub mod ucmp_i32;
 pub mod ucmp_i40;
 pub mod ucmp_i64;

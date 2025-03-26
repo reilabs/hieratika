@@ -1,5 +1,6 @@
 pub mod icmp_sgt_i8;
 pub mod icmp_sgt_i16;
+pub mod icmp_sgt_i24;
 pub mod icmp_sgt_i32;
 pub mod icmp_sgt_i40;
 pub mod icmp_sgt_i64;

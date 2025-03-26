@@ -1,6 +1,7 @@
 pub mod fshr_i1;
 pub mod fshr_i8;
 pub mod fshr_i16;
+pub mod fshr_i24;
 pub mod fshr_i32;
 pub mod fshr_i40;
 pub mod fshr_i64;

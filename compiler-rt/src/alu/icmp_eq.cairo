@@ -1,5 +1,6 @@
 pub mod icmp_eq_i8;
 pub mod icmp_eq_i16;
+pub mod icmp_eq_i24;
 pub mod icmp_eq_i32;
 pub mod icmp_eq_i40;
 pub mod icmp_eq_i64;

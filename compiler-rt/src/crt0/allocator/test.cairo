@@ -1,10 +1,6 @@
-use crate::crt0::allocator::{
-    Allocator, AllocatorOps, AllocatorState, Address, ByteCount, SIZEOF_CELL, utils,
-};
-
 #[cfg(test)]
 mod allocate {
-    use super::*;
+    use crate::crt0::allocator::{Allocator, AllocatorOps, ByteCount, SIZEOF_CELL};
 
     #[test]
     fn zero() {
@@ -336,7 +332,7 @@ mod allocate {
 
 #[cfg(test)]
 mod load {
-    use super::*;
+    use crate::crt0::allocator::{Allocator, AllocatorState, AllocatorOps, Address};
     #[cairofmt::skip]
     const array: [u8; 32] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -447,7 +443,7 @@ mod load {
 
 #[cfg(test)]
 mod store {
-    use super::*;
+    use crate::crt0::allocator::{Allocator, AllocatorOps, SIZEOF_CELL, utils::cells_base_address};
 
     #[test]
     fn empty() {
@@ -457,7 +453,7 @@ mod store {
         // Store zero bytes at the allocated address.
         allocator.store(address, @array![]);
         // Verify that bytes are correctly stored in the memory cell.
-        let cell_base_address: felt252 = utils::cells_base_address(address).into();
+        let cell_base_address: felt252 = cells_base_address(address).into();
         assert_eq!(allocator.allocated_addresses.get(cell_base_address), 0x0);
     }
 
@@ -469,7 +465,7 @@ mod store {
         // Store 0x0 bytes at the allocated address.
         allocator.store(address, @array![0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]);
         // Verify that bytes are correctly stored in the memory cell.
-        let cell_base_address: felt252 = utils::cells_base_address(address).into();
+        let cell_base_address: felt252 = cells_base_address(address).into();
         assert_eq!(allocator.allocated_addresses.get(cell_base_address), 0x0);
     }
 
@@ -481,7 +477,7 @@ mod store {
         // Store an array of bytes at the allocated address.
         allocator.store(address, @array![0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]);
         // Verify that bytes are correctly stored in the memory cell.
-        let cell_base_address: felt252 = utils::cells_base_address(address).into();
+        let cell_base_address: felt252 = cells_base_address(address).into();
         assert_eq!(allocator.allocated_addresses.get(cell_base_address), 0x0807060504030201);
     }
 
@@ -497,7 +493,7 @@ mod store {
         allocator.store(address1, @array1);
         // Verify that bytes are correctly stored in the memory cell.
         let cell1 = 0x0000000000000000000000000f0e0d0c0b0a09080706050403020100;
-        let cell1_base_address: felt252 = utils::cells_base_address(address1).into();
+        let cell1_base_address: felt252 = cells_base_address(address1).into();
         assert_eq!(allocator.allocated_addresses.get(cell1_base_address), cell1);
 
         // Allocate another region and store an array of bytes at the allocated address.
@@ -506,7 +502,7 @@ mod store {
         allocator.store(address2, @array2);
         // Verify that bytes are correctly stored in the memory cell.
         let cell2 = 0x17161514131211100f0e0d0c0b0a09080706050403020100;
-        let cell2_base_address: felt252 = utils::cells_base_address(address2).into();
+        let cell2_base_address: felt252 = cells_base_address(address2).into();
         assert_eq!(allocator.allocated_addresses.get(cell2_base_address), cell2);
     }
 
@@ -526,7 +522,7 @@ mod store {
         // Verify that bytes are correctly stored in the memory cell.
         // Cell 1 - bytes from 0 to 27.
         let cell1 = 0x1b1a191817161514131211100f0e0d0c0b0a09080706050403020100;
-        let cell1_base_address: felt252 = utils::cells_base_address(address1).into();
+        let cell1_base_address: felt252 = cells_base_address(address1).into();
         assert_eq!(allocator.allocated_addresses.get(cell1_base_address), cell1);
         // Cell 2 - bytes from 28 to 31.
         let cell2 = 0x0000000000000000000000000000000000000000000000001f1e1d1c;
@@ -548,7 +544,7 @@ mod store {
         // Verify that bytes are correctly stored in the memory cell.
         // Cell 1 - bytes from 0 to 27.
         let cell1 = 0x1c1b1a00000000000000000000000000000000000000000000000000;
-        let cell1_base_address: felt252 = utils::cells_base_address(address).into();
+        let cell1_base_address: felt252 = cells_base_address(address).into();
         assert_eq!(allocator.allocated_addresses.get(cell1_base_address), cell1);
         // Cell 2 - bytes from 28 to 31.
         let cell2 = 0x000000000000000000000000000000000000000000000000001f1e1d;
@@ -568,7 +564,7 @@ mod store {
         allocator.store(address, @array![0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11, 0x22]);
 
         // Verify that bytes are correctly stored in the memory cell.
-        let cell_base_address: felt252 = utils::cells_base_address(address).into();
+        let cell_base_address: felt252 = cells_base_address(address).into();
         assert_eq!(allocator.allocated_addresses.get(cell_base_address), 0x2211ffeeddccbbaa);
     }
 }
