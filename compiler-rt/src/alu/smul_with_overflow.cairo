@@ -6,7 +6,7 @@ pub mod smul_with_overflow_i40;
 pub mod smul_with_overflow_i64;
 pub mod smul_with_overflow_i128;
 
-use crate::utils::{assert_fits_in_type, extend_sign_256};
+use crate::utils::{assert_fits_in_type, extend_sign};
 use crate::alu::shl::shl;
 use core::num::traits::{BitSize, Bounded, OverflowingMul};
 
@@ -47,8 +47,8 @@ pub fn smul_with_overflow<
     // Extend signs of operands if necessary.
     let lhs: u256 = lhs.into();
     let rhs: u256 = rhs.into();
-    let lhs = extend_sign_256(lhs, sign_bit_mask);
-    let rhs = extend_sign_256(rhs, sign_bit_mask);
+    let lhs = extend_sign::<u256>(lhs, sign_bit_mask);
+    let rhs = extend_sign::<u256>(rhs, sign_bit_mask);
 
     // Perform the multiplication and check for overflow.
     let (result, overflow): (u256, bool) = lhs.overflowing_mul(rhs);
