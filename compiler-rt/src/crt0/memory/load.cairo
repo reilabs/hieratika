@@ -31,6 +31,7 @@ mod test {
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState};
     use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::IntegerOps;
 
     /// Prepare allocator for the test suite.
     ///
@@ -70,7 +71,7 @@ mod test {
     fn load_u24() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u24>(ref allocator, 0, 0);
-        assert_eq!(data1, 0x020100_u128.try_into().unwrap());
+        assert_eq!(data1, IntegerOps::new(0x020100));
     }
 
 
@@ -87,7 +88,7 @@ mod test {
     fn load_u40() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u40>(ref allocator, 0, 0);
-        assert_eq!(data1, 0x0403020100_u128.try_into().unwrap());
+        assert_eq!(data1, IntegerOps::new(0x0403020100));
     }
 
     #[test]

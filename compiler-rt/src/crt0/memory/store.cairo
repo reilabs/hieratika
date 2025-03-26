@@ -33,6 +33,7 @@ mod test {
     use core::traits::{BitOr, BitAnd};
     use core::fmt::Debug;
     use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::IntegerOps;
 
     /// Make sure the input array of bytes can be serialized to a single variable of type T.
     fn assert_bytes<
@@ -93,9 +94,9 @@ mod test {
     }
 
     #[test]
-    /// Load a single u16 variable with the first 3 bytes of memory.
+    /// Load a single u24 variable with the first 3 bytes of memory.
     fn store_u24() {
-        test_store_t::<u24>(0x020100_u128.try_into().unwrap());
+        test_store_t::<u24>(IntegerOps::new(0x020100));
     }
 
     #[test]
@@ -107,7 +108,7 @@ mod test {
     #[test]
     /// Load a single u40 variable with the first 5 bytes of memory.
     fn store_u40() {
-        test_store_t::<u40>(0x0403020100_u128.try_into().unwrap());
+        test_store_t::<u40>(IntegerOps::new(0x0403020100));
     }
 
     #[test]
