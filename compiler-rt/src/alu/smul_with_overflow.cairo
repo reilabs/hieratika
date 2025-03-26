@@ -54,13 +54,10 @@ pub fn smul_with_overflow<
     let (result, overflow): (u256, bool) = lhs.overflowing_mul(rhs);
 
     // Manual overflow detection.
-    // If lhs and rhs values were originally shorter than 128 bit, additional
-    // overflow verification is necessary, because overflowing_mul calculated
-    // overflow as if the values are truly u128.
-    //
-    // If we detected overflow during multiplication, but sign extension bits
-    // are equal to the sign bit, this is a false positive - return the result
-    // and don't signal overflow.
+    // This is necessary because overflowing_mul performs unsigned multiplication over 256b. We need
+    // to set the overflow flag for a 2's complement multiplication over T bits.
+    // The algorithm is that if the 256-T MSB bits are all matching, truncation doesn't change the
+    // number in 2's complement and there is no overflow (i.e -1 * 2).
     let extension_bits_equal = {
         let result_sign_bit = (result & sign_bit_mask) != 0;
         let masked_bits = result & sign_ext_bit_mask;
