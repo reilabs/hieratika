@@ -52,6 +52,12 @@ impl U128TryIntoU40 of TryInto<u128, u40> {
     }
 }
 
+impl U40IntoU256 of Into<u40, u256> {
+    fn into(self: u40) -> u256 {
+        return self.data.into();
+    }
+}
+
 // The implementation of the `BitSize` trait for `u40` returns 40 because it is the size of a 40 bit
 // integer despite using 128bits of memory.
 impl U40BitSize of BitSize<u40> {
