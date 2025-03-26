@@ -52,8 +52,8 @@ impl U128TryIntoU48 of TryInto<u128, u48> {
     }
 }
 
-// The implementation of the `BitSize` trait for `u40` returns 40 because it is the size of a 40 bit
-// integer despite using 128bits of memory.
+/// The implementation of the `BitSize` trait returns the physical size of the value
+/// despite it being stored using 128 bits of memory.
 impl U48BitSize of BitSize<u48> {
     fn bits() -> usize {
         48
