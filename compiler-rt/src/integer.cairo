@@ -1,5 +1,6 @@
 pub mod u24;
 pub mod u40;
+pub mod u48;
 
 /// The basic operations required of our odd-width non-native integers.
 pub trait IntegerOps<T> {
