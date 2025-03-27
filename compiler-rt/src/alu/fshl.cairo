@@ -34,7 +34,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the fshl/fshl_<type>.cairo files.
-fn fshl<
+pub fn fshl<
     T,
     // The trait bounds are chosen so that:
     //

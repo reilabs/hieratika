@@ -17,7 +17,7 @@ use crate::integer::{u24::u24, u40::u40};
 ///
 /// This is a generic implementation for every data type. Its specialized versions
 /// are defined in this file.
-fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
+pub fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
     ref allocator: AllocatorState, address: Address, offset: i64,
 ) -> T {
     let load_address: Address = address + offset.try_into().expect('offset does not fit in u64');
@@ -26,10 +26,12 @@ fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestr
     buffer_to_t::<T>(@data)
 }
 
+#[cfg(test)]
 mod test {
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState};
     use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::IntegerOps;
 
     /// Prepare allocator for the test suite.
     ///
@@ -69,7 +71,7 @@ mod test {
     fn load_u24() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u24>(ref allocator, 0, 0);
-        assert_eq!(data1, 0x020100_u128.try_into().unwrap());
+        assert_eq!(data1, IntegerOps::new(0x020100));
     }
 
 
@@ -86,7 +88,7 @@ mod test {
     fn load_u40() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u40>(ref allocator, 0, 0);
-        assert_eq!(data1, 0x0403020100_u128.try_into().unwrap());
+        assert_eq!(data1, IntegerOps::new(0x0403020100));
     }
 
     #[test]
@@ -106,20 +108,14 @@ mod test {
     }
 }
 
-pub fn __llvm_load_p_l_b(address: Address, offset: i64) -> i8 {
-    // This must be <u8> because:
-    //   Trait has no implementation in context:
-    //   core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i8>.
+pub fn __llvm_load_p_l_b(address: Address, offset: i64) -> u8 {
     let mut allocator = get_allocator().unbox();
-    load::<u8>(ref allocator, address, offset).try_into().unwrap()
+    load::<u8>(ref allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_z(address: Address, offset: i64) -> i16 {
-    // This must be <u16> because:
-    //   Trait has no implementation in context:
-    //   core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i16>.
+pub fn __llvm_load_p_l_z(address: Address, offset: i64) -> u16 {
     let mut allocator = get_allocator().unbox();
-    load::<u16>(ref allocator, address, offset).try_into().unwrap()
+    load::<u16>(ref allocator, address, offset)
 }
 
 pub fn __llvm_load_p_l_x(address: Address, offset: i64) -> u24 {
@@ -127,12 +123,9 @@ pub fn __llvm_load_p_l_x(address: Address, offset: i64) -> u24 {
     load::<u24>(ref allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_i(address: Address, offset: i64) -> i32 {
-    // This must be <u32> because:
-    //   Trait has no implementation in context:
-    //   core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i32>.
+pub fn __llvm_load_p_l_i(address: Address, offset: i64) -> u32 {
     let mut allocator = get_allocator().unbox();
-    load::<u32>(ref allocator, address, offset).try_into().unwrap()
+    load::<u32>(ref allocator, address, offset)
 }
 
 pub fn __llvm_load_p_l_n(address: Address, offset: i64) -> u40 {
@@ -140,18 +133,12 @@ pub fn __llvm_load_p_l_n(address: Address, offset: i64) -> u40 {
     load::<u40>(ref allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> i64 {
-    // This must be <u64> because:
-    //   Trait has no implementation in context:
-    //   core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i64>.
+pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> u64 {
     let mut allocator = get_allocator().unbox();
-    load::<u64>(ref allocator, address, offset).try_into().unwrap()
+    load::<u64>(ref allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_o(address: Address, offset: i64) -> i128 {
-    // This must be <u128> because:
-    //   Trait has no implementation in context:
-    //   core::num::traits::ops::overflowing::OverflowingMul::<core::integer::i128>.
+pub fn __llvm_load_p_l_o(address: Address, offset: i64) -> u128 {
     let mut allocator = get_allocator().unbox();
-    load::<u128>(ref allocator, address, offset).try_into().unwrap()
+    load::<u128>(ref allocator, address, offset)
 }

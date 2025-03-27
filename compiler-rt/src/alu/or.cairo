@@ -16,7 +16,7 @@ extern fn bitwise(lhs: u128, rhs: u128) -> (u128, u128, u128) implicits(Bitwise)
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the or/or_<type>.cairo files.
-fn or<
+pub fn or<
     T,
     // The trait bounds are chosen so that:
     //

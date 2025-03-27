@@ -27,7 +27,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the ushl_sat/ushl_sat_<type>.cairo files.
-fn ushl_sat<
+pub fn ushl_sat<
     T,
     // The trait bounds are chosen so that:
     //

@@ -13,7 +13,7 @@ use core::num::traits::{BitSize, Bounded};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the icmp_ult/icmp_ult_<type>.cairo files.
-fn icmp_ult<
+pub fn icmp_ult<
     T,
     // The trait bounds are chosen so that:
     //

@@ -16,7 +16,9 @@ use crate::integer::{u24::u24, u40::u40};
 ///
 /// This is a generic implementation for every data type. Its specialized versions are defined in
 /// this file.
-fn store<T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, +TryInto<T, u8>>(
+pub fn store<
+    T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, +TryInto<T, u8>,
+>(
     ref allocator: AllocatorState, value: T, address: Address, offset: i64,
 ) {
     let store_address: Address = address + offset.try_into().expect('offset does not fit in u64');
@@ -24,6 +26,7 @@ fn store<T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, 
     allocator.store(store_address, @buffer);
 }
 
+#[cfg(test)]
 mod test {
     use super::store;
     use crate::crt0::allocator::{Allocator, AllocatorOps, ByteCount};
@@ -32,6 +35,7 @@ mod test {
     use core::traits::{BitOr, BitAnd};
     use core::fmt::Debug;
     use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::IntegerOps;
 
     /// Make sure the input array of bytes can be serialized to a single variable of type T.
     fn assert_bytes<
@@ -92,9 +96,9 @@ mod test {
     }
 
     #[test]
-    /// Load a single u16 variable with the first 3 bytes of memory.
+    /// Load a single u24 variable with the first 3 bytes of memory.
     fn store_u24() {
-        test_store_t::<u24>(0x020100_u128.try_into().unwrap());
+        test_store_t::<u24>(IntegerOps::new(0x020100));
     }
 
     #[test]
@@ -106,7 +110,7 @@ mod test {
     #[test]
     /// Load a single u40 variable with the first 5 bytes of memory.
     fn store_u40() {
-        test_store_t::<u40>(0x0403020100_u128.try_into().unwrap());
+        test_store_t::<u40>(IntegerOps::new(0x0403020100));
     }
 
     #[test]
@@ -123,17 +127,11 @@ mod test {
 }
 
 pub fn __llvm_store_b_p_l_v(value: u8, address: Address, offset: i64) {
-    // This must be <u8> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i8>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
 
 pub fn __llvm_store_z_p_l_v(value: u16, address: Address, offset: i64) {
-    // This must be <u16> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i16>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
@@ -144,17 +142,11 @@ pub fn __llvm_store_x_p_l_v(value: u24, address: Address, offset: i64) {
 }
 
 pub fn __llvm_store_i_p_l_v(value: u32, address: Address, offset: i64) {
-    // This must be <u32> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i32>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
 
 pub fn __llvm_store_n_p_l_v(value: u40, address: Address, offset: i64) {
-    // This must be <u64> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i64>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
@@ -165,9 +157,6 @@ pub fn __llvm_store_l_p_l_v(value: u64, address: Address, offset: i64) {
 }
 
 pub fn __llvm_store_o_p_l_v(value: u128, address: Address, offset: i64) {
-    // This must be <u128> because:
-    //   Trait has no implementation in context:
-    //   core::traits::BitAnd::<core::integer::i128>.
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }

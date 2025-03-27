@@ -13,7 +13,7 @@ use core::num::traits::{BitSize, WrappingMul};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the mul/mul_<type>.cairo files.
-fn mul<
+pub fn mul<
     T,
     // The trait bounds are chosen so that:
     //

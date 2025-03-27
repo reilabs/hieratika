@@ -16,7 +16,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the ssub_sat/ssub_sat_<type>.cairo files.
-fn ssub_sat<
+pub fn ssub_sat<
     T,
     // The trait bounds are chosen so that:
     //

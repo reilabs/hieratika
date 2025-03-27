@@ -13,7 +13,7 @@ use crate::alu::sdiv::divide_with_remainder_signed;
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the srem/srem_<type>.cairo files.
-fn srem<
+pub fn srem<
     T,
     // The trait bounds are chosen so that:
     //

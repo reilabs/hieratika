@@ -31,7 +31,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub, OverflowingMul};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the sshl_sat/sshl_sat_<type>.cairo files.
-fn sshl_sat<
+pub fn sshl_sat<
     T,
     // The trait bounds are chosen so that:
     //

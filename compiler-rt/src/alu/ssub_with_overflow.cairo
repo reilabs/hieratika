@@ -74,7 +74,7 @@ pub fn signed_subtract_with_overflow<
 //
 // This is a generic implementation for every data type. Its specialized version
 // is defined and tested in the ssub_with_overflow/ssub_with_overflow_<type>.cairo file.
-fn ssub_with_overflow<
+pub fn ssub_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //

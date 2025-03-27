@@ -40,6 +40,7 @@ pub fn buffer_to_t<T, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruc
     value
 }
 
+#[cfg(test)]
 mod test_buffer_to_t {
     use super::buffer_to_t;
     use crate::integer::u40::u40;
@@ -141,6 +142,7 @@ pub fn t_to_buffer<
     buffer
 }
 
+#[cfg(test)]
 mod test_t_to_buffer {
     use super::t_to_buffer;
     use crate::integer::u40::u40;

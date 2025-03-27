@@ -31,7 +31,7 @@ use crate::alu::shl::shl;
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the sext/sext_<type>.cairo files.
-fn sext<
+pub fn sext<
     T, // The input type, the one to be sign extended,
     U, // The output type, the one after sign extension.
     // The trait bounds are chosen so that:

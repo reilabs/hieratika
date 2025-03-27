@@ -15,7 +15,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingAdd};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the sadd_sat/sadd_sat_<type>.cairo files.
-fn sadd_sat<
+pub fn sadd_sat<
     T,
     // The trait bounds are chosen so that:
     //

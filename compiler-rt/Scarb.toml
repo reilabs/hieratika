@@ -9,3 +9,6 @@ edition = "2024_07"
 
 [dev-dependencies]
 cairo_test = "2.10.1"
+
+[profile.release.cairo]
+allow-warnings = false
