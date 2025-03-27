@@ -53,20 +53,20 @@ pub fn negate_twos_complement(value: u128) -> u128 {
 
 // Performs sign extension.
 //
-// Some polyfills emulate operations with signed integers, but Cairo works with unsigned integers.
+// Some polyfills emulate operations with signed integers using unsigned integers.
 // When casting an integer to a wider width it's important to set the new MSBs to the correct value
 // using sign-extention operations.
 pub fn extend_sign<
     T,
-    impl TPartialEq: PartialEq<T>,
-    impl TBitAnd: BitAnd<T>,
-    impl TBitNot: BitNot<T>,
-    impl TBitOr: BitOr<T>,
-    impl TZero: Zero<T>,
-    impl TOne: One<T>,
-    impl TSub: Sub<T>,
-    impl TDestruct: Destruct<T>,
-    impl TCopy: Copy<T>,
+    +PartialEq<T>,
+    +BitAnd<T>,
+    +BitNot<T>,
+    +BitOr<T>,
+    +Zero<T>,
+    +One<T>,
+    +Sub<T>,
+    +Destruct<T>,
+    +Copy<T>,
 >(
     value: T, sign_bit_mask: T,
 ) -> T {

@@ -82,10 +82,10 @@ pub fn sshl_sat<
     let max_value = sign_bit_mask - 1;
     let min_value = sign_bit_mask;
 
-    // Cairo does not have << or >> operators so we must implement the shift manually.
+    // Manually shifting (i.e. signed multiplication by 2). `shl` isn't used because it performs
+    // unsigned multiplication without reporting overflow.
     let mut result = n;
     let mut is_overflowed = false;
-    // Perform the shift `shift` number of times.
     for _ in 0..shift {
         let (product, overflowed) = smul_with_overflow::<T>(result, 2);
         is_overflowed = overflowed || is_overflowed;

@@ -45,10 +45,8 @@ pub fn smul_with_overflow<
     let sign_ext_bit_mask = ~value_mask;
 
     // Extend signs of operands if necessary.
-    let lhs: u256 = lhs.into();
-    let rhs: u256 = rhs.into();
-    let lhs = extend_sign::<u256>(lhs, sign_bit_mask);
-    let rhs = extend_sign::<u256>(rhs, sign_bit_mask);
+    let lhs = extend_sign::<u256>(lhs.into(), sign_bit_mask);
+    let rhs = extend_sign::<u256>(rhs.into(), sign_bit_mask);
 
     // Perform the multiplication and check for overflow.
     let (result, overflow): (u256, bool) = lhs.overflowing_mul(rhs);
