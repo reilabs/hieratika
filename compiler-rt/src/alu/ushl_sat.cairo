@@ -4,6 +4,7 @@ pub mod ushl_sat_i24;
 pub mod ushl_sat_i32;
 pub mod ushl_sat_i40;
 pub mod ushl_sat_i64;
+pub mod ushl_sat_i128;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

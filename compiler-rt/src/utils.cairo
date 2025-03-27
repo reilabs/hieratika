@@ -1,4 +1,5 @@
-use core::num::traits::{BitSize, WrappingAdd};
+use core::num::traits::{BitSize, WrappingAdd, Zero, One};
+use core::traits::{Copy, PartialEq, BitAnd, BitNot, BitOr, Sub};
 
 // Indicated the direction of overflow in polyfills implementing arithmetic operations that can
 // overflow.
@@ -50,15 +51,27 @@ pub fn negate_twos_complement(value: u128) -> u128 {
     (~value).wrapping_add(1)
 }
 
-
 // Performs sign extension.
 //
-// The polyfill API requires operands to be u128, despite the actual value can be e.g. i8.
-// In such case the remaining MSBs of u128 are zero, even if the operand is negative
-// and should be sign-extended.
-pub fn extend_sign(value: u128, sign_bit_mask: u128) -> u128 {
-    let sign_bit = (value & sign_bit_mask) != 0;
-    let value_mask = sign_bit_mask - 1;
+// Some polyfills emulate operations with signed integers using unsigned integers.
+// When casting an integer to a wider width it's important to set the new MSBs to the correct value
+// using sign-extention operations.
+pub fn extend_sign<
+    T,
+    +PartialEq<T>,
+    +BitAnd<T>,
+    +BitNot<T>,
+    +BitOr<T>,
+    +Zero<T>,
+    +One<T>,
+    +Sub<T>,
+    +Destruct<T>,
+    +Copy<T>,
+>(
+    value: T, sign_bit_mask: T,
+) -> T {
+    let sign_bit = (value & sign_bit_mask) != Zero::<T>::zero();
+    let value_mask = sign_bit_mask - One::<T>::one();
     let sign_ext_bit_mask = ~value_mask;
 
     if sign_bit {

@@ -4,6 +4,7 @@ pub mod uadd_sat_i24;
 pub mod uadd_sat_i32;
 pub mod uadd_sat_i40;
 pub mod uadd_sat_i64;
+pub mod uadd_sat_i128;
 
 use crate::alu::uadd_with_overflow::uadd_with_overflow;
 use core::num::traits::{BitSize, Bounded, OverflowingAdd};

@@ -4,6 +4,7 @@ pub mod smul_with_overflow_i24;
 pub mod smul_with_overflow_i32;
 pub mod smul_with_overflow_i40;
 pub mod smul_with_overflow_i64;
+pub mod smul_with_overflow_i128;
 
 use crate::utils::{assert_fits_in_type, extend_sign};
 use crate::alu::shl::shl;
@@ -28,6 +29,7 @@ pub fn smul_with_overflow<
     impl TBounded: Bounded<T>,
     impl TTryInto: TryInto<u128, T>,
     impl TInto: Into<T, u128>,
+    impl TInto_256: Into<T, u256>,
     impl TDestruct: Destruct<T>,
     impl TOverflowingMul: OverflowingMul<T>,
 >(
@@ -38,21 +40,22 @@ pub fn smul_with_overflow<
     assert_fits_in_type::<T>(rhs);
 
     // Generate masks used for sign extension.
-    let sign_bit_mask = shl::<u128>(1, BitSize::<T>::bits().into() - 1);
+    let sign_bit_mask: u256 = shl::<u128>(1, BitSize::<T>::bits().into() - 1).into();
     let value_mask = sign_bit_mask - 1;
     let sign_ext_bit_mask = ~value_mask;
 
     // Extend signs of operands if necessary.
-    let lhs = extend_sign(lhs, sign_bit_mask);
-    let rhs = extend_sign(rhs, sign_bit_mask);
+    let lhs = extend_sign::<u256>(lhs.into(), sign_bit_mask);
+    let rhs = extend_sign::<u256>(rhs.into(), sign_bit_mask);
 
     // Perform the multiplication and check for overflow.
-    let (result, overflow) = lhs.overflowing_mul(rhs);
+    let (result, overflow): (u256, bool) = lhs.overflowing_mul(rhs);
 
     // Manual overflow detection.
-    // If we detected overflow during multiplication, but sign extension bits
-    // are equal to the sign bit, this is a false positive - return the result
-    // and don't signal overflow.
+    // This is necessary because overflowing_mul performs unsigned multiplication over 256b. We need
+    // to set the overflow flag for a 2's complement multiplication over T bits.
+    // The algorithm is that if the 256-T MSB bits are all matching, truncation doesn't change the
+    // number in 2's complement and there is no overflow (i.e -1 * 2).
     let extension_bits_equal = {
         let result_sign_bit = (result & sign_bit_mask) != 0;
         let masked_bits = result & sign_ext_bit_mask;
@@ -62,12 +65,14 @@ pub fn smul_with_overflow<
             masked_bits == 0
         }
     };
-    let truncated_result = result & Bounded::<T>::MAX.into();
+    // Because `result` is truncated to the least significant T bits using bitwise AND, it is safe
+    // to call `try_into().unwrap()` to downcast from u256 to u128 without risking any panic.
+    let truncated_result: u128 = (result & Bounded::<T>::MAX.into()).try_into().unwrap();
     if overflow && extension_bits_equal {
         return (truncated_result, false);
     }
     // Overflow occurs if the result does not fit in the concrete type.
-    let does_result_fit_in_t = truncated_result & value_mask == result;
+    let does_result_fit_in_t = truncated_result.into() & value_mask == result;
 
     (truncated_result, !does_result_fit_in_t)
 }

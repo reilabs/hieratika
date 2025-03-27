@@ -9,7 +9,7 @@ mod tests {
     use super::__llvm_smul_with_overflow_b_b_Sbcs;
     use crate::alu::test_case::TestCaseTwoArgsTwoExpected;
     #[cairofmt::skip]
-    pub const test_cases: [TestCaseTwoArgsTwoExpected; 265] = [
+    pub const test_cases: [TestCaseTwoArgsTwoExpected; 267] = [
         // Due to Cairo's casting limitation, negative numbers are represented as bit patterns.
 
         // Random test cases
@@ -269,6 +269,8 @@ mod tests {
         TestCaseTwoArgsTwoExpected{lhs: 118, rhs: 0b10001000, expected: (176, true)}, // rhs = -120
         TestCaseTwoArgsTwoExpected{lhs: 0b11110111, rhs: 88, expected: (232, true)}, // lhs = -9
         TestCaseTwoArgsTwoExpected{lhs: 120, rhs: 0b10000110, expected: (208, true)}, // rhs = -122
+        TestCaseTwoArgsTwoExpected{lhs: 0b11111111, rhs: 2, expected: (0b11111110, false)}, // lhs = -1
+        TestCaseTwoArgsTwoExpected{lhs: 0b10101010, rhs: 2, expected: (0b01010100, true)}, // lhs = -86
 
         // Edge cases
         TestCaseTwoArgsTwoExpected{lhs: 0, rhs: 0, expected: (0, false)},

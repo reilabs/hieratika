@@ -52,6 +52,12 @@ impl U128TryIntoU48 of TryInto<u128, u48> {
     }
 }
 
+impl U48IntoU256 of Into<u48, u256> {
+    fn into(self: u48) -> u256 {
+        return self.data.into();
+    }
+}
+
 /// The implementation of the `BitSize` trait returns the physical size of the value
 /// despite it being stored using 128 bits of memory.
 impl U48BitSize of BitSize<u48> {

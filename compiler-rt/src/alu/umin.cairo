@@ -4,6 +4,7 @@ pub mod umin_i24;
 pub mod umin_i32;
 pub mod umin_i40;
 pub mod umin_i64;
+pub mod umin_i128;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};

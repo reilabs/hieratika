@@ -61,5 +61,5 @@ pub fn sext<
 
     // Extend that bit to the entirety of the u128 container type and chop off
     // extra bits above the target type.
-    extend_sign(value, sign_bit_mask) & Bounded::<U>::MAX.into()
+    extend_sign::<u128>(value, sign_bit_mask) & Bounded::<U>::MAX.into()
 }

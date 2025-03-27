@@ -4,6 +4,7 @@ pub mod smin_i24;
 pub mod smin_i32;
 pub mod smin_i40;
 pub mod smin_i64;
+pub mod smin_i128;
 
 use crate::utils::assert_fits_in_type;
 use crate::alu::shl::shl;

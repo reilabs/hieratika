@@ -4,6 +4,7 @@ pub mod mul_i24;
 pub mod mul_i32;
 pub mod mul_i40;
 pub mod mul_i64;
+pub mod mul_i128;
 
 use crate::utils::expect_into;
 use core::num::traits::{BitSize, WrappingMul};
