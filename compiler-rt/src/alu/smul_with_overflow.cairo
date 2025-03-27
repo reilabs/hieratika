@@ -13,7 +13,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingMul};
 //
 // This is a generic implementation for every data type. Its specialized version
 // is defined and tested in the smul_with_overflow/smul_with_overflow_<type>.cairo file.
-fn smul_with_overflow<
+pub fn smul_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //

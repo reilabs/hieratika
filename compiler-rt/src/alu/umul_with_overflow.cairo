@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, OverflowingMul};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the umul_with_overflow/umul_with_overflow_<type>.cairo files.
-fn umul_with_overflow<
+pub fn umul_with_overflow<
     T,
     // The trait bounds are chosen so that:
     //

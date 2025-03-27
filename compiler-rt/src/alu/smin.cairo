@@ -15,7 +15,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the smin/smin_<type>.cairo files.
-fn smin<
+pub fn smin<
     T,
     // The trait bounds are chosen so that:
     //

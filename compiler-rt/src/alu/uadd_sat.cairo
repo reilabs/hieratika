@@ -12,7 +12,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingAdd};
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the uadd_sat/uadd_sat_<type>.cairo files.
-fn uadd_sat<
+pub fn uadd_sat<
     T,
     // The trait bounds are chosen so that:
     //

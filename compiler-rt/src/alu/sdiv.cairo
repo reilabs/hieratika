@@ -75,7 +75,7 @@ pub fn divide_with_remainder_signed<
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the sdiv/sdiv_<type>.cairo files.
-fn sdiv<
+pub fn sdiv<
     T,
     // The trait bounds are chosen so that:
     //
