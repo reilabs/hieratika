@@ -7,3 +7,4 @@ pub mod atomicrmw_or;
 pub mod atomicrmw_xor;
 pub mod atomicrmw_max;
 pub mod atomicrmw_min;
+pub mod atomicrmw_umax;
