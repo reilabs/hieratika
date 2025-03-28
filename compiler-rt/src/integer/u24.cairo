@@ -5,7 +5,7 @@ use core::num::traits::{
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
-use core::traits::{Div, Rem, BitOr, BitAnd, BitNot};
+use core::traits::{Div, Rem, BitOr, BitAnd, BitNot, BitXor};
 
 /// The struct to represent 24-bit integers.
 ///
@@ -166,6 +166,12 @@ impl U24BitOr of BitOr<u24> {
     fn bitor(lhs: u24, rhs: u24) -> u24 {
         let result = lhs.data | rhs.data;
         u24 { data: result & Bounded::<u24>::MAX.into() }
+    }
+}
+
+impl U24BitXor of BitXor<u24> {
+    fn bitxor(lhs: u24, rhs: u24) -> u24 {
+        u24 { data: (lhs.data ^ rhs.data) & Bounded::<u24>::MAX.into() }
     }
 }
 
@@ -334,6 +340,14 @@ mod tests {
         let lhs = U24Ops::new(0b11110000101010101111);
         let rhs = U24Ops::new(0b00001111010101010000);
         assert_eq!(BitOr::bitor(lhs, rhs).data, 0xfffff_u128);
+    }
+
+    #[test]
+    fn test_bit_xor_u24() {
+        let lhs = U24Ops::new(0b11110010101010101111);
+        let rhs = U24Ops::new(0b01001111110101011010);
+        let res = U24Ops::new(0b10111101011111110101);
+        assert_eq!(lhs ^ rhs, res);
     }
 
     #[test]

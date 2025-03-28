@@ -2,7 +2,7 @@ use core::num::traits::{
     BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
     OverflowingMul,
 };
-use core::traits::{Div, Rem, BitOr, BitAnd, BitNot};
+use core::traits::{Div, Rem, BitOr, BitAnd, BitNot, BitXor};
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
@@ -165,6 +165,12 @@ impl U48BitOr of BitOr<u48> {
     fn bitor(lhs: u48, rhs: u48) -> u48 {
         let result = lhs.data | rhs.data;
         u48 { data: result & Bounded::<u48>::MAX.into() }
+    }
+}
+
+impl U48BitXor of BitXor<u48> {
+    fn bitxor(lhs: u48, rhs: u48) -> u48 {
+        u48 { data: (lhs.data ^ rhs.data) & Bounded::<u48>::MAX.into() }
     }
 }
 
@@ -335,6 +341,14 @@ mod tests {
         let lhs = U48Ops::new(0b11110000101010101111);
         let rhs = U48Ops::new(0b00001111010101010000);
         assert_eq!(BitOr::bitor(lhs, rhs), U48Ops::new(0xfffff));
+    }
+
+    #[test]
+    fn test_bit_xor_u48() {
+        let lhs = U48Ops::new(0b11110010101010101111);
+        let rhs = U48Ops::new(0b01001111110101011010);
+        let res = U48Ops::new(0b10111101011111110101);
+        assert_eq!(lhs ^ rhs, res);
     }
 
     #[test]
