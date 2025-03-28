@@ -3,6 +3,7 @@ pub mod umul_with_overflow_i16;
 pub mod umul_with_overflow_i24;
 pub mod umul_with_overflow_i32;
 pub mod umul_with_overflow_i40;
+pub mod umul_with_overflow_i48;
 pub mod umul_with_overflow_i64;
 pub mod umul_with_overflow_i128;
 

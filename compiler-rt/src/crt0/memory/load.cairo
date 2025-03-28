@@ -3,7 +3,7 @@ use core::num::traits::{BitSize, OverflowingMul};
 use core::traits::BitOr;
 use crate::crt0::utils::{BITS_IN_BYTE, buffer_to_t};
 use super::get_allocator;
-use crate::integer::{u24::u24, u40::u40};
+use crate::integer::{u24::u24, u40::u40, u48::u48};
 
 /// Load a portion of data from the provided address plus the provided offset and return them as a
 /// single variable of type T. The number of loaded bytes is equal to the size of T. `offset` must
@@ -30,7 +30,7 @@ pub fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicD
 mod test {
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState};
-    use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::{u24::u24, u40::u40, u48::u48};
     use crate::integer::IntegerOps;
 
     /// Prepare allocator for the test suite.
@@ -92,6 +92,14 @@ mod test {
     }
 
     #[test]
+    /// Load a single u48 variable with the first 6 bytes of memory.
+    fn load_u48() {
+        let mut allocator = get_allocator().unbox();
+        let data1 = load::<u48>(ref allocator, 0, 0);
+        assert_eq!(data1, IntegerOps::new(0x050403020100));
+    }
+
+    #[test]
     /// Load a single u64 variable with the first 8 bytes of memory.
     fn load_u64() {
         let mut allocator = get_allocator().unbox();
@@ -131,6 +139,11 @@ pub fn __llvm_load_p_l_i(address: Address, offset: i64) -> u32 {
 pub fn __llvm_load_p_l_n(address: Address, offset: i64) -> u40 {
     let mut allocator = get_allocator().unbox();
     load::<u40>(ref allocator, address, offset)
+}
+
+pub fn __llvm_load_p_l_k(address: Address, offset: i64) -> u48 {
+    let mut allocator = get_allocator().unbox();
+    load::<u48>(ref allocator, address, offset)
 }
 
 pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> u64 {

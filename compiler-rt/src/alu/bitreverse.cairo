@@ -4,6 +4,7 @@ pub mod bitreverse_i16;
 pub mod bitreverse_i24;
 pub mod bitreverse_i32;
 pub mod bitreverse_i40;
+pub mod bitreverse_i48;
 pub mod bitreverse_i64;
 pub mod bitreverse_i128;
 

@@ -3,6 +3,7 @@ pub mod sdiv_i16;
 pub mod sdiv_i24;
 pub mod sdiv_i32;
 pub mod sdiv_i40;
+pub mod sdiv_i48;
 pub mod sdiv_i64;
 pub mod sdiv_i128;
 

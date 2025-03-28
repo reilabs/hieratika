@@ -3,6 +3,7 @@ pub mod add_i16;
 pub mod add_i24;
 pub mod add_i32;
 pub mod add_i40;
+pub mod add_i48;
 pub mod add_i64;
 pub mod add_i128;
 

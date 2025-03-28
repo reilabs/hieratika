@@ -3,6 +3,7 @@ pub mod sadd_with_overflow_i16;
 pub mod sadd_with_overflow_i24;
 pub mod sadd_with_overflow_i32;
 pub mod sadd_with_overflow_i40;
+pub mod sadd_with_overflow_i48;
 pub mod sadd_with_overflow_i64;
 pub mod sadd_with_overflow_i128;
 

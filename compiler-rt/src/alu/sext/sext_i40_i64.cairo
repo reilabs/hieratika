@@ -19,8 +19,9 @@ mod tests {
         TestCaseOneArg { arg: 0b1111111111111111111111111111111111000001, expected: 0b1111111111111111111111111111111111111111111111111111111111000001 },
         TestCaseOneArg { arg: 0b1111111111111111111111111111111111111111, expected: 0b1111111111111111111111111111111111111111111111111111111111111111 },
     ];
+
     #[test]
-    fn test_i40() {
+    fn test_i40_i64() {
         for case in test_cases.span() {
             assert_eq!(__llvm_sext_n_to_l(*case.arg), *case.expected);
         }

@@ -3,6 +3,7 @@ pub mod icmp_uge_i16;
 pub mod icmp_uge_i24;
 pub mod icmp_uge_i32;
 pub mod icmp_uge_i40;
+pub mod icmp_uge_i48;
 pub mod icmp_uge_i64;
 pub mod icmp_uge_i128;
 

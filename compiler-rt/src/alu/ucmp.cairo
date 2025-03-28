@@ -3,6 +3,7 @@ pub mod ucmp_i16;
 pub mod ucmp_i24;
 pub mod ucmp_i32;
 pub mod ucmp_i40;
+pub mod ucmp_i48;
 pub mod ucmp_i64;
 pub mod ucmp_i128;
 

@@ -3,6 +3,7 @@ pub mod ushl_sat_i16;
 pub mod ushl_sat_i24;
 pub mod ushl_sat_i32;
 pub mod ushl_sat_i40;
+pub mod ushl_sat_i48;
 pub mod ushl_sat_i64;
 pub mod ushl_sat_i128;
 

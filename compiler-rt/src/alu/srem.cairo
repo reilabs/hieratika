@@ -3,6 +3,7 @@ pub mod srem_i16;
 pub mod srem_i24;
 pub mod srem_i32;
 pub mod srem_i40;
+pub mod srem_i48;
 pub mod srem_i64;
 pub mod srem_i128;
 

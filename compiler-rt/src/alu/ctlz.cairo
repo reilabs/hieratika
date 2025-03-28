@@ -4,6 +4,7 @@ pub mod ctlz_i16;
 pub mod ctlz_i24;
 pub mod ctlz_i32;
 pub mod ctlz_i40;
+pub mod ctlz_i48;
 pub mod ctlz_i64;
 pub mod ctlz_i128;
 
