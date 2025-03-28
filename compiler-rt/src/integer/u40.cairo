@@ -2,7 +2,7 @@ use core::num::traits::{
     BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
     OverflowingMul,
 };
-use core::traits::{Div, Rem, BitOr, BitAnd};
+use core::traits::{Div, Rem, BitOr, BitAnd, BitNot};
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
@@ -175,6 +175,12 @@ impl U40BitAnd of BitAnd<u40> {
     }
 }
 
+impl U40BitNot of BitNot<u40> {
+    fn bitnot(a: u40) -> u40 {
+        u40 { data: ~a.data & Bounded::<u40>::MAX.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u40;
@@ -340,5 +346,15 @@ mod tests {
         let lhs = U40Ops::new(0b11110000101010101111);
         let rhs = U40Ops::new(0b10101010101010101010);
         assert_eq!(BitAnd::bitand(lhs, rhs), U40Ops::new(0b10100000101010101010));
+    }
+
+    #[test]
+    fn test_bit_not_u40() {
+        assert_eq!(~U40Ops::new(0b1), U40Ops::new(0b1111111111111111111111111111111111111110));
+        assert_eq!(~U40Ops::new(0), U40Ops::new(0b1111111111111111111111111111111111111111));
+        assert_eq!(
+            ~U40Ops::new(0b1111000011110000000011110000101010101111),
+            U40Ops::new(0b0000111100001111111100001111010101010000),
+        );
     }
 }

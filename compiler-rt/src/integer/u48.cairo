@@ -2,7 +2,7 @@ use core::num::traits::{
     BitSize, Bounded, WrappingAdd, WrappingSub, WrappingMul, OverflowingAdd, OverflowingSub,
     OverflowingMul,
 };
-use core::traits::{Div, Rem, BitOr, BitAnd};
+use core::traits::{Div, Rem, BitOr, BitAnd, BitNot};
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
@@ -175,6 +175,12 @@ impl U48BitAnd of BitAnd<u48> {
     }
 }
 
+impl U48BitNot of BitNot<u48> {
+    fn bitnot(a: u48) -> u48 {
+        u48 { data: ~a.data & Bounded::<u48>::MAX.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u48;
@@ -340,5 +346,19 @@ mod tests {
         let lhs = U48Ops::new(0b11110000101010101111);
         let rhs = U48Ops::new(0b10101010101010101010);
         assert_eq!(BitAnd::bitand(lhs, rhs), U48Ops::new(0b10100000101010101010));
+    }
+
+    #[test]
+    fn test_bit_not_u48() {
+        assert_eq!(
+            ~U48Ops::new(0b1), U48Ops::new(0b111111111111111111111111111111111111111111111110),
+        );
+        assert_eq!(
+            ~U48Ops::new(0), U48Ops::new(0b111111111111111111111111111111111111111111111111),
+        );
+        assert_eq!(
+            ~U48Ops::new(0b111100001111000011110000000011110000101010101111),
+            U48Ops::new(0b000011110000111100001111111100001111010101010000),
+        );
     }
 }
