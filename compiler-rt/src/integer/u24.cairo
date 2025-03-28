@@ -5,7 +5,7 @@ use core::num::traits::{
 use crate::integer::IntegerOps;
 use crate::utils::assert_fits_in_type;
 
-use core::traits::{Div, Rem, BitOr, BitAnd};
+use core::traits::{Div, Rem, BitOr, BitAnd, BitNot};
 
 /// The struct to represent 24-bit integers.
 ///
@@ -176,6 +176,12 @@ impl U24BitAnd of BitAnd<u24> {
     }
 }
 
+impl U24BitNot of BitNot<u24> {
+    fn bitnot(a: u24) -> u24 {
+        u24 { data: ~a.data & Bounded::<u24>::MAX.into() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u24;
@@ -339,5 +345,14 @@ mod tests {
         let lhs = U24Ops::new(0b11110000101010101111);
         let rhs = U24Ops::new(0b10101010101010101010);
         assert_eq!(BitAnd::bitand(lhs, rhs).data, 0b10100000101010101010_u128);
+    }
+
+    #[test]
+    fn test_bit_not_u24() {
+        assert_eq!(~U24Ops::new(0b1), U24Ops::new(0b111111111111111111111110));
+        assert_eq!(~U24Ops::new(0), U24Ops::new(0b111111111111111111111111));
+        assert_eq!(
+            ~U24Ops::new(0b000011110000101010101111), U24Ops::new(0b111100001111010101010000),
+        );
     }
 }
