@@ -188,6 +188,15 @@ impl U24BitNot of BitNot<u24> {
     }
 }
 
+impl U24PartialOrd of PartialOrd<u24> {
+    fn ge(lhs: u24, rhs: u24) -> bool {
+        PartialOrd::ge(lhs.data, rhs.data)
+    }
+    fn lt(lhs: u24, rhs: u24) -> bool {
+        PartialOrd::lt(lhs.data, rhs.data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u24;
@@ -368,5 +377,17 @@ mod tests {
         assert_eq!(
             ~U24Ops::new(0b000011110000101010101111), U24Ops::new(0b111100001111010101010000),
         );
+    }
+
+    #[test]
+    fn test_partial_ord_u24() {
+        let a = U24Ops::new(3);
+        let b = U24Ops::new(3);
+        assert!(PartialOrd::ge(a, b));
+        assert!(!PartialOrd::lt(a, b));
+
+        let c = U24Ops::new(0);
+        assert!(PartialOrd::ge(a, c));
+        assert!(!PartialOrd::lt(a, c));
     }
 }

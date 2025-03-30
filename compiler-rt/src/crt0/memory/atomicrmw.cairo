@@ -9,3 +9,4 @@ pub mod atomicrmw_max;
 pub mod atomicrmw_min;
 pub mod atomicrmw_umax;
 pub mod atomicrmw_umin;
+pub mod atomicrmw_uinc_wrap;
