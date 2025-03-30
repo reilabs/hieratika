@@ -187,6 +187,15 @@ impl U40BitNot of BitNot<u40> {
     }
 }
 
+impl U40PartialOrd of PartialOrd<u40> {
+    fn ge(lhs: u40, rhs: u40) -> bool {
+        PartialOrd::ge(lhs.data, rhs.data)
+    }
+    fn lt(lhs: u40, rhs: u40) -> bool {
+        PartialOrd::lt(lhs.data, rhs.data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u40;
@@ -370,5 +379,17 @@ mod tests {
             ~U40Ops::new(0b1111000011110000000011110000101010101111),
             U40Ops::new(0b0000111100001111111100001111010101010000),
         );
+    }
+
+    #[test]
+    fn test_partial_ord_u40() {
+        let a = U40Ops::new(3);
+        let b = U40Ops::new(3);
+        assert!(PartialOrd::ge(a, b));
+        assert!(PartialOrd::lt(a, U40Ops::new(4)));
+
+        let c = U40Ops::new(0);
+        assert!(PartialOrd::ge(a, c));
+        assert!(!PartialOrd::lt(a, c));
     }
 }

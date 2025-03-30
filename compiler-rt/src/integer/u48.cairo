@@ -187,6 +187,15 @@ impl U48BitNot of BitNot<u48> {
     }
 }
 
+impl U48PartialOrd of PartialOrd<u48> {
+    fn ge(lhs: u48, rhs: u48) -> bool {
+        PartialOrd::ge(lhs.data, rhs.data)
+    }
+    fn lt(lhs: u48, rhs: u48) -> bool {
+        PartialOrd::lt(lhs.data, rhs.data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::u48;
@@ -374,5 +383,17 @@ mod tests {
             ~U48Ops::new(0b111100001111000011110000000011110000101010101111),
             U48Ops::new(0b000011110000111100001111111100001111010101010000),
         );
+    }
+
+    #[test]
+    fn test_partial_ord_u48() {
+        let a = U48Ops::new(3);
+        let b = U48Ops::new(3);
+        assert!(PartialOrd::ge(a, b));
+        assert!(PartialOrd::lt(a, U48Ops::new(4)));
+
+        let c = U48Ops::new(0);
+        assert!(PartialOrd::ge(a, c));
+        assert!(!PartialOrd::lt(a, c));
     }
 }
