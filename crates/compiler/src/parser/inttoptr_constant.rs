@@ -31,7 +31,9 @@ pub struct IntToPtrConstant {
 impl IntToPtrConstant {
     /// Creates a parser for `inttoptr` constant expressions with `child_expr`
     /// expressions allowed in the
-    pub fn parser(child_expr: impl SimpleParser<ConstantExpression>) -> impl SimpleParser<Self> {
+    pub fn parser<'a>(
+        child_expr: impl SimpleParser<'a, ConstantExpression>,
+    ) -> impl SimpleParser<'a, Self> {
         just("ptr")
             .ignore_then(just("inttoptr").padded_by(whitespace()))
             .ignore_then(choice((
@@ -46,7 +48,7 @@ impl IntToPtrConstant {
 
     /// Creates a parser for the `T v` portion of an integer constant expression
     /// where `v` is a literal integer.
-    fn t_lit_to_ptr() -> impl SimpleParser<Self> {
+    fn t_lit_to_ptr<'a>() -> impl SimpleParser<'a, Self> {
         typ::integer()
             .padded_by(whitespace())
             .then(number::integer::<i128>(10).padded_by(whitespace()))
@@ -62,7 +64,9 @@ impl IntToPtrConstant {
 
     /// Creates a parser for the `T v` portion of an integer constant expression
     /// where `v` is a constant expression that is not a literal integer.
-    fn t_expr_to_ptr(child_expr: impl SimpleParser<ConstantExpression>) -> impl SimpleParser<Self> {
+    fn t_expr_to_ptr<'a>(
+        child_expr: impl SimpleParser<'a, ConstantExpression>,
+    ) -> impl SimpleParser<'a, Self> {
         typ::integer()
             .padded_by(whitespace())
             .then(child_expr.padded_by(whitespace()))
@@ -75,7 +79,7 @@ impl IntToPtrConstant {
 
     /// Creates a parser for the `to ptr` portion of the `inttoptr` constant
     /// expression.
-    fn literal_to_ptr() -> impl SimpleParser<()> {
+    fn literal_to_ptr<'a>() -> impl SimpleParser<'a, ()> {
         just("to")
             .padded_by(whitespace())
             .ignore_then(just("ptr").padded_by(whitespace()))
@@ -101,7 +105,8 @@ mod test {
         // Successes
         assert_eq!(
             IntToPtrConstant::parser(ConstantExpression::parser())
-                .parse("ptr inttoptr (i64 1 to ptr)"),
+                .parse("ptr inttoptr (i64 1 to ptr)")
+                .into_result(),
             Ok(IntToPtrConstant {
                 int_type: LLVMType::i64,
                 integer:  Box::new(ConstantExpression::Integer(IntegerConstant {
@@ -112,7 +117,8 @@ mod test {
         );
         assert_eq!(
             IntToPtrConstant::parser(ConstantExpression::parser())
-                .parse("ptr inttoptr (i64 @foobar to ptr)"),
+                .parse("ptr inttoptr (i64 @foobar to ptr)")
+                .into_result(),
             Ok(IntToPtrConstant {
                 int_type: LLVMType::i64,
                 integer:  Box::new(ConstantExpression::Name("foobar".into())),
@@ -123,16 +129,19 @@ mod test {
         assert!(
             IntToPtrConstant::parser(ConstantExpression::parser())
                 .parse("ptr inttoptr (i64 to ptr)")
+                .into_result()
                 .is_err()
         );
         assert!(
             IntToPtrConstant::parser(ConstantExpression::parser())
                 .parse("ptr inttoptr (i64 1)")
+                .into_result()
                 .is_err()
         );
         assert!(
             IntToPtrConstant::parser(ConstantExpression::parser())
                 .parse("ptr inttoptr i64 1 to ptr)")
+                .into_result()
                 .is_err()
         );
     }

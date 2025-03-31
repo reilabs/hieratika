@@ -3,18 +3,18 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/cairoc",
   "crates/cli",
   "crates/compiler",
   "crates/driver",
   "crates/error",
-  "crates/cairoc",
   "crates/flo",
-  "crates/test-utils",
-  "crates/mangler",
   "crates/lifter",
+  "crates/mangler",
+  "crates/test-utils",
 ]
 
-# Cairo is excluded because it is imported as git submodule and it has its own Cargo workspace.
+# Cairo is excluded because it is imported as git submodule that has its own Cargo workspace.
 exclude = ["cairo", "tests"]
 
 # Here we set keys that are relevant across all packages, allowing them to be inherited.
@@ -34,8 +34,8 @@ rust-version = "1.83.0"
 # Dependencies that are used by more than one crate are specified here, allowing us to ensure that
 # we match versions in all crates.
 [workspace.dependencies]
-anyhow = "1.0.89"
-ariadne = "0.5.0"
+anyhow = "1.0.97"
+ariadne = "0.5.1"
 backtrace = "0.3.74"
 bimap = { version = "0.6.3", features = ["serde"] }
 cairo-lang-compiler = { path = "cairo/crates/cairo-lang-compiler" }
@@ -57,11 +57,10 @@ hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
 hieratika-mangler = { path = "crates/mangler" }
 hieratika-test-utils = { path = "crates/test-utils" }
-miette = { version = "7.4.0", features = ["fancy"] }
+miette = { version = "7.5.0", features = ["fancy"] }
 starknet-types-core = "0.1.7"
-thiserror = "2.0.8"
+thiserror = "2.0.12"
 hieratika-lifter = { path = "crates/lifter" }
-tracing = "0.1.40"
 
 [profile.release]
 debug = true           # Include full debug information in release builds.

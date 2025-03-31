@@ -14,18 +14,12 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ariadne.workspace = true
-clap.workspace = true
 cairo-lang-compiler.workspace = true
 cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
-cairo-lang-diagnostics = { path = "../../cairo/crates/cairo-lang-diagnostics" }
-cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
 cairo-lang-lowering.workspace = true
 cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 hieratika-compiler.workspace = true
-itertools.workspace = true
-tracing.workspace = true
 hieratika-cairoc.workspace = true
 hieratika-flo.workspace = true
 hieratika-errors.workspace = true

@@ -1,9 +1,9 @@
 //! A parser for blockaddress constant pointer expressions.
 
 use chumsky::{
+    IterParser,
     Parser,
     prelude::{just, none_of},
-    text::TextParser,
 };
 
 use crate::parser::SimpleParser;
@@ -24,7 +24,7 @@ impl BlockAddress {
     /// Generates a parser for the `BlockAddress` type from the standard pointer
     /// constant `blockaddress` expression.
     #[must_use]
-    pub fn parser() -> impl SimpleParser<Self> {
+    pub fn parser<'a>() -> impl SimpleParser<'a, Self> {
         just("ptr")
             .padded()
             .ignore_then(just("blockaddress"))
@@ -34,20 +34,20 @@ impl BlockAddress {
     /// Parses a function name as it is expected to occur in the first argument
     /// of the `blockaddress` constant.
     #[must_use]
-    pub fn function_name() -> impl SimpleParser<String> {
+    pub fn function_name<'a>() -> impl SimpleParser<'a, String> {
         just("@").ignore_then(none_of("@%,()").repeated().collect::<String>())
     }
 
     /// Parses a block reference as it is expected to appear in the second
     /// argument of the `blockaddress` constant.
     #[must_use]
-    pub fn block_ref() -> impl SimpleParser<String> {
+    pub fn block_ref<'a>() -> impl SimpleParser<'a, String> {
         just("%").ignore_then(none_of("@%,()").repeated().collect::<String>())
     }
 
     /// Parses the arguments to the `blockaddress` constant expression.
     #[must_use]
-    pub fn arguments() -> impl SimpleParser<BlockAddress> {
+    pub fn arguments<'a>() -> impl SimpleParser<'a, BlockAddress> {
         Self::function_name()
             .then_ignore(just(",").padded())
             .then(Self::block_ref())
@@ -66,27 +66,33 @@ mod test {
 
     #[test]
     fn can_parse_function_name_in_blockaddr() {
-        let result = BlockAddress::function_name().parse("@hieratika_test_indirectbr");
+        let result = BlockAddress::function_name()
+            .parse("@hieratika_test_indirectbr")
+            .into_result();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "hieratika_test_indirectbr");
     }
 
     #[test]
     fn can_parse_block_ref_in_blockaddr() {
-        let result = BlockAddress::block_ref().parse("%bb1");
+        let result = BlockAddress::block_ref().parse("%bb1").into_result();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "bb1");
     }
 
     #[test]
     fn can_parse_arguments_of_block_ref_in_blockaddr() {
-        let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr,%bb1");
+        let result = BlockAddress::arguments()
+            .parse("@hieratika_test_indirectbr,%bb1")
+            .into_result();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), BlockAddress {
             function_name: "hieratika_test_indirectbr".to_string(),
             block_ref:     "bb1".to_string(),
         });
-        let result = BlockAddress::arguments().parse("@hieratika_test_indirectbr, %bb1");
+        let result = BlockAddress::arguments()
+            .parse("@hieratika_test_indirectbr, %bb1")
+            .into_result();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), BlockAddress {
             function_name: "hieratika_test_indirectbr".to_string(),
@@ -96,8 +102,9 @@ mod test {
 
     #[test]
     fn can_parse_blockaddr() {
-        let result =
-            BlockAddress::parser().parse("ptr blockaddress(@hieratika_test_input, %exit_safe)");
+        let result = BlockAddress::parser()
+            .parse("ptr blockaddress(@hieratika_test_input, %exit_safe)")
+            .into_result();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), BlockAddress {
             function_name: "hieratika_test_input".to_string(),

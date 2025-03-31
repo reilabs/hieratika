@@ -2,8 +2,9 @@
 //! utilities for querying and reasoning about said layouts.
 
 use chumsky::{
+    IterParser,
     Parser,
-    error::Simple,
+    error::Rich,
     prelude::{choice, just},
 };
 use hieratika_errors::{
@@ -28,7 +29,7 @@ use crate::{
         DEFAULT_VECTOR_64_LAYOUT,
         DEFAULT_VECTOR_128_LAYOUT,
     },
-    parser::number::positive_integer,
+    parser::number,
 };
 
 /// Information about the expected data-layout for this module.
@@ -137,33 +138,35 @@ impl DataLayout {
 
         // Parse out each specification from the data-layout string.
         for part in parts {
-            if let Ok(e) = Endianness::parser().parse(part) {
+            if let Ok(e) = Endianness::parser().parse(part).into_result() {
                 layout.endianness = e;
-            } else if let Ok(m) = Mangling::parser().parse(part) {
+            } else if let Ok(m) = Mangling::parser().parse(part).into_result() {
                 layout.mangling = m;
-            } else if let Ok(align) = parsing::stack_alignment().parse(part) {
+            } else if let Ok(align) = parsing::stack_alignment().parse(part).into_result() {
                 layout.stack_alignment = align;
-            } else if let Ok(p_addr) = parsing::program_address_space().parse(part) {
+            } else if let Ok(p_addr) = parsing::program_address_space().parse(part).into_result() {
                 layout.program_address_space = p_addr;
-            } else if let Ok(g_addr) = parsing::global_address_space().parse(part) {
+            } else if let Ok(g_addr) = parsing::global_address_space().parse(part).into_result() {
                 layout.global_address_space = g_addr;
-            } else if let Ok(a_addr) = parsing::alloc_address_space().parse(part) {
+            } else if let Ok(a_addr) = parsing::alloc_address_space().parse(part).into_result() {
                 layout.alloc_address_space = a_addr;
-            } else if let Ok(ptr_spec) = PointerLayout::parser().parse(part) {
+            } else if let Ok(ptr_spec) = PointerLayout::parser().parse(part).into_result() {
                 layout.pointer_layouts.push(ptr_spec);
-            } else if let Ok(int_spec) = IntegerLayout::parser().parse(part) {
+            } else if let Ok(int_spec) = IntegerLayout::parser().parse(part).into_result() {
                 layout.integer_layouts.push(int_spec);
-            } else if let Ok(vec) = VectorLayout::parser().parse(part) {
+            } else if let Ok(vec) = VectorLayout::parser().parse(part).into_result() {
                 layout.vector_layouts.push(vec);
-            } else if let Ok(float_spec) = FloatLayout::parser().parse(part) {
+            } else if let Ok(float_spec) = FloatLayout::parser().parse(part).into_result() {
                 layout.float_layouts.push(float_spec);
-            } else if let Ok(agg) = AggregateLayout::parser().parse(part) {
+            } else if let Ok(agg) = AggregateLayout::parser().parse(part).into_result() {
                 layout.aggregate_layout = agg;
-            } else if let Ok(f_ptr) = FunctionPointerLayout::parser().parse(part) {
+            } else if let Ok(f_ptr) = FunctionPointerLayout::parser().parse(part).into_result() {
                 layout.function_pointer_layout = f_ptr;
-            } else if let Ok(iw) = NativeIntegerWidths::parser().parse(part) {
+            } else if let Ok(iw) = NativeIntegerWidths::parser().parse(part).into_result() {
                 layout.native_integer_widths = iw;
-            } else if let Ok(npa) = NonIntegralPointerAddressSpaces::parser().parse(part) {
+            } else if let Ok(npa) =
+                NonIntegralPointerAddressSpaces::parser().parse(part).into_result()
+            {
                 layout.nointptr_address_spaces = npa;
             } else if part.is_empty() {
                 // We don't know if empty parts are allowed, so we just behave permissively
@@ -377,7 +380,7 @@ pub enum Endianness {
 
 impl Endianness {
     /// Parses the endianness specification part of the data-layout.
-    fn parser() -> impl parsing::DLParser<Endianness> {
+    fn parser<'a>() -> impl parsing::DLParser<'a, Endianness> {
         choice((
             just("e").to(Endianness::Little),
             just("E").to(Endianness::Big),
@@ -425,7 +428,7 @@ pub enum Mangling {
 
 impl Mangling {
     /// Parses the mangling specification part of the data-layout.
-    fn parser() -> impl parsing::DLParser<Mangling> {
+    fn parser<'a>() -> impl parsing::DLParser<'a, Mangling> {
         just("m:").ignore_then(choice((
             just("a").to(Mangling::XCOFF),
             just("e").to(Mangling::ELF),
@@ -461,13 +464,17 @@ impl PointerLayout {
     /// Parses the pointer layout specification as part of the data layout
     /// string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<PointerLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, PointerLayout> {
         just("p")
-            .ignore_then(positive_integer(10).delimited_by(just("["), just("]")).or_not())
-            .then(parsing::field(positive_integer(10)))
-            .then(parsing::field(positive_integer(10)))
-            .then(parsing::field(positive_integer(10)).or_not())
-            .then(parsing::field(positive_integer(10)).or_not())
+            .ignore_then(
+                number::positive_integer(10)
+                    .delimited_by(just("["), just("]"))
+                    .or_not(),
+            )
+            .then(parsing::field(number::positive_integer(10)))
+            .then(parsing::field(number::positive_integer(10)))
+            .then(parsing::field(number::positive_integer(10)).or_not())
+            .then(parsing::field(number::positive_integer(10)).or_not())
             .try_map(
                 |((((address_space, size), abi_alignment), preferred_alignment), index_size),
                  span| {
@@ -475,7 +482,7 @@ impl PointerLayout {
                     let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
                     let index_size = index_size.unwrap_or(size);
                     if index_size > size {
-                        Err(Simple::custom(
+                        Err(Rich::custom(
                             span,
                             format!(
                                 "The requested index size {index_size} is larger than the pointer \
@@ -513,18 +520,15 @@ impl IntegerLayout {
     /// Parses an integer layout specification as part of the data layout
     /// string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<IntegerLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, IntegerLayout> {
         just("i")
-            .ignore_then(positive_integer(10))
-            .then(parsing::field(positive_integer(10)))
-            .then(parsing::field(positive_integer(10)).or_not())
+            .ignore_then(number::positive_integer(10))
+            .then(parsing::field(number::positive_integer(10)))
+            .then(parsing::field(number::positive_integer(10)).or_not())
             .try_map(|((size, abi_alignment), preferred_alignment), span| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
                 if size == BYTE_SIZE_BITS && abi_alignment != size {
-                    Err(Simple::custom(
-                        span,
-                        "i8 was not aligned to a byte boundary",
-                    ))?;
+                    Err(Rich::custom(span, "i8 was not aligned to a byte boundary"))?;
                 }
 
                 Ok(Self {
@@ -553,11 +557,11 @@ impl VectorLayout {
     /// Parses a vector layout specification as part of the data layout
     /// string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<VectorLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, VectorLayout> {
         just("v")
-            .ignore_then(positive_integer(10))
-            .then(parsing::field(positive_integer(10)))
-            .then(parsing::field(positive_integer(10)).or_not())
+            .ignore_then(number::positive_integer(10))
+            .then(parsing::field(number::positive_integer(10)))
+            .then(parsing::field(number::positive_integer(10)).or_not())
             .map(|((size, abi_alignment), preferred_alignment)| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
 
@@ -587,15 +591,15 @@ impl FloatLayout {
     /// Parses a floating-point layout specification as part of the data layout
     /// string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<FloatLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, FloatLayout> {
         just("f")
-            .ignore_then(positive_integer(10))
-            .then(parsing::field(positive_integer(10)))
-            .then(parsing::field(positive_integer(10)).or_not())
+            .ignore_then(number::positive_integer(10))
+            .then(parsing::field(number::positive_integer(10)))
+            .then(parsing::field(number::positive_integer(10)).or_not())
             .try_map(|((size, abi_alignment), preferred_alignment), span| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
                 if !&[16, 32, 64, 80, 128].contains(&size) {
-                    Err(Simple::custom(
+                    Err(Rich::custom(
                         span,
                         format!("{size} is not a valid floating-point size"),
                     ))?;
@@ -624,10 +628,10 @@ impl AggregateLayout {
     /// Parses the aggregate layout specification as part of the data layout
     /// string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<AggregateLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, AggregateLayout> {
         just("a")
-            .ignore_then(positive_integer(10))
-            .then(parsing::field(positive_integer(10)).or_not())
+            .ignore_then(number::positive_integer(10))
+            .then(parsing::field(number::positive_integer(10)).or_not())
             .map(|(abi_alignment, preferred_alignment)| {
                 let preferred_alignment = preferred_alignment.unwrap_or(abi_alignment);
 
@@ -656,7 +660,7 @@ pub enum FunctionPointerType {
 impl FunctionPointerType {
     /// Parses the function pointer type as part of the data layout string.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<FunctionPointerType> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, FunctionPointerType> {
         choice((
             just("i").to(FunctionPointerType::Independent),
             just("n").to(FunctionPointerType::Multiple),
@@ -678,10 +682,10 @@ impl FunctionPointerLayout {
     /// Parses the function pointer layout specification as part of this data
     /// layout.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<FunctionPointerLayout> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, FunctionPointerLayout> {
         just("F")
             .ignore_then(FunctionPointerType::parser())
-            .then(positive_integer(10))
+            .then(number::positive_integer(10))
             .map(|(ptr_type, abi_alignment)| Self {
                 ptr_type,
                 abi_alignment,
@@ -701,10 +705,14 @@ pub struct NativeIntegerWidths {
 impl NativeIntegerWidths {
     /// Parses the specification of native integer widths for the target CPU.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<NativeIntegerWidths> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, NativeIntegerWidths> {
         just("n")
-            .ignore_then(positive_integer(10))
-            .then(parsing::field(positive_integer(10)).repeated())
+            .ignore_then(number::positive_integer(10))
+            .then(
+                parsing::field(number::positive_integer(10))
+                    .repeated()
+                    .collect::<Vec<_>>(),
+            )
             .map(|(first, mut rest)| {
                 rest.insert(0, first);
                 Self { widths: rest }
@@ -724,12 +732,17 @@ impl NonIntegralPointerAddressSpaces {
     /// Parses the specification of address-spaces in which pointers are
     /// non-integral.
     #[must_use]
-    pub fn parser() -> impl parsing::DLParser<NonIntegralPointerAddressSpaces> {
+    pub fn parser<'a>() -> impl parsing::DLParser<'a, NonIntegralPointerAddressSpaces> {
         just("ni")
-            .ignore_then(parsing::field(positive_integer(10)).repeated().at_least(1))
+            .ignore_then(
+                parsing::field(number::positive_integer(10))
+                    .repeated()
+                    .at_least(1)
+                    .collect::<Vec<_>>(),
+            )
             .try_map(|address_spaces, span| {
                 if address_spaces.contains(&0) {
-                    Err(Simple::custom(
+                    Err(Rich::custom(
                         span,
                         "The 0 address space cannot be specified as using non-integral pointers",
                     ))?;
@@ -743,48 +756,48 @@ impl NonIntegralPointerAddressSpaces {
 /// Utility parsing functions to aid in the parsing of data-layouts but that are
 /// not associated directly with any type.
 pub mod parsing {
-    use chumsky::{Parser, error::Simple, prelude::just};
+    use chumsky::{Parser, error::Rich, extra, prelude::just};
 
     use crate::{constant::BYTE_SIZE_BITS, parser::number::positive_integer};
 
     /// Simply to avoid typing out the whole parser type parameter specification
     /// every single time given it only varies in one parameter.
-    pub trait DLParser<T>: Parser<char, T, Error = Simple<char>> {}
+    pub trait DLParser<'a, T>: Parser<'a, &'a str, T, extra::Err<Rich<'a, char>>> {}
 
     /// A blanket impl to make this work, because yay.
-    impl<T, U> DLParser<T> for U where U: Parser<char, T, Error = Simple<char>> {}
+    impl<'a, T, U> DLParser<'a, T> for U where U: Parser<'a, &'a str, T, extra::Err<Rich<'a, char>>> {}
 
     /// Parses an element separator.
     #[must_use]
-    pub fn elem_sep<'a>() -> impl DLParser<&'a str> {
+    pub fn elem_sep<'a>() -> impl DLParser<'a, &'a str> {
         just("-")
     }
 
     /// Parses a field separator.
     #[must_use]
-    pub fn field_sep<'a>() -> impl DLParser<&'a str> {
+    pub fn field_sep<'a>() -> impl DLParser<'a, &'a str> {
         just(":")
     }
 
     /// Parses a field, namely a colon followed by something as given by the
     /// `then` parser.
-    pub fn field<T>(then: impl DLParser<T>) -> impl DLParser<T> {
+    pub fn field<'a, T>(then: impl DLParser<'a, T>) -> impl DLParser<'a, T> {
         field_sep().ignore_then(then)
     }
 
     /// Parses the stack alignment specification part of the data-layout.
     #[must_use]
-    pub fn stack_alignment() -> impl DLParser<usize> {
+    pub fn stack_alignment<'a>() -> impl DLParser<'a, usize> {
         just("S")
             .ignore_then(positive_integer(10))
-            .validate(|alignment, span, emit| {
+            .try_map(|alignment, span| {
                 if alignment % BYTE_SIZE_BITS != 0 {
-                    emit(Simple::custom(
+                    Err(Rich::custom(
                         span,
                         format!("{alignment} must be aligned to a byte offset"),
-                    ));
+                    ))?;
                 }
-                alignment
+                Ok(alignment)
             })
     }
 
@@ -794,17 +807,17 @@ pub mod parsing {
     }
 
     #[must_use]
-    pub fn program_address_space() -> impl DLParser<usize> {
+    pub fn program_address_space<'a>() -> impl DLParser<'a, usize> {
         address_space("P")
     }
 
     #[must_use]
-    pub fn global_address_space() -> impl DLParser<usize> {
+    pub fn global_address_space<'a>() -> impl DLParser<'a, usize> {
         address_space("G")
     }
 
     #[must_use]
-    pub fn alloc_address_space() -> impl DLParser<usize> {
+    pub fn alloc_address_space<'a>() -> impl DLParser<'a, usize> {
         address_space("A")
     }
 }
@@ -1072,18 +1085,20 @@ mod test {
     #[test]
     fn can_parse_endianness_segment() {
         // Failures
-        assert!(Endianness::parser().parse("foo").is_err());
+        assert!(Endianness::parser().parse("foo").into_result().is_err());
 
         // Successes
         assert_eq!(
             Endianness::parser()
                 .parse("e")
+                .into_result()
                 .expect("Little endian spec did not parse"),
             Endianness::Little
         );
         assert_eq!(
             Endianness::parser()
                 .parse("E")
+                .into_result()
                 .expect("Big endian spec did not parse"),
             Endianness::Big
         );
@@ -1092,77 +1107,138 @@ mod test {
     #[test]
     fn can_parse_mangling_segment() {
         // Failures
-        assert!(Mangling::parser().parse("m:").is_err());
-        assert!(Mangling::parser().parse("m:f").is_err());
-        assert!(Mangling::parser().parse("f").is_err());
+        assert!(Mangling::parser().parse("m:").into_result().is_err());
+        assert!(Mangling::parser().parse("m:f").into_result().is_err());
+        assert!(Mangling::parser().parse("f").into_result().is_err());
 
         // Successes
-        assert_eq!(Mangling::parser().parse("m:a"), Ok(Mangling::XCOFF));
-        assert_eq!(Mangling::parser().parse("m:e"), Ok(Mangling::ELF));
-        assert_eq!(Mangling::parser().parse("m:l"), Ok(Mangling::GOFF));
-        assert_eq!(Mangling::parser().parse("m:m"), Ok(Mangling::MIPS));
-        assert_eq!(Mangling::parser().parse("m:o"), Ok(Mangling::MachO));
-        assert_eq!(Mangling::parser().parse("m:w"), Ok(Mangling::COFF));
-        assert_eq!(Mangling::parser().parse("m:x"), Ok(Mangling::COFF86));
+        assert_eq!(
+            Mangling::parser().parse("m:a").into_result(),
+            Ok(Mangling::XCOFF)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:e").into_result(),
+            Ok(Mangling::ELF)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:l").into_result(),
+            Ok(Mangling::GOFF)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:m").into_result(),
+            Ok(Mangling::MIPS)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:o").into_result(),
+            Ok(Mangling::MachO)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:w").into_result(),
+            Ok(Mangling::COFF)
+        );
+        assert_eq!(
+            Mangling::parser().parse("m:x").into_result(),
+            Ok(Mangling::COFF86)
+        );
     }
 
     #[test]
     fn can_parse_stack_alignment_segment() {
         // Failures
-        assert!(parsing::stack_alignment().parse("m:").is_err());
-        assert!(parsing::stack_alignment().parse("S").is_err());
-        assert!(parsing::stack_alignment().parse("S15").is_err());
+        assert!(parsing::stack_alignment().parse("m:").into_result().is_err());
+        assert!(parsing::stack_alignment().parse("S").into_result().is_err());
+        assert!(parsing::stack_alignment().parse("S15").into_result().is_err());
 
         // Successes
-        assert_eq!(parsing::stack_alignment().parse("S8"), Ok(8));
-        assert_eq!(parsing::stack_alignment().parse("S32"), Ok(32));
-        assert_eq!(parsing::stack_alignment().parse("S64"), Ok(64));
-        assert_eq!(parsing::stack_alignment().parse("S128"), Ok(128));
-        assert_eq!(parsing::stack_alignment().parse("S256"), Ok(256));
+        assert_eq!(parsing::stack_alignment().parse("S8").into_result(), Ok(8));
+        assert_eq!(
+            parsing::stack_alignment().parse("S32").into_result(),
+            Ok(32)
+        );
+        assert_eq!(
+            parsing::stack_alignment().parse("S64").into_result(),
+            Ok(64)
+        );
+        assert_eq!(
+            parsing::stack_alignment().parse("S128").into_result(),
+            Ok(128)
+        );
+        assert_eq!(
+            parsing::stack_alignment().parse("S256").into_result(),
+            Ok(256)
+        );
     }
 
     #[test]
     fn can_parse_program_address_space() {
         // Failures
-        assert!(parsing::program_address_space().parse("PA").is_err());
-        assert!(parsing::program_address_space().parse("P").is_err());
+        assert!(parsing::program_address_space().parse("PA").into_result().is_err());
+        assert!(parsing::program_address_space().parse("P").into_result().is_err());
 
         // Successes
-        assert_eq!(parsing::program_address_space().parse("P1"), Ok(1));
-        assert_eq!(parsing::program_address_space().parse("P0"), Ok(0));
+        assert_eq!(
+            parsing::program_address_space().parse("P1").into_result(),
+            Ok(1)
+        );
+        assert_eq!(
+            parsing::program_address_space().parse("P0").into_result(),
+            Ok(0)
+        );
     }
 
     #[test]
     fn can_parse_global_address_space() {
         // Failures
-        assert!(parsing::global_address_space().parse("GA").is_err());
-        assert!(parsing::global_address_space().parse("G").is_err());
+        assert!(parsing::global_address_space().parse("GA").into_result().is_err());
+        assert!(parsing::global_address_space().parse("G").into_result().is_err());
 
         // Successes
-        assert_eq!(parsing::global_address_space().parse("G1"), Ok(1));
-        assert_eq!(parsing::global_address_space().parse("G0"), Ok(0));
+        assert_eq!(
+            parsing::global_address_space().parse("G1").into_result(),
+            Ok(1)
+        );
+        assert_eq!(
+            parsing::global_address_space().parse("G0").into_result(),
+            Ok(0)
+        );
     }
 
     #[test]
     fn can_parse_alloc_address_space() {
         // Failures
-        assert!(parsing::alloc_address_space().parse("AA").is_err());
-        assert!(parsing::alloc_address_space().parse("A").is_err());
+        assert!(parsing::alloc_address_space().parse("AA").into_result().is_err());
+        assert!(parsing::alloc_address_space().parse("A").into_result().is_err());
 
         // Successes
-        assert_eq!(parsing::alloc_address_space().parse("A1"), Ok(1));
-        assert_eq!(parsing::alloc_address_space().parse("A0"), Ok(0));
+        assert_eq!(
+            parsing::alloc_address_space().parse("A1").into_result(),
+            Ok(1)
+        );
+        assert_eq!(
+            parsing::alloc_address_space().parse("A0").into_result(),
+            Ok(0)
+        );
     }
 
     #[test]
     fn can_parse_pointer_spec() {
         // Failures
-        assert!(PointerLayout::parser().parse("p[1]:64:128:128:68").is_err());
-        assert!(PointerLayout::parser().parse("p[]:64:128:128:32").is_err());
+        assert!(
+            PointerLayout::parser()
+                .parse("p[1]:64:128:128:68")
+                .into_result()
+                .is_err()
+        );
+        assert!(
+            PointerLayout::parser()
+                .parse("p[]:64:128:128:32")
+                .into_result()
+                .is_err()
+        );
 
         // Successes
         assert_eq!(
-            PointerLayout::parser().parse("p[1]:64:128:128:64"),
+            PointerLayout::parser().parse("p[1]:64:128:128:64").into_result(),
             Ok(PointerLayout {
                 address_space:       1,
                 size:                64,
@@ -1172,7 +1248,7 @@ mod test {
             })
         );
         assert_eq!(
-            PointerLayout::parser().parse("p:64:128:128:64"),
+            PointerLayout::parser().parse("p:64:128:128:64").into_result(),
             Ok(PointerLayout {
                 address_space:       0,
                 size:                64,
@@ -1182,7 +1258,7 @@ mod test {
             })
         );
         assert_eq!(
-            PointerLayout::parser().parse("p:64:128"),
+            PointerLayout::parser().parse("p:64:128").into_result(),
             Ok(PointerLayout {
                 address_space:       0,
                 size:                64,
@@ -1196,12 +1272,12 @@ mod test {
     #[test]
     fn can_parse_integer_spec() {
         // Failures
-        assert!(IntegerLayout::parser().parse("i").is_err());
-        assert!(IntegerLayout::parser().parse("i8:16").is_err());
+        assert!(IntegerLayout::parser().parse("i").into_result().is_err());
+        assert!(IntegerLayout::parser().parse("i8:16").into_result().is_err());
 
         // Successes
         assert_eq!(
-            IntegerLayout::parser().parse("i8:8"),
+            IntegerLayout::parser().parse("i8:8").into_result(),
             Ok(IntegerLayout {
                 size:                8,
                 abi_alignment:       8,
@@ -1209,7 +1285,7 @@ mod test {
             })
         );
         assert_eq!(
-            IntegerLayout::parser().parse("i32:64"),
+            IntegerLayout::parser().parse("i32:64").into_result(),
             Ok(IntegerLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1217,7 +1293,7 @@ mod test {
             })
         );
         assert_eq!(
-            IntegerLayout::parser().parse("i32:64:128"),
+            IntegerLayout::parser().parse("i32:64:128").into_result(),
             Ok(IntegerLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1229,12 +1305,12 @@ mod test {
     #[test]
     fn can_parse_vector_spec() {
         // Failures
-        assert!(VectorLayout::parser().parse("v").is_err());
-        assert!(VectorLayout::parser().parse("v8").is_err());
+        assert!(VectorLayout::parser().parse("v").into_result().is_err());
+        assert!(VectorLayout::parser().parse("v8").into_result().is_err());
 
         // Successes
         assert_eq!(
-            VectorLayout::parser().parse("v8:8"),
+            VectorLayout::parser().parse("v8:8").into_result(),
             Ok(VectorLayout {
                 size:                8,
                 abi_alignment:       8,
@@ -1242,7 +1318,7 @@ mod test {
             })
         );
         assert_eq!(
-            VectorLayout::parser().parse("v32:64"),
+            VectorLayout::parser().parse("v32:64").into_result(),
             Ok(VectorLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1250,7 +1326,7 @@ mod test {
             })
         );
         assert_eq!(
-            VectorLayout::parser().parse("v32:64:128"),
+            VectorLayout::parser().parse("v32:64:128").into_result(),
             Ok(VectorLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1262,13 +1338,13 @@ mod test {
     #[test]
     fn can_parse_float_spec() {
         // Failures
-        assert!(FloatLayout::parser().parse("f").is_err());
-        assert!(FloatLayout::parser().parse("f8:16").is_err());
-        assert!(FloatLayout::parser().parse("f96:128").is_err());
+        assert!(FloatLayout::parser().parse("f").into_result().is_err());
+        assert!(FloatLayout::parser().parse("f8:16").into_result().is_err());
+        assert!(FloatLayout::parser().parse("f96:128").into_result().is_err());
 
         // Successes
         assert_eq!(
-            FloatLayout::parser().parse("f16:16"),
+            FloatLayout::parser().parse("f16:16").into_result(),
             Ok(FloatLayout {
                 size:                16,
                 abi_alignment:       16,
@@ -1276,7 +1352,7 @@ mod test {
             })
         );
         assert_eq!(
-            FloatLayout::parser().parse("f32:64"),
+            FloatLayout::parser().parse("f32:64").into_result(),
             Ok(FloatLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1284,7 +1360,7 @@ mod test {
             })
         );
         assert_eq!(
-            FloatLayout::parser().parse("f32:64:128"),
+            FloatLayout::parser().parse("f32:64:128").into_result(),
             Ok(FloatLayout {
                 size:                32,
                 abi_alignment:       64,
@@ -1296,18 +1372,18 @@ mod test {
     #[test]
     fn can_parse_aggregate_spec() {
         // Failures
-        assert!(FloatLayout::parser().parse("a").is_err());
+        assert!(FloatLayout::parser().parse("a").into_result().is_err());
 
         // Successes
         assert_eq!(
-            AggregateLayout::parser().parse("a64"),
+            AggregateLayout::parser().parse("a64").into_result(),
             Ok(AggregateLayout {
                 abi_alignment:       64,
                 preferred_alignment: 64,
             })
         );
         assert_eq!(
-            AggregateLayout::parser().parse("a64:128"),
+            AggregateLayout::parser().parse("a64:128").into_result(),
             Ok(AggregateLayout {
                 abi_alignment:       64,
                 preferred_alignment: 128,
@@ -1318,15 +1394,15 @@ mod test {
     #[test]
     fn can_parse_function_pointer_type() {
         // Failures
-        assert!(FunctionPointerType::parser().parse("a").is_err());
+        assert!(FunctionPointerType::parser().parse("a").into_result().is_err());
 
         // Successes
         assert_eq!(
-            FunctionPointerType::parser().parse("i"),
+            FunctionPointerType::parser().parse("i").into_result(),
             Ok(FunctionPointerType::Independent)
         );
         assert_eq!(
-            FunctionPointerType::parser().parse("n"),
+            FunctionPointerType::parser().parse("n").into_result(),
             Ok(FunctionPointerType::Multiple)
         );
     }
@@ -1334,26 +1410,26 @@ mod test {
     #[test]
     fn can_parse_function_pointer_spec() {
         // Failures
-        assert!(FunctionPointerLayout::parser().parse("Fi").is_err());
-        assert!(FunctionPointerLayout::parser().parse("Fb64").is_err());
+        assert!(FunctionPointerLayout::parser().parse("Fi").into_result().is_err());
+        assert!(FunctionPointerLayout::parser().parse("Fb64").into_result().is_err());
 
         // Successes
         assert_eq!(
-            FunctionPointerLayout::parser().parse("Fi64"),
+            FunctionPointerLayout::parser().parse("Fi64").into_result(),
             Ok(FunctionPointerLayout {
                 ptr_type:      FunctionPointerType::Independent,
                 abi_alignment: 64,
             })
         );
         assert_eq!(
-            FunctionPointerLayout::parser().parse("Fi128"),
+            FunctionPointerLayout::parser().parse("Fi128").into_result(),
             Ok(FunctionPointerLayout {
                 ptr_type:      FunctionPointerType::Independent,
                 abi_alignment: 128,
             })
         );
         assert_eq!(
-            FunctionPointerLayout::parser().parse("Fn32"),
+            FunctionPointerLayout::parser().parse("Fn32").into_result(),
             Ok(FunctionPointerLayout {
                 ptr_type:      FunctionPointerType::Multiple,
                 abi_alignment: 32,
@@ -1364,16 +1440,16 @@ mod test {
     #[test]
     fn can_parse_native_integer_widths_spec() {
         // Failures
-        assert!(NativeIntegerWidths::parser().parse("Fi").is_err());
-        assert!(NativeIntegerWidths::parser().parse("n").is_err());
+        assert!(NativeIntegerWidths::parser().parse("Fi").into_result().is_err());
+        assert!(NativeIntegerWidths::parser().parse("n").into_result().is_err());
 
         // Successes
         assert_eq!(
-            NativeIntegerWidths::parser().parse("n64"),
+            NativeIntegerWidths::parser().parse("n64").into_result(),
             Ok(NativeIntegerWidths { widths: vec![64] })
         );
         assert_eq!(
-            NativeIntegerWidths::parser().parse("n16:32:64"),
+            NativeIntegerWidths::parser().parse("n16:32:64").into_result(),
             Ok(NativeIntegerWidths {
                 widths: vec![16, 32, 64],
             })
@@ -1383,19 +1459,36 @@ mod test {
     #[test]
     fn can_parse_nointptr_address_spaces_spec() {
         // Failures
-        assert!(NonIntegralPointerAddressSpaces::parser().parse("ni").is_err());
-        assert!(NonIntegralPointerAddressSpaces::parser().parse("ni:").is_err());
-        assert!(NonIntegralPointerAddressSpaces::parser().parse("ni:0").is_err());
+        assert!(
+            NonIntegralPointerAddressSpaces::parser()
+                .parse("ni")
+                .into_result()
+                .is_err()
+        );
+        assert!(
+            NonIntegralPointerAddressSpaces::parser()
+                .parse("ni:")
+                .into_result()
+                .is_err()
+        );
+        assert!(
+            NonIntegralPointerAddressSpaces::parser()
+                .parse("ni:0")
+                .into_result()
+                .is_err()
+        );
 
         // Successes
         assert_eq!(
-            NonIntegralPointerAddressSpaces::parser().parse("ni:1"),
+            NonIntegralPointerAddressSpaces::parser().parse("ni:1").into_result(),
             Ok(NonIntegralPointerAddressSpaces {
                 address_spaces: vec![1],
             })
         );
         assert_eq!(
-            NonIntegralPointerAddressSpaces::parser().parse("ni:1:3:5"),
+            NonIntegralPointerAddressSpaces::parser()
+                .parse("ni:1:3:5")
+                .into_result(),
             Ok(NonIntegralPointerAddressSpaces {
                 address_spaces: vec![1, 3, 5],
             })

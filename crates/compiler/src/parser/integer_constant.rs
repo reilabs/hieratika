@@ -31,7 +31,7 @@ impl IntegerConstant {
 
     /// Parses the integer constant from the LLVM IR source text.
     #[must_use]
-    pub fn parser() -> impl SimpleParser<Self> {
+    pub fn parser<'a>() -> impl SimpleParser<'a, Self> {
         typ::integer()
             .then_ignore(whitespace())
             .then(integer::<i128>(10))
@@ -43,45 +43,48 @@ impl IntegerConstant {
 mod test {
     use chumsky::Parser;
 
-    use super::IntegerConstant;
-    use crate::llvm::typesystem::LLVMType;
+    use crate::{llvm::typesystem::LLVMType, parser::integer_constant::IntegerConstant};
 
     #[test]
     fn can_parse_integer_constants() {
         // Successes
         assert_eq!(
-            IntegerConstant::parser().parse("i1 0"),
+            IntegerConstant::parser().parse("i1 0").into_result(),
             Ok(IntegerConstant::new(LLVMType::bool, 0))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i1 1"),
+            IntegerConstant::parser().parse("i1 1").into_result(),
             Ok(IntegerConstant::new(LLVMType::bool, 1))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i8 10"),
+            IntegerConstant::parser().parse("i8 10").into_result(),
             Ok(IntegerConstant::new(LLVMType::i8, 10))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i128 -37"),
+            IntegerConstant::parser().parse("i128 -37").into_result(),
             Ok(IntegerConstant::new(LLVMType::i128, -37))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i64 10"),
+            IntegerConstant::parser().parse("i64 10").into_result(),
             Ok(IntegerConstant::new(LLVMType::i64, 10))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i24 -37"),
+            IntegerConstant::parser().parse("i24 -37").into_result(),
             Ok(IntegerConstant::new(LLVMType::i24, -37))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i128 -4176471573560389552232087451844504212"),
+            IntegerConstant::parser()
+                .parse("i128 -4176471573560389552232087451844504212")
+                .into_result(),
             Ok(IntegerConstant::new(
                 LLVMType::i128,
                 -4_176_471_573_560_389_552_232_087_451_844_504_212
             ))
         );
         assert_eq!(
-            IntegerConstant::parser().parse("i128 -170141183460469231731687303715884105728"),
+            IntegerConstant::parser()
+                .parse("i128 -170141183460469231731687303715884105728")
+                .into_result(),
             Ok(IntegerConstant::new(
                 LLVMType::i128,
                 -170_141_183_460_469_231_731_687_303_715_884_105_728
@@ -89,7 +92,7 @@ mod test {
         );
 
         // Failures
-        assert!(IntegerConstant::parser().parse("i64 a1").is_err());
-        assert!(IntegerConstant::parser().parse("i8 -a1128").is_err());
+        assert!(IntegerConstant::parser().parse("i64 a1").into_result().is_err());
+        assert!(IntegerConstant::parser().parse("i8 -a1128").into_result().is_err());
     }
 }

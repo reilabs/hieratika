@@ -2,8 +2,9 @@
 //! capabilities in Inkwell.
 
 use chumsky::{
+    IterParser,
     Parser,
-    prelude::{choice, filter, just},
+    prelude::{any, choice, just},
     recursive,
     text::whitespace,
 };
@@ -43,7 +44,7 @@ pub enum ConstantExpression {
 impl ConstantExpression {
     /// Parses an arbitrary constant expression in LLVM.
     #[must_use]
-    pub fn parser() -> impl SimpleParser<Self> {
+    pub fn parser<'a>() -> impl SimpleParser<'a, Self> {
         recursive::recursive(|parser| {
             choice((
                 Self::constant_name().map(Self::Name).padded_by(whitespace()),
@@ -61,14 +62,15 @@ impl ConstantExpression {
 
     /// Parses a constant name.
     #[must_use]
-    pub fn constant_name() -> impl SimpleParser<String> {
+    pub fn constant_name<'a>() -> impl SimpleParser<'a, String> {
         just("@").ignore_then(choice((Self::complex_name(), Self::simple_name())))
     }
 
     /// Parses a simple LLVM name, namely one _not_ enclosed by double quotes.
     #[must_use]
-    fn simple_name() -> impl SimpleParser<String> {
-        filter(|c: &char| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+    fn simple_name<'a>() -> impl SimpleParser<'a, String> {
+        any()
+            .filter(|c: &char| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
             .repeated()
             .at_least(1)
             .collect()
@@ -76,14 +78,15 @@ impl ConstantExpression {
 
     /// Parses a complex LLVM name, namely one enclosed in double quotes.
     #[must_use]
-    fn complex_name() -> impl SimpleParser<String> {
-        filter(|c: &char| {
-            c.is_alphanumeric() || *c == '_' || *c == '-' || *c == '$' || *c == '.' || *c == ':'
-        })
-        .repeated()
-        .at_least(1)
-        .collect()
-        .delimited_by(just("\""), just("\""))
+    fn complex_name<'a>() -> impl SimpleParser<'a, String> {
+        any()
+            .filter(|c: &char| {
+                c.is_alphanumeric() || *c == '_' || *c == '-' || *c == '$' || *c == '.' || *c == ':'
+            })
+            .repeated()
+            .at_least(1)
+            .collect()
+            .delimited_by(just("\""), just("\""))
     }
 }
 
@@ -106,30 +109,35 @@ mod constant_expression {
     fn can_parse_constant_names() {
         // Successes
         assert_eq!(
-            ConstantExpression::parser().parse("@foo_bar-baz"),
+            ConstantExpression::parser().parse("@foo_bar-baz").into_result(),
             Ok(ConstantExpression::Name("foo_bar-baz".into()))
         );
         assert_eq!(
-            ConstantExpression::parser().parse("@\"foo$bar..baz\""),
+            ConstantExpression::parser().parse("@\"foo$bar..baz\"").into_result(),
             Ok(ConstantExpression::Name("foo$bar..baz".into()))
         );
 
         // Failures
-        assert!(ConstantExpression::parser().parse("@\"foo_bar$baz").is_err());
+        assert!(
+            ConstantExpression::parser()
+                .parse("@\"foo_bar$baz")
+                .into_result()
+                .is_err()
+        );
     }
 
     #[test]
     fn can_parse_integer_constants() {
         // Successes
         assert_eq!(
-            ConstantExpression::parser().parse("i1 0"),
+            ConstantExpression::parser().parse("i1 0").into_result(),
             Ok(ConstantExpression::Integer(IntegerConstant::new(
                 LLVMType::bool,
                 0
             )))
         );
         assert_eq!(
-            ConstantExpression::parser().parse("i128 -37"),
+            ConstantExpression::parser().parse("i128 -37").into_result(),
             Ok(ConstantExpression::Integer(IntegerConstant::new(
                 LLVMType::i128,
                 -37
@@ -137,15 +145,17 @@ mod constant_expression {
         );
 
         // Failures
-        assert!(ConstantExpression::parser().parse("i64 a1").is_err());
-        assert!(ConstantExpression::parser().parse("i8 -a1128").is_err());
+        assert!(ConstantExpression::parser().parse("i64 a1").into_result().is_err());
+        assert!(ConstantExpression::parser().parse("i8 -a1128").into_result().is_err());
     }
 
     #[test]
     fn can_parse_ptrtoint_constants() {
         // Successes
         assert_eq!(
-            ConstantExpression::parser().parse("i128 ptrtoint (ptr @\"baz$bar\" to i128)"),
+            ConstantExpression::parser()
+                .parse("i128 ptrtoint (ptr @\"baz$bar\" to i128)")
+                .into_result(),
             Ok(ConstantExpression::PtrToInt(PtrToIntConstant {
                 int_type: LLVMType::i128,
                 pointer:  Box::new(ConstantExpression::Name("baz$bar".into())),
@@ -156,6 +166,7 @@ mod constant_expression {
         assert!(
             ConstantExpression::parser()
                 .parse("ptrtoint (@\"baz$bar\" to i128)")
+                .into_result()
                 .is_err()
         );
     }
@@ -164,7 +175,9 @@ mod constant_expression {
     fn can_parse_inttoptr_constants() {
         // Successes
         assert_eq!(
-            ConstantExpression::parser().parse("ptr inttoptr (i64 @foobar to ptr)"),
+            ConstantExpression::parser()
+                .parse("ptr inttoptr (i64 @foobar to ptr)")
+                .into_result(),
             Ok(ConstantExpression::IntToPtr(IntToPtrConstant {
                 int_type: LLVMType::i64,
                 integer:  Box::new(ConstantExpression::Name("foobar".into())),
@@ -175,6 +188,7 @@ mod constant_expression {
         assert!(
             ConstantExpression::parser()
                 .parse("ptr inttoptr i64 1 to ptr)")
+                .into_result()
                 .is_err()
         );
     }
@@ -184,7 +198,8 @@ mod constant_expression {
         // Successes
         assert_eq!(
             ConstantExpression::parser()
-                .parse("ptr blockaddress(@hieratika_test_input, %exit_safe)"),
+                .parse("ptr blockaddress(@hieratika_test_input, %exit_safe)")
+                .into_result(),
             Ok(ConstantExpression::Blockaddress(BlockAddress {
                 function_name: "hieratika_test_input".into(),
                 block_ref:     "exit_safe".into(),
@@ -195,16 +210,19 @@ mod constant_expression {
         assert!(
             ConstantExpression::parser()
                 .parse("ptr blockaddress(@hieratika_test_input, %exit_safe")
+                .into_result()
                 .is_err()
         );
         assert!(
             ConstantExpression::parser()
                 .parse("ptr blockaddress(@hieratika_test_input)")
+                .into_result()
                 .is_err()
         );
         assert!(
             ConstantExpression::parser()
                 .parse("ptr blockaddress(hieratika_test_input, exit_safe)")
+                .into_result()
                 .is_err()
         );
     }

@@ -3639,8 +3639,10 @@ impl ObjectGenerator {
                 // bits of precision. We need to be able to work with constant values of the
                 // i128 type, so we are forced to parse them ourselves in this case.
                 let source_text = value.print_to_string().to_string();
-                let parsed_result =
-                    IntegerConstant::parser().parse(source_text.as_str()).map_err(|_| {
+                let parsed_result = IntegerConstant::parser()
+                    .parse(source_text.as_str())
+                    .into_result()
+                    .map_err(|_| {
                         Error::MalformedLLVM(format!(
                             "`{source_text}` is not a valid integer constant"
                         ))
@@ -3658,6 +3660,7 @@ impl ObjectGenerator {
             // compiler is concerned.
             let constant_expr = ConstantExpression::parser()
                 .parse(constant_expression_fragment.as_str())
+                .into_result()
                 .map_err(|_| {
                     Error::MalformedLLVM(format!(
                         "The expression `{constant_expression_fragment}` is not a valid integer \
@@ -3793,6 +3796,7 @@ impl ObjectGenerator {
             // compiler is concerned.
             let constant_expr = ConstantExpression::parser()
                 .parse(constant_expression_fragment.as_str())
+                .into_result()
                 .map_err(|_| {
                     Error::MalformedLLVM(format!(
                         "The expression `{constant_expression_fragment}` is not a valid pointer \
