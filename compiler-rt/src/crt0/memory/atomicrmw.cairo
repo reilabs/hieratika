@@ -11,3 +11,4 @@ pub mod atomicrmw_umax;
 pub mod atomicrmw_umin;
 pub mod atomicrmw_uinc_wrap;
 pub mod atomicrmw_udec_wrap;
+pub mod atomicrmw_usub_cond;
