@@ -5,6 +5,7 @@ pub mod shl_i16;
 pub mod shl_i24;
 pub mod shl_i32;
 pub mod shl_i40;
+pub mod shl_i48;
 pub mod shl_i64;
 pub mod shl_i128;
 

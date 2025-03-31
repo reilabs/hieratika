@@ -3,7 +3,7 @@ use core::num::traits::BitSize;
 use core::traits::BitAnd;
 use crate::crt0::utils::t_to_buffer;
 use super::get_allocator;
-use crate::integer::{u24::u24, u40::u40};
+use crate::integer::{u24::u24, u40::u40, u48::u48};
 
 /// Store a portion of data at the provided address plus the provided offset. The number of stored
 /// bytes is equal to the size of T. `offset` must be non-negative and must fit in u64.
@@ -34,7 +34,7 @@ mod test {
     use core::num::traits::{BitSize, OverflowingMul};
     use core::traits::{BitOr, BitAnd};
     use core::fmt::Debug;
-    use crate::integer::{u24::u24, u40::u40};
+    use crate::integer::{u24::u24, u40::u40, u48::u48};
     use crate::integer::IntegerOps;
 
     /// Make sure the input array of bytes can be serialized to a single variable of type T.
@@ -90,37 +90,43 @@ mod test {
     }
 
     #[test]
-    /// Load a single u16 variable with the first 2 bytes of memory.
+    /// Store a single u16 variable with the first 2 bytes of memory.
     fn store_u16() {
         test_store_t::<u16>(0x0100);
     }
 
     #[test]
-    /// Load a single u24 variable with the first 3 bytes of memory.
+    /// Store a single u24 variable with the first 3 bytes of memory.
     fn store_u24() {
         test_store_t::<u24>(IntegerOps::new(0x020100));
     }
 
     #[test]
-    /// Load a single u32 variable with the first 4 bytes of memory.
+    /// Store a single u32 variable with the first 4 bytes of memory.
     fn store_u32() {
         test_store_t::<u32>(0x03020100);
     }
 
     #[test]
-    /// Load a single u40 variable with the first 5 bytes of memory.
+    /// Store a single u40 variable with the first 5 bytes of memory.
     fn store_u40() {
         test_store_t::<u40>(IntegerOps::new(0x0403020100));
     }
 
     #[test]
-    /// Load a single u64 variable with the first 8 bytes of memory.
+    /// Store a single u48 variable with the first 5 bytes of memory.
+    fn store_u48() {
+        test_store_t::<u48>(IntegerOps::new(0x050403020100));
+    }
+
+    #[test]
+    /// Store a single u64 variable with the first 8 bytes of memory.
     fn store_u64() {
         test_store_t::<u64>(0x0706050403020100);
     }
 
     #[test]
-    /// Load a single u128 variable with the first 16 bytes of memory.
+    /// Store a single u128 variable with the first 16 bytes of memory.
     fn store_u128() {
         test_store_t::<u128>(0x0f0e0d0c0b0a09080706050403020100);
     }
@@ -147,6 +153,11 @@ pub fn __llvm_store_i_p_l_v(value: u32, address: Address, offset: i64) {
 }
 
 pub fn __llvm_store_n_p_l_v(value: u40, address: Address, offset: i64) {
+    let mut allocator = get_allocator().unbox();
+    store(ref allocator, value, address, offset);
+}
+
+pub fn __llvm_store_k_p_l_v(value: u48, address: Address, offset: i64) {
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }

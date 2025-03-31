@@ -20,6 +20,7 @@ mod tests {
         TestCaseOneArg { arg: 0b110000010000000000000000, expected: 0b1111111111111111110000010000000000000000 },
         TestCaseOneArg { arg: 0b111111110000000000000000, expected: 0b1111111111111111111111110000000000000000 },
     ];
+
     #[test]
     fn test_i24_i40() {
         for case in test_cases.span() {
