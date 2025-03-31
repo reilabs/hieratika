@@ -52,9 +52,7 @@ inkwell = { git = "https://github.com/stevefan1999-personal/inkwell", rev = "0c1
 ] }
 itertools = "0.14.0"
 hieratika-cairoc = { path = "crates/cairoc" }
-hieratika-cli = { path = "crates/cli" }
 hieratika-compiler = { path = "crates/compiler" }
-hieratika-driver = { path = "crates/driver" }
 hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
 hieratika-mangler = { path = "crates/mangler" }

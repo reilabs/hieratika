@@ -112,8 +112,10 @@ fn get_flat_lowered_function(
     }
 }
 
-/// This function returns the `FlatLowered` object of a Cairo program. The
-/// filename can be either a project or a single file.
+/// This function returns the `FlatLowered` object of a Cairo program.
+///
+/// The filename can be either a single file, or a path to a cairo project in
+/// the form of a directory containing a `cairo_project.toml` file.
 ///
 /// # Errors
 ///
@@ -179,7 +181,7 @@ pub fn generate_sierra_all_crates(db: &RootDatabase) -> Result<CrateSierra> {
     generate_sierra(db, crate_ids)
 }
 
-/// Container for Cairo FlatLowered IR an its associated intern db.
+/// Container for Cairo FlatLowered IR and its associated intern db.
 pub struct CairoFlatLowered {
     /// A mapping between external symbol names and their associated Cairo
     /// FlatLowered objects.
@@ -202,6 +204,14 @@ mod test {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
     use crate::{build_db, generate_flat_lowered, generate_sierra};
+
+    #[test]
+    fn can_compile_compiler_rt() -> miette::Result<()> {
+        let compiler_rt_project = Path::new("../../compiler-rt");
+        generate_flat_lowered(compiler_rt_project)?;
+
+        Ok(())
+    }
 
     #[test]
     fn flat_lowered_cairo_example_folder() {
