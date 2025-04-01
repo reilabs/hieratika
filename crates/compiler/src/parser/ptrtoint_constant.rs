@@ -20,7 +20,9 @@ pub struct PtrToIntConstant {
 
 impl PtrToIntConstant {
     /// Creates a parser for `ptrtoint` constant expressions.
-    pub fn parser(child_expr: impl SimpleParser<ConstantExpression>) -> impl SimpleParser<Self> {
+    pub fn parser<'a>(
+        child_expr: impl SimpleParser<'a, ConstantExpression>,
+    ) -> impl SimpleParser<'a, Self> {
         typ::integer()
             .ignore_then(just("ptrtoint").padded_by(whitespace()))
             .ignore_then(Self::ptr_to_t(child_expr).delimited_by(
@@ -31,7 +33,9 @@ impl PtrToIntConstant {
 
     /// Creates a parser for the `ptr x to T` portion of the `ptrtoint` constant
     /// expression.
-    fn ptr_to_t(child_expr: impl SimpleParser<ConstantExpression>) -> impl SimpleParser<Self> {
+    fn ptr_to_t<'a>(
+        child_expr: impl SimpleParser<'a, ConstantExpression>,
+    ) -> impl SimpleParser<'a, Self> {
         just("ptr")
             .padded_by(whitespace())
             .ignore_then(child_expr.padded_by(whitespace()))
@@ -58,7 +62,8 @@ mod test {
         // Successes
         assert_eq!(
             PtrToIntConstant::parser(ConstantExpression::parser())
-                .parse("i8 ptrtoint (ptr @foo to i8)"),
+                .parse("i8 ptrtoint (ptr @foo to i8)")
+                .into_result(),
             Ok(PtrToIntConstant {
                 int_type: LLVMType::i8,
                 pointer:  Box::new(ConstantExpression::Name("foo".into())),
@@ -66,7 +71,8 @@ mod test {
         );
         assert_eq!(
             PtrToIntConstant::parser(ConstantExpression::parser())
-                .parse("i128 ptrtoint (ptr @\"baz$bar\" to i128)"),
+                .parse("i128 ptrtoint (ptr @\"baz$bar\" to i128)")
+                .into_result(),
             Ok(PtrToIntConstant {
                 int_type: LLVMType::i128,
                 pointer:  Box::new(ConstantExpression::Name("baz$bar".into())),
@@ -77,16 +83,19 @@ mod test {
         assert!(
             PtrToIntConstant::parser(ConstantExpression::parser())
                 .parse("i64 ptrtoint (ptr @\"baz$bar\" to i128")
+                .into_result()
                 .is_err()
         );
         assert!(
             PtrToIntConstant::parser(ConstantExpression::parser())
                 .parse("i32 ptrtoint (ptr @\"baz$bar\")")
+                .into_result()
                 .is_err()
         );
         assert!(
             PtrToIntConstant::parser(ConstantExpression::parser())
                 .parse("i16 ptrtoint (@\"baz$bar\" to i128)")
+                .into_result()
                 .is_err()
         );
     }
