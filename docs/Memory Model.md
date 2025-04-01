@@ -41,6 +41,8 @@ like `atomicrmw`. This memory model design is concerned with the core memory pol
 to be able to allocate memory, both on the heap and on the "stack", while also being able to
 manipulate that memory.
 
+### Allocator polyfills
+
 Hieratika defines two polyfills and two _sets of_ polyfills for interacting with memory. The two
 polyfills are as follows:
 
@@ -74,6 +76,45 @@ These families of polyfills are as follows:
 For now, if any of these polyfills fails to operate correctly (such as encountering a load from a
 non-allocated memory region), they panic.
 
+### Additional Memory Polyfills
+
+Hieratika also provides additional memory polyfills to support atomic operations. These include the
+`cmpxchg` and `atomicrmw_*` families of polyfills.
+
+- `fn __llvm_cmpxchg_p_T_T_STcs<T>(address: Address, offset_bytes: i64, expected: T, desired: T) -> (T, bool)`:
+  This polyfill performs an atomic compare-and-exchange operation. It compares the value at the
+  specified memory location with the expected value, and if they are equal, replaces it with the
+  desired value. It returns the original value and a boolean indicating whether the exchange was
+  successful.
+- `fn __llvm_atomicrmw_op_p_T_T_T<T>(address: Address, offset_bytes: i64, value: T) -> T`: This
+  polyfill performs an atomic read-modify-write operation. It loads the value from the specified
+  memory location, performs the specified operation on it, and stores the result back into memory.
+  It returns the original value.
+
+The `atomicrmw_*` family of polyfills supports the following operations:
+
+- `xchg`: Atomically exchange a value in memory with a new value.
+- `add`: Atomically add a value to the value in memory.
+- `sub`: Atomically subtract a value from the value in memory.
+- `and`: Atomically perform a bitwise AND operation.
+- `nand`: Atomically perform a bitwise NAND operation.
+- `or`: Atomically perform a bitwise OR operation.
+- `xor`: Atomically perform a bitwise XOR operation.
+- `max`: Atomically store the greater of the value in memory and a given value (signed comparison).
+- `min`: Atomically store the lesser of the value in memory and a given value (signed comparison).
+- `umax`: Atomically store the greater of the value in memory and a given value (unsigned
+  comparison).
+- `umin`: Atomically store the lesser of the value in memory and a given value (unsigned
+  comparison).
+- `uinc_wrap`: Atomically increment the value in memory, wrapping on overflow.
+- `udec_wrap`: Atomically decrement the value in memory, wrapping on underflow.
+- `usub_cond`: Atomically subtract a value from the value in memory, conditionally storing the
+  result if it is non-negative.
+- `usub_sat`: Atomically subtract a value from the value in memory, saturating at zero.
+
+The `f###` variants (e.g., `fadd`, `fsub`, `fmax`, `fmin`) are not implemented as they operate on
+floating-point types, which are not supported in the current memory model.
+
 ## The Memory Subsystem
 
 The memory subsystem refers to the runtime functionality for managing memory. It is responsible for
@@ -83,9 +124,9 @@ mutable memory semantics to present to the guest code.
 
 ### The Allocator
 
-The allocator is responsible for providing memory to the guest program when requested, as well as
-handling mapping `load`s and `store`s from the LLVM memory semantics to that of the underlying
-memory.
+The `allocator` is a submodule of `crt0` and is responsible for providing memory to the guest
+program when requested, as well as handling mapping `load`s and `store`s from the LLVM memory
+semantics to that of the underlying memory.
 
 - The allocator is based on some [kind](#emulating-mutable-memory-in-cairo) of
   semantically-contiguous buffer that allows it to present an emulation of contiguous memory to the
@@ -99,6 +140,16 @@ memory.
 
 Due to the write-once nature of Cairo's memory, the allocator does _not_ have to handle the freeing
 of memory. On this platform, freeing memory is a no-op.
+
+### The Memory Submodule
+
+The `memory` submodule of `crt0` contains the memory polyfills that provide the runtime operations
+necessary for interacting with memory. These polyfills include:
+
+- `alloc` and `alloca`: For allocating memory on the heap and stack, respectively.
+- `load` and `store`: For reading and writing values to memory.
+- `cmpxchg`: For atomic compare-and-exchange operations.
+- The `atomicrmw_*` family of polyfills: For atomic read-modify-write operations.
 
 ### Emulating Mutable Memory in Cairo
 
