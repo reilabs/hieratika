@@ -1,0 +1,5 @@
+[crate_roots]
+compiler-rt = "src"
+
+[config.global]
+edition = "2024_07" # This must be kept in sync with the `Scarb.toml` file in the same folder.

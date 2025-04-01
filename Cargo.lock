@@ -1450,8 +1450,8 @@ dependencies = [
  "cairo-lang-sierra-generator",
  "cairo-lang-utils",
  "hieratika-errors",
- "hieratika-flo",
  "itertools 0.14.0",
+ "miette",
  "rayon",
 ]
 
