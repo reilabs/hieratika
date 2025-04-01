@@ -131,8 +131,8 @@ type. For example this IR snippet:
 ```
 
 must be mapped to the following implementation: `__llvm_ptrtoint_p_to_l`, where `p` and `l` are
-symbols used by the [name mangling scheme](#name-mangling-scheme) to represent a pointer and a
-signed 64-bit integer.
+symbols used by the [name mangling scheme](./Name%20Mangling.md) to represent a pointer and a signed
+64-bit integer.
 
 #### Vectors
 
@@ -290,41 +290,7 @@ bits 127 to N-2. For example:
 
 #### Name mangling scheme
 
-Types of arguments and the return type are encoded in the name of a polyfill in the form of symbols.
-The symbols are defined as follows:
-
-| Type            | Symbol |
-| --------------- | ------ |
-| Void            | `v`    |
-| Bool            | `c`    |
-| Enum            | `e`    |
-| Unsigned8       | `B`    |
-| Unsigned16      | `H`    |
-| Unsigned32      | `I`    |
-| Unsigned64      | `Q`    |
-| Unsigned128     | `O`    |
-| Signed8         | `b`    |
-| Signed16        | `z`    |
-| Signed24        | `x`    |
-| Signed32        | `i`    |
-| Signed40        | `n`    |
-| Signed48        | `k`    |
-| Signed64        | `l`    |
-| Signed128       | `o`    |
-| WeaklyTypedFelt | `w`    |
-| Half            | `h`    |
-| Float           | `f`    |
-| Double          | `d`    |
-| Quad            | `q`    |
-| Pointer         | `p`    |
-
-Examples:
-
-| Description                                     | Example                |
-| ----------------------------------------------- | ---------------------- |
-| Accept i8, return i8                            | `__llvm_name_b_b`      |
-| Accpept two i128, return i128                   | `__llvm_name_o_o_o`    |
-| Accept two i24, return a struct of i64 and bool | `__llvm_name_x_x_Slcs` |
+The mangling scheme is described in a [dedicated document](Name%20Mangling.md).
 
 #### Instruction Polyfills
 
