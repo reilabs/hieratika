@@ -98,6 +98,7 @@ pub fn mangle_type(typ: &Type) -> Result<String> {
         Type::Signed48 => "k",
         Type::Signed64 => "l",
         Type::Signed128 => "o",
+        Type::Signed256 => "y",
         Type::WeaklyTypedFelt => "w",
         Type::Half => "h",
         Type::Float => "f",

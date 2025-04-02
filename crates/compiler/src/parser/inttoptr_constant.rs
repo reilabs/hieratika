@@ -3,7 +3,6 @@
 use chumsky::{
     Parser,
     prelude::{choice, just},
-    text::whitespace,
 };
 
 use crate::{
@@ -30,18 +29,16 @@ pub struct IntToPtrConstant {
 
 impl IntToPtrConstant {
     /// Creates a parser for `inttoptr` constant expressions with `child_expr`
-    /// expressions allowed in the
+    /// expressions allowed in expression positions.
     pub fn parser<'a>(
         child_expr: impl SimpleParser<'a, ConstantExpression>,
     ) -> impl SimpleParser<'a, Self> {
         just("ptr")
-            .ignore_then(just("inttoptr").padded_by(whitespace()))
+            .ignore_then(just("inttoptr").padded())
             .ignore_then(choice((
-                Self::t_lit_to_ptr()
-                    .padded_by(whitespace())
-                    .delimited_by(just("("), just(")")),
+                Self::t_lit_to_ptr().padded().delimited_by(just("("), just(")")),
                 Self::t_expr_to_ptr(child_expr)
-                    .padded_by(whitespace())
+                    .padded()
                     .delimited_by(just("("), just(")")),
             )))
     }
@@ -50,9 +47,9 @@ impl IntToPtrConstant {
     /// where `v` is a literal integer.
     fn t_lit_to_ptr<'a>() -> impl SimpleParser<'a, Self> {
         typ::integer()
-            .padded_by(whitespace())
-            .then(number::integer::<i128>(10).padded_by(whitespace()))
-            .then_ignore(Self::literal_to_ptr().padded_by(whitespace()))
+            .padded()
+            .then(number::integer::<i128>(10).padded())
+            .then_ignore(Self::literal_to_ptr().padded())
             .map(|(source_type, integer_value)| Self {
                 int_type: source_type.clone(),
                 integer:  Box::new(ConstantExpression::Integer(IntegerConstant {
@@ -68,9 +65,9 @@ impl IntToPtrConstant {
         child_expr: impl SimpleParser<'a, ConstantExpression>,
     ) -> impl SimpleParser<'a, Self> {
         typ::integer()
-            .padded_by(whitespace())
-            .then(child_expr.padded_by(whitespace()))
-            .then_ignore(Self::literal_to_ptr().padded_by(whitespace()))
+            .padded()
+            .then(child_expr.padded())
+            .then_ignore(Self::literal_to_ptr().padded())
             .map(|(source_type, integer_expr)| Self {
                 int_type: source_type.clone(),
                 integer:  Box::new(integer_expr),
@@ -80,10 +77,7 @@ impl IntToPtrConstant {
     /// Creates a parser for the `to ptr` portion of the `inttoptr` constant
     /// expression.
     fn literal_to_ptr<'a>() -> impl SimpleParser<'a, ()> {
-        just("to")
-            .padded_by(whitespace())
-            .ignore_then(just("ptr").padded_by(whitespace()))
-            .ignored()
+        just("to").padded().ignore_then(just("ptr").padded()).ignored()
     }
 }
 

@@ -485,12 +485,8 @@ impl PolyfillMap {
     }
 
     fn getelementptr(&mut self) {
-        // This takes a pointer to an aggregate (either an array or a struct), and the
-        // offset (in felts) within that pointer that corresponds to the target element.
-        // It then returns a pointer to that element.
-        //
-        // This can only work at a single level, and so any usage needs to decompose
-        // this.
+        // This takes a pointer and the offset in bytes from that pointer that
+        // corresponds to the new pointer.
         self.mk(
             "getelementptr",
             &[LLVMType::ptr, LLVMType::i64],
@@ -1318,6 +1314,7 @@ impl PolyfillMap {
             LLVMType::i48,
             LLVMType::i64,
             LLVMType::i128,
+            LLVMType::i256,
         ]
     }
 
@@ -1400,7 +1397,7 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1561);
+        assert_eq!(count, 1714);
     }
 
     #[test]

@@ -85,6 +85,9 @@ pub enum LLVMType {
     /// The 128-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
     i128,
 
+    /// The 256-bit wide [integer type](https://llvm.org/docs/LangRef.html#integer-type).
+    i256,
+
     /// The IEEE-754 `binary16` [floating point type](https://llvm.org/docs/LangRef.html#floating-point-types).
     f16,
 
@@ -214,6 +217,7 @@ impl LLVMType {
                 | Self::i48
                 | Self::i64
                 | Self::i128
+                | Self::i256
         )
     }
 
@@ -258,6 +262,7 @@ impl LLVMType {
             LLVMType::i48 => 48,
             LLVMType::i64 => 64,
             LLVMType::i128 => 128,
+            LLVMType::i256 => 256,
             LLVMType::f16 => 16,
             LLVMType::f32 => 32,
             LLVMType::f64 => 64,
@@ -358,6 +363,10 @@ impl LLVMType {
                 AlignType::ABI => data_layout.int_spec_of(128).abi_alignment,
                 AlignType::Preferred => data_layout.int_spec_of(128).preferred_alignment,
             },
+            LLVMType::i256 => match align_type {
+                AlignType::ABI => data_layout.int_spec_of(256).abi_alignment,
+                AlignType::Preferred => data_layout.int_spec_of(256).preferred_alignment,
+            },
             LLVMType::f16 => match align_type {
                 AlignType::ABI => data_layout.expect_float_spec_of(16).abi_alignment,
                 AlignType::Preferred => data_layout.expect_float_spec_of(16).preferred_alignment,
@@ -410,6 +419,7 @@ impl Display for LLVMType {
             LLVMType::i48 => "i48".to_string(),
             LLVMType::i64 => "i64".to_string(),
             LLVMType::i128 => "i128".to_string(),
+            LLVMType::i256 => "i256".to_string(),
             LLVMType::f16 => "f16".to_string(),
             LLVMType::f32 => "f32".to_string(),
             LLVMType::f64 => "f64".to_string(),
@@ -550,6 +560,7 @@ impl<'ctx> TryFrom<&IntType<'ctx>> for LLVMType {
             48 => Self::i48,
             64 => Self::i64,
             128 => Self::i128,
+            256 => Self::i256,
             _ => Err(Error::UnsupportedType(value.to_string()))?,
         };
 
@@ -742,9 +753,20 @@ impl LLVMArray {
     /// outside the bounds of the array, as this is not an uncommon usage for
     /// LLVM Array types.
     #[must_use]
-    pub fn offset_of_element_at(&self, index: usize, data_layout: &DataLayout) -> usize {
-        let element_size = self.typ.size_of(data_layout);
+    pub fn offset_of_element_at(&self, index: i128, data_layout: &DataLayout) -> i128 {
+        let element_size = self.typ.size_of(data_layout) as i128;
         element_size * index
+    }
+
+    /// Calculates the offset in bytes of the element at the provided `index` in
+    /// the array `self` under the provided data layout.
+    ///
+    /// Note that this method will happily calculate element offsets that are
+    /// outside the bounds of the array, as this is not an uncommon usage for
+    /// LLVM Array types.
+    #[must_use]
+    pub fn offset_of_element_at_bytes(&self, index: i128, data_layout: &DataLayout) -> i128 {
+        self.offset_of_element_at(index, data_layout) / BYTE_SIZE_BITS as i128
     }
 }
 
@@ -922,7 +944,7 @@ impl LLVMStruct {
     ///
     /// - If the index is not within the bounds of the structure.
     #[must_use]
-    pub fn offset_of_element_at(&self, index: usize, data_layout: &DataLayout) -> usize {
+    pub fn offset_of_element_at(&self, index: usize, data_layout: &DataLayout) -> i128 {
         // We cannot compute the offset at all if the index exceeds the number of
         // elements in the structure.
         assert!(
@@ -955,7 +977,18 @@ impl LLVMStruct {
             current_offset += element.alloc_size_of(data_layout);
         }
 
-        current_offset
+        current_offset as i128
+    }
+
+    /// Calculates the offset in bytes of the element at the provided `index` in
+    /// the struct `self` under the provided data layout.
+    ///
+    /// # Panics
+    ///
+    /// - If the index is not within the bounds of the structure.
+    #[must_use]
+    pub fn offset_of_element_at_bytes(&self, index: usize, data_layout: &DataLayout) -> i128 {
+        self.offset_of_element_at(index, data_layout) / BYTE_SIZE_BITS as i128
     }
 }
 

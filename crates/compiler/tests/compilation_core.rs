@@ -10,8 +10,8 @@ fn compiles_core() -> miette::Result<()> {
     let compiler = common::default_compiler_from_path("input/compilation/core.ll")?;
     let flo = compiler.run()?;
 
-    // There should be 2678 functions in the context.
-    assert_eq!(common::count_functions(&flo, false), 2678);
+    // There should be 2812 functions in the context.
+    assert_eq!(common::count_functions(&flo, false), 2812);
 
     Ok(())
 }

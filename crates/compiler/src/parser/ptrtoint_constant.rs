@@ -1,6 +1,6 @@
 //! A parser for the `ptrtoint` constant expression.
 
-use chumsky::{Parser, prelude::just, text::whitespace};
+use chumsky::{Parser, prelude::just};
 
 use crate::{
     llvm::typesystem::LLVMType,
@@ -23,12 +23,9 @@ impl PtrToIntConstant {
     pub fn parser<'a>(
         child_expr: impl SimpleParser<'a, ConstantExpression>,
     ) -> impl SimpleParser<'a, Self> {
-        typ::integer()
-            .ignore_then(just("ptrtoint").padded_by(whitespace()))
-            .ignore_then(Self::ptr_to_t(child_expr).delimited_by(
-                just("(").padded_by(whitespace()),
-                just(")").padded_by(whitespace()),
-            ))
+        typ::integer().ignore_then(just("ptrtoint").padded()).ignore_then(
+            Self::ptr_to_t(child_expr).delimited_by(just("(").padded(), just(")").padded()),
+        )
     }
 
     /// Creates a parser for the `ptr x to T` portion of the `ptrtoint` constant
@@ -37,10 +34,10 @@ impl PtrToIntConstant {
         child_expr: impl SimpleParser<'a, ConstantExpression>,
     ) -> impl SimpleParser<'a, Self> {
         just("ptr")
-            .padded_by(whitespace())
-            .ignore_then(child_expr.padded_by(whitespace()))
-            .then_ignore(just("to").padded_by(whitespace()))
-            .then(typ::integer().padded_by(whitespace()))
+            .padded()
+            .ignore_then(child_expr.padded())
+            .then_ignore(just("to").padded())
+            .then(typ::integer().padded())
             .map(|(ptr_expr, target_type)| Self {
                 int_type: target_type,
                 pointer:  Box::new(ptr_expr),

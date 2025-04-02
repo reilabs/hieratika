@@ -843,6 +843,7 @@ mod test {
     };
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn can_parse_data_layout() {
         let dl_string = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
 
@@ -864,13 +865,16 @@ mod test {
         assert_eq!(layout.alloc_address_space, 0);
 
         // Pointers in address space zero are aligned to 64 bits.
-        assert_eq!(layout.pointer_layouts, vec![PointerLayout {
-            address_space:       0,
-            size:                64,
-            abi_alignment:       64,
-            preferred_alignment: 64,
-            index_size:          64,
-        }]);
+        assert_eq!(
+            layout.pointer_layouts,
+            vec![PointerLayout {
+                address_space:       0,
+                size:                64,
+                abi_alignment:       64,
+                preferred_alignment: 64,
+                index_size:          64,
+            }]
+        );
 
         // Integers are semi-customized, with 8, 16, 64, and 128 using layouts specified
         // in the string
@@ -940,21 +944,30 @@ mod test {
         }));
 
         // For the aggregate layout we have the default
-        assert_eq!(layout.aggregate_layout, AggregateLayout {
-            abi_alignment:       0,
-            preferred_alignment: 64,
-        });
+        assert_eq!(
+            layout.aggregate_layout,
+            AggregateLayout {
+                abi_alignment:       0,
+                preferred_alignment: 64,
+            }
+        );
 
         // For the function pointer layout we also have our default
-        assert_eq!(layout.function_pointer_layout, FunctionPointerLayout {
-            ptr_type:      FunctionPointerType::Independent,
-            abi_alignment: 64,
-        });
+        assert_eq!(
+            layout.function_pointer_layout,
+            FunctionPointerLayout {
+                ptr_type:      FunctionPointerType::Independent,
+                abi_alignment: 64,
+            }
+        );
 
         // For native integer widths this string specifies 32, 64
-        assert_eq!(layout.native_integer_widths, NativeIntegerWidths {
-            widths: vec![32, 64],
-        });
+        assert_eq!(
+            layout.native_integer_widths,
+            NativeIntegerWidths {
+                widths: vec![32, 64],
+            }
+        );
 
         // And no address spaces should be using non-integral pointers
         assert_eq!(
@@ -966,6 +979,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn can_parse_data_layout_to_default() {
         let dl_string = "";
 
@@ -987,13 +1001,16 @@ mod test {
         assert_eq!(layout.alloc_address_space, 0);
 
         // Pointers in address space zero are aligned to 64 bits.
-        assert_eq!(layout.pointer_layouts, vec![PointerLayout {
-            address_space:       0,
-            size:                64,
-            abi_alignment:       64,
-            preferred_alignment: 64,
-            index_size:          64,
-        }]);
+        assert_eq!(
+            layout.pointer_layouts,
+            vec![PointerLayout {
+                address_space:       0,
+                size:                64,
+                abi_alignment:       64,
+                preferred_alignment: 64,
+                index_size:          64,
+            }]
+        );
 
         // All the integer layouts should be default
         assert!(layout.integer_layouts.contains(&IntegerLayout {
@@ -1057,21 +1074,30 @@ mod test {
         }));
 
         // For the aggregate layout we have the default
-        assert_eq!(layout.aggregate_layout, AggregateLayout {
-            abi_alignment:       0,
-            preferred_alignment: 64,
-        });
+        assert_eq!(
+            layout.aggregate_layout,
+            AggregateLayout {
+                abi_alignment:       0,
+                preferred_alignment: 64,
+            }
+        );
 
         // For the function pointer layout we also have our default
-        assert_eq!(layout.function_pointer_layout, FunctionPointerLayout {
-            ptr_type:      FunctionPointerType::Independent,
-            abi_alignment: 64,
-        });
+        assert_eq!(
+            layout.function_pointer_layout,
+            FunctionPointerLayout {
+                ptr_type:      FunctionPointerType::Independent,
+                abi_alignment: 64,
+            }
+        );
 
         // For native integer widths we should have the default
-        assert_eq!(layout.native_integer_widths, NativeIntegerWidths {
-            widths: vec![32, 64],
-        });
+        assert_eq!(
+            layout.native_integer_widths,
+            NativeIntegerWidths {
+                widths: vec![32, 64],
+            }
+        );
 
         // And no address spaces should be using non-integral pointers
         assert_eq!(
