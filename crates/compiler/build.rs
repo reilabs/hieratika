@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 /// The environment variable that we get the input files from.
 const SOURCE_FILE_ENV_VAR: &str = "RUST_TEST_INPUTS";
 
-/// The target directory in the project where the artefacts should end up.
+/// The target directory in the project where the artifacts should end up.
 const TARGET_DIR: &str = "input/compilation";
 
 /// Executes to copy the compilation inputs into the correct place in the build
@@ -11,6 +11,7 @@ const TARGET_DIR: &str = "input/compilation";
 #[allow(clippy::permissions_set_readonly_false)] // We do not care if it is world-writable
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=inputs/compilation");
 
     // We do want to continue if they are missing, at least for compilation.
     let env_val = std::env::var(SOURCE_FILE_ENV_VAR).unwrap_or("".into());

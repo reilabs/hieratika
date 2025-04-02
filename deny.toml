@@ -105,7 +105,6 @@ exceptions = [
   { crate = "indent", allow = ["MPL-2.0"] },
   { crate = "is_ci", allow = ["ISC"] },
   { crate = "subtle", allow = ["BSD-3-Clause"] },
-  { crate = "tiny-keccak", allow = ["CC0-1.0"] },
   { crate = "unescaper", allow = ["MIT"] },
   { crate = "unicode-ident", allow = ["Unicode-3.0"] },
 ]

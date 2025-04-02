@@ -667,7 +667,6 @@ impl FlatLoweredTranslator<'_> {
             TypeLongId::GenericParameter(_param) => Err(Error::UnsupportedTypeError.into()),
             TypeLongId::Var(_var) => Err(Error::UnsupportedTypeError.into()),
             TypeLongId::ImplType(_impl) => Err(Error::UnsupportedTypeError.into()),
-            TypeLongId::TraitType(_trait) => Err(Error::UnsupportedTypeError.into()),
             TypeLongId::Closure(_closure) => Err(Error::UnsupportedTypeError.into()),
             TypeLongId::Missing(_missing) => Err(Error::UnsupportedTypeError.into()),
         }
