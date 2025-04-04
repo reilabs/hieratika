@@ -24,3 +24,4 @@ pub mod load;
 pub mod store;
 pub mod cmpxchg;
 pub mod atomicrmw;
+pub mod getelementptr;
