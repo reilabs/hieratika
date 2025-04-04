@@ -10,8 +10,8 @@ fn compiles_compiler_builtins() -> miette::Result<()> {
     let compiler = common::default_compiler_from_path("input/compilation/compiler_builtins.ll")?;
     let flo = compiler.run()?;
 
-    // There should be 1408 functions in the context.
-    assert_eq!(common::count_functions(&flo, false), 1408);
+    // There should be 2490 functions in the context.
+    assert_eq!(common::count_functions(&flo, false), 2490);
 
     Ok(())
 }

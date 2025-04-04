@@ -29,6 +29,15 @@
     additionalCargoLock = rust-src + "/lib/rustlib/src/rust/library/Cargo.lock";
 
     copyTarget = true;
+    compressTarget = false;
+
+    # HACK(ktemkin): naersk currently uses our instructions to emit LLVM IR to emit its own "dummy-src"
+    # LLVM-IR. We'll remove things that refer to it.
+    preFixup = ''
+        for i in $(grep -ril '/dummy-src' $out); do
+            rm "$i"
+        done
+    '';
   };
 
   fd' = lib.concatStringsSep " " [
@@ -38,7 +47,7 @@
   ];
 in stdenvNoCC.mkDerivation (self: {
   name = "rust-test-input-llvm-ir";
-  src = targetDir + "/target.tar.zst";
+  src = targetDir;
 
   strictDeps = true;
   __structuredAttrs = true;
@@ -66,7 +75,7 @@ in stdenvNoCC.mkDerivation (self: {
     for llName in "''${desiredLlFiles[@]}"; do
       ${fd'} -t f \
         "^$llName-.+\.ll$" \
-        -x cp --no-preserve=mode "{}" "$out/$llName.ll";
+        -x cp -n --no-preserve=mode "{}" "$out/$llName.ll";
     done
 
     runHook postInstall

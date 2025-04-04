@@ -5,7 +5,6 @@ use chumsky::{
     Parser,
     prelude::{choice, just},
     recursive,
-    text::whitespace,
 };
 
 use crate::{
@@ -23,6 +22,7 @@ pub fn integer<'a>() -> impl crate::parser::SimpleParser<'a, LLVMType> {
         just("16").to(LLVMType::i16),
         just("1").to(LLVMType::bool),
         just("8").to(LLVMType::i8),
+        just("256").to(LLVMType::i256),
         just("24").to(LLVMType::i24),
         just("32").to(LLVMType::i32),
         just("48").to(LLVMType::i48),
@@ -54,11 +54,11 @@ pub fn array<'a>(
     child_type: impl crate::parser::SimpleParser<'a, LLVMType>,
 ) -> impl crate::parser::SimpleParser<'a, LLVMArray> {
     just("[")
-        .padded_by(whitespace())
-        .ignore_then(positive_integer(10).padded_by(whitespace()))
-        .then_ignore(just("x").padded_by(whitespace()))
-        .then(child_type.padded_by(whitespace()))
-        .then_ignore(just("]").padded_by(whitespace()))
+        .padded()
+        .ignore_then(positive_integer(10).padded())
+        .then_ignore(just("x").padded())
+        .then(child_type.padded())
+        .then_ignore(just("]").padded())
         .map(|(count, typ)| LLVMArray::new(count, typ))
 }
 
@@ -67,10 +67,7 @@ pub fn array<'a>(
 fn struct_body<'a>(
     child_type: impl crate::parser::SimpleParser<'a, LLVMType>,
 ) -> impl crate::parser::SimpleParser<'a, Vec<LLVMType>> {
-    child_type
-        .padded_by(whitespace())
-        .separated_by(just(","))
-        .collect::<Vec<_>>()
+    child_type.padded().separated_by(just(",")).collect::<Vec<_>>()
 }
 
 /// Parses a packed struct type from the LLVM IR source text.
@@ -79,9 +76,9 @@ pub fn packed_struct<'a>(
     child_type: impl crate::parser::SimpleParser<'a, LLVMType>,
 ) -> impl crate::parser::SimpleParser<'a, LLVMStruct> {
     just("<{")
-        .padded_by(whitespace())
+        .padded()
         .ignore_then(struct_body(child_type))
-        .then_ignore(just("}>").padded_by(whitespace()))
+        .then_ignore(just("}>").padded())
         .map(|types| LLVMStruct::packed(&types))
 }
 
@@ -91,9 +88,9 @@ pub fn unpacked_struct<'a>(
     child_type: impl crate::parser::SimpleParser<'a, LLVMType>,
 ) -> impl crate::parser::SimpleParser<'a, LLVMStruct> {
     just("{")
-        .padded_by(whitespace())
+        .padded()
         .ignore_then(struct_body(child_type))
-        .then_ignore(just("}").padded_by(whitespace()))
+        .then_ignore(just("}").padded())
         .map(|types| LLVMStruct::unpacked(&types))
 }
 
@@ -104,8 +101,8 @@ pub fn any_struct<'a>(
     child_type: impl crate::parser::SimpleParser<'a, LLVMType>,
 ) -> impl crate::parser::SimpleParser<'a, LLVMStruct> {
     choice((
-        packed_struct(child_type.clone()).padded_by(whitespace()),
-        unpacked_struct(child_type).padded_by(whitespace()),
+        packed_struct(child_type.clone()).padded(),
+        unpacked_struct(child_type).padded(),
     ))
 }
 

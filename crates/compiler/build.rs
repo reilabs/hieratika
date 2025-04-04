@@ -10,6 +10,8 @@ const TARGET_DIR: &str = "input/compilation";
 /// directory if they do not exist.
 #[allow(clippy::permissions_set_readonly_false)] // We do not care if it is world-writable
 fn main() {
+    println!("cargo:rerun-if-changed=../../flake.lock");
+    println!("cargo:rerun-if-changed=../../flake.nix");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=inputs/compilation");
 
@@ -45,6 +47,7 @@ fn main() {
                 .permissions();
             perms.set_readonly(false);
             fs::set_permissions(&target_path, perms.clone()).expect("Could not set permissions");
+            fs::remove_file(&target_path).expect("Could not remove existing file");
         }
 
         // Actually copy the file.

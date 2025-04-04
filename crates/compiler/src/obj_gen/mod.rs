@@ -1438,7 +1438,7 @@ impl ObjectGenerator {
                         let bits_before_index = struct_type
                             .offset_of_element_at(gep_index_value, self.get_data_layout());
                         let const_offset = bb.simple_assign_new_const(ConstantValue {
-                            value: bits_before_index as u128,
+                            value: u128::from_le_bytes(bits_before_index.to_le_bytes()),
                             typ:   Type::Signed64,
                         });
 
@@ -1450,9 +1450,11 @@ impl ObjectGenerator {
                         };
 
                         // We then call the GEP polyfill...
-                        bb.simple_call_builtin(gep, vec![current_ptr_var, const_offset], vec![
-                            result_id,
-                        ]);
+                        bb.simple_call_builtin(
+                            gep,
+                            vec![current_ptr_var, const_offset],
+                            vec![result_id],
+                        );
 
                         // ...and update our state variables.
                         current_ptr_var = result_id;
@@ -1476,9 +1478,11 @@ impl ObjectGenerator {
                         } else {
                             bb.add_variable(Type::Pointer)
                         };
-                        bb.simple_call_builtin(gep, vec![current_ptr_var, actual_offset], vec![
-                            result_id,
-                        ]);
+                        bb.simple_call_builtin(
+                            gep,
+                            vec![current_ptr_var, actual_offset],
+                            vec![result_id],
+                        );
 
                         // Then we update our state variables, assigning the source type to our
                         // current type and the output of the top-level gep
@@ -1564,7 +1568,7 @@ impl ObjectGenerator {
         typ: &LLVMType,
         stored_value: VariableId,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         #[allow(clippy::enum_glob_use)]
@@ -1573,7 +1577,8 @@ impl ObjectGenerator {
         // primitive types (the numerics and pointers). To that end, we have to handle
         // the store differently based on the type being stored.
         match &typ {
-            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | f128 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | i256 | f16 | f32 | f64
+            | f128 | ptr => {
                 self.store_primitive(typ, stored_value, pointer, initial_offset, bb)?;
             }
             Array(array_type) => {
@@ -1612,7 +1617,7 @@ impl ObjectGenerator {
         typ: &LLVMType,
         stored_value: VariableId,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         assert!(
@@ -1624,7 +1629,7 @@ impl ObjectGenerator {
         // constant for that offset. As this constant is purely used once, we never add
         // it to the function context.
         let offset = bb.simple_assign_new_const(ConstantValue {
-            value: initial_offset as u128,
+            value: u128::from_le_bytes(initial_offset.to_le_bytes()),
             typ:   Type::Signed64,
         });
 
@@ -1654,7 +1659,7 @@ impl ObjectGenerator {
         struct_type: &LLVMStruct,
         struct_value: VariableId,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         // As we can only store primitive types, we have to pull the struct apart, piece
@@ -1701,7 +1706,7 @@ impl ObjectGenerator {
         array_type: &LLVMArray,
         array_value: VariableId,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         // As we can only store primitive types, we have to pull the array apart, piece
@@ -1726,7 +1731,8 @@ impl ObjectGenerator {
 
         for (ix, element) in array_elements.into_iter().enumerate() {
             self.store_value(array_elem_type, element, pointer, accumulated_offset, bb)?;
-            accumulated_offset = array_type.offset_of_element_at(ix, self.get_data_layout());
+            accumulated_offset =
+                array_type.offset_of_element_at(ix as i128, self.get_data_layout());
         }
 
         // There is nothing to return, so we are done.
@@ -1802,14 +1808,15 @@ impl ObjectGenerator {
         target: VariableId,
         typ: &LLVMType,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         #[allow(clippy::enum_glob_use)]
         use LLVMType::*;
 
         match &typ {
-            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | f16 | f32 | f64 | f128 | ptr => {
+            bool | i8 | i16 | i24 | i32 | i40 | i48 | i64 | i128 | i256 | f16 | f32 | f64
+            | f128 | ptr => {
                 self.load_primitive_into(target, typ, pointer, initial_offset, bb)?;
             }
             Array(array_type) => {
@@ -1851,7 +1858,7 @@ impl ObjectGenerator {
         target: VariableId,
         typ: &LLVMType,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         assert!(
@@ -1863,7 +1870,7 @@ impl ObjectGenerator {
         // constant for that offset. As this constant is purely used once, we never add
         // it to the function context.
         let offset = bb.simple_assign_new_const(ConstantValue {
-            value: initial_offset as u128,
+            value: u128::from_le_bytes(initial_offset.to_le_bytes()),
             typ:   Type::Signed64,
         });
 
@@ -1893,7 +1900,7 @@ impl ObjectGenerator {
         target: VariableId,
         struct_type: &LLVMStruct,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         // We need to track the offset from the pointer as we load elements.
@@ -1940,7 +1947,7 @@ impl ObjectGenerator {
         target: VariableId,
         array_type: &LLVMArray,
         pointer: VariableId,
-        initial_offset: usize,
+        initial_offset: i128,
         bb: &mut BlockBuilder,
     ) -> Result<()> {
         let mut accumulated_offset = initial_offset;
@@ -1959,7 +1966,8 @@ impl ObjectGenerator {
 
             // We always have to finish by incrementing the offset by the size of the thing
             // we just loaded so that the next load proceeds correctly.
-            accumulated_offset = array_type.offset_of_element_at(ix, self.get_data_layout());
+            accumulated_offset =
+                array_type.offset_of_element_at(ix as i128, self.get_data_layout());
         }
 
         // In FLO, we do not have any first-class array type, so arrays are structures
@@ -2139,9 +2147,11 @@ impl ObjectGenerator {
         bb.add_fence(ordering);
 
         // Finally, we can generate the call to the appropriate polyfill.
-        bb.simple_call_builtin(polyfill_name, vec![pointer_op_id, numeric_op_id], vec![
-            return_var,
-        ]);
+        bb.simple_call_builtin(
+            polyfill_name,
+            vec![pointer_op_id, numeric_op_id],
+            vec![return_var],
+        );
 
         // And we have to fence after it as well.
         bb.add_fence(ordering);
@@ -3891,8 +3901,9 @@ impl ObjectGenerator {
     /// Processes the provided constant `expression` into a program fragment in
     /// FLO.
     ///
-    /// It returns an optional [`VariableId`]. If set, this indicates that the
-    /// input `variable` should instead be replaced by the returned variable.
+    /// It returns a [`VariableId`] that indicates the target variable that was
+    /// written to. This can **differ** from the provided `variable` under some
+    /// circumstances so should always be used to replace it.
     ///
     /// Note that we do not process these expressions at compile time for now,
     /// instead generating runtime code for them. This makes it easier to
@@ -3902,6 +3913,11 @@ impl ObjectGenerator {
     ///
     /// - [`Error::MalformedLLVM`] if any variable referenced by the
     ///   `expression` is not defined before its usage.
+    ///
+    /// # Panics
+    ///
+    /// - If a GEP index is out of bounds for a struct type.
+    #[expect(clippy::too_many_lines)]
     pub fn build_constant_expression_into(
         &self,
         variable: VariableId,
@@ -4005,6 +4021,79 @@ impl ObjectGenerator {
                     })?;
 
                 bb.simple_get_internal_block_address(variable, *block_id);
+
+                Ok(variable)
+            }
+            ConstantExpression::GetElementPtr(gep_constant) => {
+                // We start by getting the source type over which the GEP instruction is
+                // operating.
+                let source_type = gep_constant.pointee_type.clone();
+
+                // The pointer in the constant must always exist statically, meaning that it is
+                // a global value of some kind. To that end, we can look it up in the function
+                // context, and fail if it is unknown.
+                let base_pointer = func_ctx.try_lookup_variable(&gep_constant.pointer_name)?;
+
+                // Then we have our indices, which are all constant expressions at this stage,
+                // so we are guaranteed to be able to compute the offset statically.
+                let mut current_type_in_stack = source_type;
+                let mut accumulated_offset: i128 = 0;
+                for IntegerConstant { value, .. } in &gep_constant.offsets {
+                    // Calculating this is type-dependent, so we dispatch on the current type in the
+                    // stack of types to offset into.
+                    match &current_type_in_stack {
+                        // We cannot do negative indices in structs
+                        #[expect(clippy::cast_sign_loss)]
+                        LLVMType::Structure(struct_type) => {
+                            let bytes_before_index = struct_type.offset_of_element_at_bytes(
+                                *value as usize,
+                                self.get_data_layout(),
+                            );
+                            accumulated_offset += bytes_before_index;
+
+                            current_type_in_stack = struct_type
+                                .elements
+                                .get(*value as usize)
+                                .expect("Struct element was not in bounds")
+                                .clone();
+                        }
+                        LLVMType::Array(array_type) => {
+                            let bytes_before_index = array_type
+                                .offset_of_element_at_bytes(*value, self.get_data_layout());
+                            accumulated_offset += bytes_before_index;
+                            current_type_in_stack = array_type.typ.as_ref().clone();
+                        }
+                        _ => {
+                            // For all other types we simply just offset by the
+                            // type size.
+                            let type_size =
+                                current_type_in_stack.alloc_size_of_bytes(self.get_data_layout());
+                            accumulated_offset += type_size as i128 * *value;
+                        }
+                    }
+                }
+
+                // Here, accumulated_offset contains the offset from the base pointer, but we
+                // don't know how that pointer is going to be used, or its value, so we have to
+                // calculate the offset at runtime using the gep polyfill.
+                let accumulated_offset_id = bb.simple_assign_new_const(ConstantValue {
+                    value: u128::from_le_bytes(accumulated_offset.to_le_bytes()),
+                    typ:   Type::Signed64,
+                });
+
+                // We then need the GEP polyfill itself.
+                let gep = self.polyfills.try_get_polyfill(
+                    "getelementptr",
+                    &[LLVMType::ptr, LLVMType::i64],
+                    &LLVMType::ptr,
+                )?;
+
+                // Finally we issue the call into the provided variable.
+                bb.simple_call_builtin(
+                    gep,
+                    vec![base_pointer, accumulated_offset_id],
+                    vec![variable],
+                );
 
                 Ok(variable)
             }

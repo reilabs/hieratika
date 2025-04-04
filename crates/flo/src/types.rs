@@ -555,6 +555,7 @@ pub enum Type {
     Signed48,
     Signed64,
     Signed128,
+    Signed256,
 
     // Type for working with Cairo's built-in felt.
     // This is the only type considered weak -- it can accept or be assigned to any integer type.

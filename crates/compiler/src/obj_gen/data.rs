@@ -302,6 +302,7 @@ impl ObjectContext {
             LLVMType::i48 => Type::Signed48,
             LLVMType::i64 => Type::Signed64,
             LLVMType::i128 => Type::Signed128,
+            LLVMType::i256 => Type::Signed256,
             LLVMType::f16 => Type::Half,
             LLVMType::f32 => Type::Float,
             LLVMType::f64 => Type::Double,

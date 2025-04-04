@@ -6,12 +6,12 @@ use chumsky::{
     Parser,
     prelude::{any, choice, just},
     recursive,
-    text::whitespace,
 };
 
 use crate::parser::{
     SimpleParser,
-    block_address::BlockAddress,
+    block_address::BlockAddressConstant,
+    getelementptr_constant::GetElementPtrConstant,
     integer_constant::IntegerConstant,
     inttoptr_constant::IntToPtrConstant,
     ptrtoint_constant::PtrToIntConstant,
@@ -38,7 +38,10 @@ pub enum ConstantExpression {
     IntToPtr(IntToPtrConstant),
 
     /// A `blockaddress` constant expression.
-    Blockaddress(BlockAddress),
+    Blockaddress(BlockAddressConstant),
+
+    /// A `getelementptr` constant expression.
+    GetElementPtr(GetElementPtrConstant),
 }
 
 impl ConstantExpression {
@@ -47,15 +50,12 @@ impl ConstantExpression {
     pub fn parser<'a>() -> impl SimpleParser<'a, Self> {
         recursive::recursive(|parser| {
             choice((
-                Self::constant_name().map(Self::Name).padded_by(whitespace()),
-                IntegerConstant::parser().map(Self::Integer).padded_by(whitespace()),
-                PtrToIntConstant::parser(parser.clone())
-                    .map(Self::PtrToInt)
-                    .padded_by(whitespace()),
-                IntToPtrConstant::parser(parser)
-                    .map(Self::IntToPtr)
-                    .padded_by(whitespace()),
-                BlockAddress::parser().map(Self::Blockaddress).padded_by(whitespace()),
+                Self::constant_name().map(Self::Name).padded(),
+                IntegerConstant::parser().map(Self::Integer).padded(),
+                PtrToIntConstant::parser(parser.clone()).map(Self::PtrToInt).padded(),
+                IntToPtrConstant::parser(parser).map(Self::IntToPtr).padded(),
+                BlockAddressConstant::parser().map(Self::Blockaddress).padded(),
+                GetElementPtrConstant::parser().map(Self::GetElementPtr).padded(),
             ))
         })
     }
@@ -98,7 +98,8 @@ mod constant_expression {
     use crate::{
         llvm::typesystem::LLVMType,
         parser::{
-            block_address::BlockAddress,
+            block_address::BlockAddressConstant,
+            getelementptr_constant::GetElementPtrConstant,
             integer_constant::IntegerConstant,
             inttoptr_constant::IntToPtrConstant,
             ptrtoint_constant::PtrToIntConstant,
@@ -200,7 +201,7 @@ mod constant_expression {
             ConstantExpression::parser()
                 .parse("ptr blockaddress(@hieratika_test_input, %exit_safe)")
                 .into_result(),
-            Ok(ConstantExpression::Blockaddress(BlockAddress {
+            Ok(ConstantExpression::Blockaddress(BlockAddressConstant {
                 function_name: "hieratika_test_input".into(),
                 block_ref:     "exit_safe".into(),
             }))
@@ -224,6 +225,33 @@ mod constant_expression {
                 .parse("ptr blockaddress(hieratika_test_input, exit_safe)")
                 .into_result()
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn can_parse_getelementptr_constant() {
+        // Successes
+        assert_eq!(
+            GetElementPtrConstant::parser()
+                .parse("ptr getelementptr inbounds nuw (i32, ptr @constptr, i64 8)")
+                .into_result(),
+            Ok(GetElementPtrConstant {
+                pointee_type: LLVMType::i32,
+                pointer_name: "constptr".into(),
+                offsets:      vec![IntegerConstant::new(LLVMType::i64, 8)],
+            })
+        );
+
+        // Failures
+        assert!(
+            GetElementPtrConstant::parser()
+                .parse("ptr getelementptr i32, ptr @constptr, i64 8)")
+                .has_errors()
+        );
+        assert!(
+            GetElementPtrConstant::parser()
+                .parse("ptr getelementptr (ptr @constptr, i64 8)")
+                .has_errors()
         );
     }
 }
