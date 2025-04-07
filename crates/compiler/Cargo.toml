@@ -18,6 +18,7 @@ bimap.workspace = true
 chumsky = "0.10.0"
 downcast-rs = "2.0.1"
 ethnum.workspace = true
+hieratika-cairoc.workspace = true
 hieratika-errors.workspace = true
 hieratika-flo.workspace = true
 hieratika-mangler.workspace = true

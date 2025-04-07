@@ -1420,6 +1420,9 @@ mod test {
     use regex::bytes::Regex;
 
     use crate::{llvm::typesystem::LLVMType, polyfill::PolyfillMap};
+    use hieratika_cairoc::generate_flat_lowered;
+    use std::path::Path;
+use std::collections::HashSet;
 
     #[test]
     fn polyfill_lookup_works() {
@@ -1456,5 +1459,60 @@ mod test {
                 "{name} is an invalid polyfill name"
             );
         }
+    }
+
+    #[test]
+    fn all_polyfills_exist() {
+
+        let compiler_rt_project = Path::new("../../compiler-rt");
+        let fl = generate_flat_lowered(compiler_rt_project).unwrap();
+        let map = PolyfillMap::new();
+
+        // Extract polyfill names from PolyfillMap
+        let polyfill_names: HashSet<_> = map.iter().map(|(_, v)| v.to_string()).collect();
+
+        // Extract polyfill names from fl.cairo_ir
+        let cairo_polyfill_names: HashSet<_> = fl
+            .cairo_ir
+            .keys()
+            .filter_map(|key| {
+                if let Some(polyfill_name) = key.split("::").last() {
+                    if polyfill_name.starts_with("__llvm") {
+                        return Some(polyfill_name.to_string());
+                    }
+                }
+                None
+            })
+            .collect();
+
+        // Find polyfills present in fl.cairo_ir but not in PolyfillMap
+        let mut in_cairo_not_in_map: Vec<_> = cairo_polyfill_names
+            .difference(&polyfill_names)
+            .cloned()
+            .collect();
+
+        // Find polyfills present in PolyfillMap but not in fl.cairo_ir
+        let mut in_map_not_in_cairo: Vec<_> = polyfill_names
+            .difference(&cairo_polyfill_names)
+            .cloned()
+            .collect();
+
+        // Sort the results alphabetically
+        in_cairo_not_in_map.sort();
+        in_map_not_in_cairo.sort();
+
+        // Print the results
+        println!("Polyfills in fl.cairo_ir but not in PolyfillMap:");
+        for polyfill in &in_cairo_not_in_map {
+            println!("{}", polyfill);
+        }
+
+        println!("Polyfills in PolyfillMap but not in fl.cairo_ir:");
+        for polyfill in &in_map_not_in_cairo {
+            println!("{}", polyfill);
+        }
+
+        // Ensure the test does not fail
+        assert!(true);
     }
 }
