@@ -98,6 +98,22 @@ macro_rules! unary_intrinsic {
             }
         }
     };
+    ($name:ident, $tys:expr) => {
+        fn $name(&mut self) {
+            let base_name = format!("llvm.{}", stringify!($name));
+            for typ in $tys {
+                let name = format!("{base_name}.{typ}");
+                let arg_types = &[typ.clone()];
+                let op = LLVMOperation::of(&name, arg_types, &typ);
+
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &typ);
+
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
+            }
+        }
+    };
 }
 
 /// Generates a binary intrinsic with the provided `name` and with a type
@@ -1027,7 +1043,20 @@ impl PolyfillMap {
 impl PolyfillMap {
     unary_intrinsic!(bitreverse, integer_types);
 
-    unary_intrinsic!(bswap, integer_types);
+    // As per the LLVM Language reference:
+    //  You can use bswap on any integer type that is an even number of bytes (i.e.
+    // BitWidth % 16 == 0).
+    unary_intrinsic!(
+        bswap,
+        vec![
+            LLVMType::i16,
+            LLVMType::i32,
+            LLVMType::i48,
+            LLVMType::i64,
+            LLVMType::i128,
+            LLVMType::i256
+        ]
+    );
 
     unary_intrinsic!(ctpop, integer_types);
 
@@ -1411,7 +1440,7 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1714);
+        assert_eq!(count, 1710);
     }
 
     #[test]
