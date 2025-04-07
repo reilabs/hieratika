@@ -459,7 +459,7 @@ impl PolyfillMap {
         for typ in Self::intptr_types() {
             self.mk(
                 "cmpxchg",
-                &[LLVMType::ptr, typ.clone(), typ.clone()],
+                &[LLVMType::ptr, LLVMType::i64, typ.clone(), typ.clone()],
                 &LLVMType::make_struct(false, &[typ.clone(), LLVMType::bool]),
             );
         }
