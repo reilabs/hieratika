@@ -719,8 +719,6 @@ impl PolyfillMap {
 
 /// The definition of the [C/C++ library intrinsics](https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics).
 impl PolyfillMap {
-    binary_intrinsic!(abs, integer_types);
-
     binary_intrinsic!(smax, integer_types);
 
     binary_intrinsic!(smin, integer_types);
@@ -796,6 +794,22 @@ impl PolyfillMap {
     unary_intrinsic!(round, float_types);
 
     unary_intrinsic!(roundeven, float_types);
+
+    fn abs(&mut self) {
+        let base_name = "llvm.abs".to_string();
+        for typ in Self::integer_types() {
+            let name = format!("{base_name}.{typ}");
+            let arg_types = &[typ.clone(), LLVMType::bool];
+            let return_type = typ.clone();
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
+
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
+
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
+        }
+    }
 
     fn memop(&mut self, name: &str) {
         let base_name = format!("llvm.{name}.p0.p0");
