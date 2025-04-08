@@ -683,6 +683,28 @@ impl PolyfillMap {
         }
     }
 
+    fn bitcast(&mut self) {
+        let base_name = "bitcast";
+        for source_ty in Self::integer_types() {
+            for target_ty in Self::integer_types() {
+                if target_ty < source_ty {
+                    // integer_types are ordered from the shortest to the longest, so this
+                    // comparison can work. We cannot have bitcast from a larger
+                    // type to a smaller type. The target type must be able
+                    // to hold the source type.
+                    continue;
+                }
+                let op = LLVMOperation::of(base_name, &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
+                let name = format!("__llvm_{base_name}_{source_ty}_to_{target_ty}");
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
+            }
+        }
+    }
+
     fn all_conversion_ops(&mut self) {
         self.trunc_op();
         self.zext();
@@ -695,6 +717,7 @@ impl PolyfillMap {
         self.sitofp();
         self.ptrtoint();
         self.inttoptr();
+        self.bitcast();
     }
 }
 
@@ -1440,7 +1463,7 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1710);
+        assert_eq!(count, 1765);
     }
 
     #[test]
