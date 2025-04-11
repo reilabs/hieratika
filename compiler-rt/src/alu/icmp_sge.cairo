@@ -1,3 +1,4 @@
+pub mod icmp_sge_i1;
 pub mod icmp_sge_i8;
 pub mod icmp_sge_i16;
 pub mod icmp_sge_i24;

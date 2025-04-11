@@ -1,3 +1,4 @@
+pub mod umax_i1;
 pub mod umax_i8;
 pub mod umax_i16;
 pub mod umax_i24;

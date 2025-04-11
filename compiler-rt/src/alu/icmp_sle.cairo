@@ -1,3 +1,4 @@
+pub mod icmp_sle_i1;
 pub mod icmp_sle_i8;
 pub mod icmp_sle_i16;
 pub mod icmp_sle_i24;

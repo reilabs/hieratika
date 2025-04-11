@@ -1,3 +1,4 @@
+pub mod urem_i1;
 pub mod urem_i8;
 pub mod urem_i16;
 pub mod urem_i24;

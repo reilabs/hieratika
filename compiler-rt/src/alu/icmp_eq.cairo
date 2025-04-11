@@ -1,3 +1,4 @@
+pub mod icmp_eq_i1;
 pub mod icmp_eq_i8;
 pub mod icmp_eq_i16;
 pub mod icmp_eq_i24;

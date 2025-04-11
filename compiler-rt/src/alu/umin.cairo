@@ -1,3 +1,4 @@
+pub mod umin_i1;
 pub mod umin_i8;
 pub mod umin_i16;
 pub mod umin_i24;

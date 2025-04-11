@@ -1,3 +1,4 @@
+pub mod scmp_i1;
 pub mod scmp_i8;
 pub mod scmp_i16;
 pub mod scmp_i24;

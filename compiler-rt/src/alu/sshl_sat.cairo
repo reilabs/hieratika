@@ -1,3 +1,4 @@
+pub mod sshl_sat_i1;
 pub mod sshl_sat_i8;
 pub mod sshl_sat_i16;
 pub mod sshl_sat_i24;

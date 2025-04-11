@@ -1,3 +1,4 @@
+pub mod ushl_sat_i1;
 pub mod ushl_sat_i8;
 pub mod ushl_sat_i16;
 pub mod ushl_sat_i24;

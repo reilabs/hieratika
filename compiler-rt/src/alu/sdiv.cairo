@@ -1,3 +1,4 @@
+pub mod sdiv_i1;
 pub mod sdiv_i8;
 pub mod sdiv_i16;
 pub mod sdiv_i24;

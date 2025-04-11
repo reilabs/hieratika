@@ -1,3 +1,4 @@
+pub mod mul_i1;
 pub mod mul_i8;
 pub mod mul_i16;
 pub mod mul_i24;
