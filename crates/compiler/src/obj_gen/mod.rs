@@ -2020,9 +2020,10 @@ impl ObjectGenerator {
              present",
         ))?;
 
-        // We then need to get the operands to the instruction, which should have three.
-        // The first is a pointer to a value of some type T, the second and third are
-        // both values of type T. The pointer is loaded and compared to the first value
+        // We then need to get the operands to the instruction, which should have four.
+        // The first is a pointer to a value of some type T, the second is the i64
+        // offset added to the pointer, the third and fourth are both values of
+        // type T. The pointer plus offset is loaded and compared to the first value
         // of type T. If the values are the same, the second value of type T is written
         // to the pointer.
         let &[pointer, compare_to, replace_with] = instruction
@@ -2049,7 +2050,7 @@ impl ObjectGenerator {
             LLVMType::make_struct(false, &[compare_to_typ.clone(), LLVMType::bool]);
         let polyfill_name = self.polyfills.try_get_polyfill(
             "cmpxchg",
-            &[pointer_typ, compare_to_typ, replace_with_typ],
+            &[pointer_typ, LLVMType::i64, compare_to_typ, replace_with_typ],
             &target_type_llvm,
         )?;
 

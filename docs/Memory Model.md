@@ -81,7 +81,7 @@ non-allocated memory region), they panic.
 Hieratika also provides additional memory polyfills to support atomic operations. These include the
 `cmpxchg` and `atomicrmw_*` families of polyfills.
 
-- `fn __llvm_cmpxchg_p_T_T_STcs<T>(address: Address, offset_bytes: i64, expected: T, desired: T) -> (T, bool)`:
+- `fn __llvm_cmpxchg_p_l_T_T_STcs<T>(address: Address, offset_bytes: i64, expected: T, desired: T) -> (T, bool)`:
   This polyfill performs an atomic compare-and-exchange operation. It compares the value at the
   specified memory location with the expected value, and if they are equal, replaces it with the
   desired value. It returns the original value and a boolean indicating whether the exchange was

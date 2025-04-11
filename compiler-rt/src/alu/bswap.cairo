@@ -1,7 +1,5 @@
 pub mod bswap_i16;
-pub mod bswap_i24;
 pub mod bswap_i32;
-pub mod bswap_i40;
 pub mod bswap_i48;
 pub mod bswap_i64;
 pub mod bswap_i128;

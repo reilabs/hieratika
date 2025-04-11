@@ -190,56 +190,56 @@ mod test {
     }
 }
 
-pub fn __llvm_cmpxchg_p_b_b_Sbcs(
+pub fn __llvm_cmpxchg_p_l_b_b_Sbcs(
     address: Address, offset: i64, expected_value: u8, new_value: u8,
 ) -> (u8, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u8>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_z_z_Szcs(
+pub fn __llvm_cmpxchg_p_l_z_z_Szcs(
     address: Address, offset: i64, expected_value: u16, new_value: u16,
 ) -> (u16, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u16>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_x_x_Sxcs(
+pub fn __llvm_cmpxchg_p_l_x_x_Sxcs(
     address: Address, offset: i64, expected_value: u24, new_value: u24,
 ) -> (u24, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u24>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_i_i_Sics(
+pub fn __llvm_cmpxchg_p_l_i_i_Sics(
     address: Address, offset: i64, expected_value: u32, new_value: u32,
 ) -> (u32, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u32>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_n_n_Sncs(
+pub fn __llvm_cmpxchg_p_l_n_n_Sncs(
     address: Address, offset: i64, expected_value: u40, new_value: u40,
 ) -> (u40, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u40>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_k_k_Skcs(
+pub fn __llvm_cmpxchg_p_l_k_k_Skcs(
     address: Address, offset: i64, expected_value: u48, new_value: u48,
 ) -> (u48, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u48>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_l_l_Slcs(
+pub fn __llvm_cmpxchg_p_l_l_l_Slcs(
     address: Address, offset: i64, expected_value: u64, new_value: u64,
 ) -> (u64, bool) {
     let mut allocator = get_allocator().unbox();
     cmpxchg::<u64>(ref allocator, address, offset, expected_value, new_value)
 }
 
-pub fn __llvm_cmpxchg_p_o_o_Socs(
+pub fn __llvm_cmpxchg_p_l_o_o_Socs(
     address: Address, offset: i64, expected_value: u128, new_value: u128,
 ) -> (u128, bool) {
     let mut allocator = get_allocator().unbox();
