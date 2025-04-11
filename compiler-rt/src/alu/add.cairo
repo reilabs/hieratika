@@ -1,3 +1,4 @@
+pub mod add_i1;
 pub mod add_i8;
 pub mod add_i16;
 pub mod add_i24;
