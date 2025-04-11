@@ -1,3 +1,4 @@
+pub mod srem_i1;
 pub mod srem_i8;
 pub mod srem_i16;
 pub mod srem_i24;

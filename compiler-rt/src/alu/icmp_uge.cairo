@@ -1,3 +1,4 @@
+pub mod icmp_uge_i1;
 pub mod icmp_uge_i8;
 pub mod icmp_uge_i16;
 pub mod icmp_uge_i24;

@@ -1,3 +1,4 @@
+pub mod sadd_sat_i1;
 pub mod sadd_sat_i8;
 pub mod sadd_sat_i16;
 pub mod sadd_sat_i24;

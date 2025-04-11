@@ -1,3 +1,4 @@
+pub mod umul_with_overflow_i1;
 pub mod umul_with_overflow_i8;
 pub mod umul_with_overflow_i16;
 pub mod umul_with_overflow_i24;
