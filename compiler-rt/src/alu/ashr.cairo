@@ -1,3 +1,4 @@
+pub mod ashr_i1;
 pub mod ashr_i8;
 pub mod ashr_i16;
 pub mod ashr_i24;
