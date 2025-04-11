@@ -1,3 +1,4 @@
+pub mod abs_i1;
 pub mod abs_i8;
 pub mod abs_i16;
 pub mod abs_i24;
