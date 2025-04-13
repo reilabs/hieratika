@@ -98,6 +98,22 @@ macro_rules! unary_intrinsic {
             }
         }
     };
+    ($name:ident, $tys:expr) => {
+        fn $name(&mut self) {
+            let base_name = format!("llvm.{}", stringify!($name));
+            for typ in $tys {
+                let name = format!("{base_name}.{typ}");
+                let arg_types = &[typ.clone()];
+                let op = LLVMOperation::of(&name, arg_types, &typ);
+
+                let polyfill_name = Self::polyfill_name(&base_name, arg_types, &typ);
+
+                self.mapping
+                    .insert_no_overwrite(op, polyfill_name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
+            }
+        }
+    };
 }
 
 /// Generates a binary intrinsic with the provided `name` and with a type
@@ -667,6 +683,28 @@ impl PolyfillMap {
         }
     }
 
+    fn bitcast(&mut self) {
+        let base_name = "bitcast";
+        for source_ty in Self::integer_types() {
+            for target_ty in Self::integer_types() {
+                if target_ty < source_ty {
+                    // integer_types are ordered from the shortest to the longest, so this
+                    // comparison can work. We cannot have bitcast from a larger
+                    // type to a smaller type. The target type must be able
+                    // to hold the source type.
+                    continue;
+                }
+                let op = LLVMOperation::of(base_name, &[source_ty.clone()], &target_ty);
+                let source_ty = Self::mangle(&source_ty);
+                let target_ty = Self::mangle(&target_ty);
+                let name = format!("__llvm_{base_name}_{source_ty}_to_{target_ty}");
+                self.mapping
+                    .insert_no_overwrite(op, name)
+                    .expect(POLYFILL_REPLACED_IN_MAPPING);
+            }
+        }
+    }
+
     fn all_conversion_ops(&mut self) {
         self.trunc_op();
         self.zext();
@@ -679,6 +717,7 @@ impl PolyfillMap {
         self.sitofp();
         self.ptrtoint();
         self.inttoptr();
+        self.bitcast();
     }
 }
 
@@ -719,8 +758,6 @@ impl PolyfillMap {
 
 /// The definition of the [C/C++ library intrinsics](https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics).
 impl PolyfillMap {
-    binary_intrinsic!(abs, integer_types);
-
     binary_intrinsic!(smax, integer_types);
 
     binary_intrinsic!(smin, integer_types);
@@ -796,6 +833,22 @@ impl PolyfillMap {
     unary_intrinsic!(round, float_types);
 
     unary_intrinsic!(roundeven, float_types);
+
+    fn abs(&mut self) {
+        let base_name = "llvm.abs".to_string();
+        for typ in Self::integer_types() {
+            let name = format!("{base_name}.{typ}");
+            let arg_types = &[typ.clone(), LLVMType::bool];
+            let return_type = typ.clone();
+            let op = LLVMOperation::of(&name, arg_types, &return_type);
+
+            let polyfill_name = Self::polyfill_name(&base_name, arg_types, &return_type);
+
+            self.mapping
+                .insert_no_overwrite(op, polyfill_name)
+                .expect(POLYFILL_REPLACED_IN_MAPPING);
+        }
+    }
 
     fn memop(&mut self, name: &str) {
         let base_name = format!("llvm.{name}.p0.p0");
@@ -1013,7 +1066,20 @@ impl PolyfillMap {
 impl PolyfillMap {
     unary_intrinsic!(bitreverse, integer_types);
 
-    unary_intrinsic!(bswap, integer_types);
+    // As per the LLVM Language reference:
+    //  You can use bswap on any integer type that is an even number of bytes (i.e.
+    // BitWidth % 16 == 0).
+    unary_intrinsic!(
+        bswap,
+        vec![
+            LLVMType::i16,
+            LLVMType::i32,
+            LLVMType::i48,
+            LLVMType::i64,
+            LLVMType::i128,
+            LLVMType::i256
+        ]
+    );
 
     unary_intrinsic!(ctpop, integer_types);
 
@@ -1397,7 +1463,7 @@ mod test {
     fn has_correct_polyfill_count() {
         let polyfills = PolyfillMap::new();
         let count = polyfills.iter().count();
-        assert_eq!(count, 1714);
+        assert_eq!(count, 1765);
     }
 
     #[test]
