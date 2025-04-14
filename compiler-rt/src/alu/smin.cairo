@@ -1,3 +1,4 @@
+pub mod smin_i1;
 pub mod smin_i8;
 pub mod smin_i16;
 pub mod smin_i24;
