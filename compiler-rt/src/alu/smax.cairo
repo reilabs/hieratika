@@ -1,3 +1,4 @@
+pub mod smax_i1;
 pub mod smax_i8;
 pub mod smax_i16;
 pub mod smax_i24;
@@ -13,7 +14,7 @@ use core::num::traits::{BitSize, Bounded, OverflowingSub};
 
 // Perform the `smax` operation.
 //
-// Return the larger of the two unsigned values.
+// Return the larger of the two signed values.
 //
 // This is a generic implementation for every data type. Its specialized versions
 // are defined and tested in the smax/smax_<type>.cairo files.
