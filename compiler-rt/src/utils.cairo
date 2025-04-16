@@ -1,20 +1,20 @@
 use core::num::traits::{BitSize, WrappingAdd, Zero, One};
 use core::traits::{Copy, PartialEq, BitAnd, BitNot, BitOr, Sub};
 
-// Indicated the direction of overflow in polyfills implementing arithmetic operations that can
-// overflow.
+/// Indicated the direction of overflow in polyfills implementing arithmetic operations that can
+/// overflow.
 #[derive(Drop)]
 pub enum OverflowDirection {
     Overflow,
     Underflow,
 }
 
-// Wrapper over .try_into() for types that don't implement Into. Panics if try_into() returns
-// Option::None.
-//
-// This check is used multiple times throughout the project, so it is marked as #[inline] to hint
-// to the compiler that, if possible, it should not emit a call to this function but instead
-// insert its body directly into the caller.
+/// Wrapper over .try_into() for types that don't implement Into. Panics if try_into() returns
+/// Option::None.
+///
+/// This check is used multiple times throughout the project, so it is marked as #[inline] to hint
+/// to the compiler that, if possible, it should not emit a call to this function but instead
+/// insert its body directly into the caller.
 #[inline]
 pub fn expect_into<
     T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>,
@@ -30,12 +30,12 @@ pub fn expect_into<
     res
 }
 
-// Make sure the value `v` can be safely downcast into type `T`, panicking if this is not
-// possible.
-//
-// This check is used multiple times throughout the project, so it is marked as #[inline] to hint
-// to the compiler that, if possible, it should not emit a call to this function but instead
-// insert its body directly into the caller.
+/// Make sure the value `v` can be safely downcast into type `T`, panicking if this is not
+/// possible.
+///
+/// This check is used multiple times throughout the project, so it is marked as #[inline] to hint
+/// to the compiler that, if possible, it should not emit a call to this function but instead
+/// insert its body directly into the caller.
 #[inline]
 pub fn assert_fits_in_type<
     T, impl TBitSize: BitSize<T>, impl TTryInto: TryInto<u128, T>, impl TDestruct: Destruct<T>,
@@ -45,17 +45,17 @@ pub fn assert_fits_in_type<
     expect_into::<T>(v);
 }
 
-// Negates the given value using two's complement representation.
+/// Negates the given value using two's complement representation.
 #[inline]
 pub fn negate_twos_complement(value: u128) -> u128 {
     (~value).wrapping_add(1)
 }
 
-// Performs sign extension.
-//
-// Some polyfills emulate operations with signed integers using unsigned integers.
-// When casting an integer to a wider width it's important to set the new MSBs to the correct value
-// using sign-extention operations.
+/// Performs sign extension.
+///
+/// Some polyfills emulate operations with signed integers using unsigned integers. When casting an
+/// integer to a wider width it's important to set the new MSBs to the correct value using
+/// sign-extension operations.
 pub fn extend_sign<
     T,
     +PartialEq<T>,
@@ -78,5 +78,16 @@ pub fn extend_sign<
         sign_ext_bit_mask | value
     } else {
         value
+    }
+}
+
+/// Causes the runtime to panic if the provided `condition` is not true.
+///
+/// It takes an `index` to better identify where the panic arose as we do not
+/// have an easy method of passing strings between Cairo and LLVM IR at the
+/// current time.
+pub fn __hieratika_assert(condition: bool, index: u128) {
+    if !condition {
+        panic!("{index}")
     }
 }
