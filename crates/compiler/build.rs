@@ -13,13 +13,14 @@ fn main() {
     println!("cargo:rerun-if-changed=../../flake.lock");
     println!("cargo:rerun-if-changed=../../flake.nix");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=inputs/compilation");
 
     // We do want to continue if they are missing, at least for compilation.
     let env_val = std::env::var(SOURCE_FILE_ENV_VAR).unwrap_or("".into());
     if env_val.is_empty() {
         return;
     }
+
+    println!("cargo:rerun-if-changed={env_val}");
 
     // Grab our path
     let path = Path::new(&env_val);
