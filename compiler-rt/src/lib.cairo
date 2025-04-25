@@ -1,4 +1,4 @@
 pub mod alu;
 pub mod crt0;
 pub mod integer;
-mod utils;
+pub mod utils;

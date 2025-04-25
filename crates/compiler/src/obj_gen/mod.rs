@@ -2962,10 +2962,7 @@ impl ObjectGenerator {
         else {
             Err(operand_count_error(&instruction, 1))?
         };
-
-        // If this is not an integer then the previous stages should have caught
-        // malformed IR.
-        let alloc_count = util::expect_int_from_bv(raw_alloc_count);
+        let alloc_count = self.get_var_or_const(&raw_alloc_count, bb, func_ctx)?;
 
         // We need a block reference, which here is guaranteed to be to a polyfill.
         let call_ref = self.polyfills.try_get_polyfill(
@@ -2977,10 +2974,6 @@ impl ObjectGenerator {
         // We also need arguments and returns with their types.
         let alloc_size = bb.simple_assign_new_const(ConstantValue {
             value: type_size as u128,
-            typ:   Type::Unsigned64,
-        });
-        let alloc_count = bb.simple_assign_new_const(ConstantValue {
-            value: u128::from(alloc_count),
             typ:   Type::Unsigned64,
         });
         let return_val = util::get_opcode_output(&instruction, func_ctx)?;
