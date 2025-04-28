@@ -7,6 +7,7 @@ pub mod icmp_ne_i40;
 pub mod icmp_ne_i48;
 pub mod icmp_ne_i64;
 pub mod icmp_ne_i128;
+pub mod icmp_ne_ptr;
 
 use crate::utils::assert_fits_in_type;
 use core::num::traits::{BitSize, Bounded};
