@@ -1,0 +1,32 @@
+[package]
+name = "hieratika-emitter"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+authors.workspace = true
+description = "Tool to lift Cairo FlatLowered into a Heiratika FLO."
+keywords.workspace = true
+categories.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+cairo-lang-compiler.workspace = true
+cairo-lang-defs = { path = "../../cairo/crates/cairo-lang-defs" }
+cairo-lang-diagnostics = { path = "../../cairo/crates/cairo-lang-diagnostics" }
+cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
+cairo-lang-lowering.workspace = true
+cairo-lang-semantic = { path = "../../cairo/crates/cairo-lang-semantic" }
+cairo-lang-sierra = { path = "../../cairo/crates/cairo-lang-sierra" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+cairo-lang-sierra-generator.workspace = true
+hieratika-lifter.workspace = true
+hieratika-compiler.workspace = true
+itertools.workspace = true
+hieratika-cairoc.workspace = true
+hieratika-flo.workspace = true
+hieratika-errors.workspace = true
+hieratika-lowerer.workspace = true

@@ -1575,6 +1575,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "hieratika-emitter"
+version = "0.1.0"
+dependencies = [
+ "cairo-lang-compiler",
+ "cairo-lang-defs",
+ "cairo-lang-diagnostics",
+ "cairo-lang-filesystem",
+ "cairo-lang-lowering",
+ "cairo-lang-semantic",
+ "cairo-lang-sierra",
+ "cairo-lang-sierra-generator",
+ "cairo-lang-utils",
+ "hieratika-cairoc",
+ "hieratika-compiler",
+ "hieratika-errors",
+ "hieratika-flo",
+ "hieratika-lifter",
+ "hieratika-lowerer",
+ "itertools 0.14.0",
+]
+
+[[package]]
 name = "hieratika-errors"
 version = "0.1.0"
 dependencies = [
@@ -1612,6 +1634,25 @@ dependencies = [
  "hieratika-compiler",
  "hieratika-errors",
  "hieratika-flo",
+]
+
+[[package]]
+name = "hieratika-lowerer"
+version = "0.1.0"
+dependencies = [
+ "bimap",
+ "cairo-lang-compiler",
+ "cairo-lang-defs",
+ "cairo-lang-diagnostics",
+ "cairo-lang-filesystem",
+ "cairo-lang-lowering",
+ "cairo-lang-semantic",
+ "cairo-lang-utils",
+ "hieratika-cairoc",
+ "hieratika-compiler",
+ "hieratika-errors",
+ "hieratika-flo",
+ "itertools 0.14.0",
 ]
 
 [[package]]
