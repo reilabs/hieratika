@@ -1229,10 +1229,12 @@ impl ObjectGenerator {
 
             // This should never fail by construction, so we bail with an error if somehow
             // it is.
-            let (mut next_extraction_var, next_extraction_type) =
-                output_variables.get(index).ok_or(Error::MalformedLLVM(format!(
+            let (mut next_extraction_var, next_extraction_type) = output_variables
+                .get(index)
+                .ok_or(Error::MalformedLLVM(format!(
                     "ExtractValue encountered with out-of-bounds index {index}"
-                )))?;
+                )))?
+                .clone();
 
             if count == num_indices - 1 {
                 next_extraction_var = target_var;
@@ -1247,7 +1249,7 @@ impl ObjectGenerator {
 
             // Finally, we update our state variables for the next iteration.
             current_extraction_var = next_extraction_var;
-            current_extraction_type = (*next_extraction_type).clone();
+            current_extraction_type = next_extraction_type.clone();
         }
 
         // We are done!
@@ -1275,7 +1277,7 @@ impl ObjectGenerator {
         func_ctx: &mut FunctionContext,
     ) -> Result<()> {
         fn compute_offset_const_type_size(
-            gen: &ObjectGenerator,
+            generator: &ObjectGenerator,
             gep_index: &BasicValueEnum,
             typ: &LLVMType,
             bb: &mut BlockBuilder,
@@ -1320,7 +1322,7 @@ impl ObjectGenerator {
                     &[LLVMType::i64, LLVMType::i64],
                     &LLVMType::i64,
                 )?;
-                let gep_index_offset = gen.get_var_or_const(gep_index, bb, func_ctx)?;
+                let gep_index_offset = generator.get_var_or_const(gep_index, bb, func_ctx)?;
                 let actual_offset = bb.add_variable(Type::Signed64);
                 bb.simple_call_builtin(
                     mul_func,
@@ -1597,7 +1599,7 @@ impl ObjectGenerator {
                 "Encountered a Store instruction attempting to store a value of type {typ}, but \
                  this is not valid"
             )))?,
-        };
+        }
 
         Ok(())
     }
@@ -1835,7 +1837,7 @@ impl ObjectGenerator {
                 "Encountered a Load instruction attempting to load a value of type {typ}, but \
                  this is not valid"
             )))?,
-        };
+        }
 
         Ok(())
     }

@@ -3,7 +3,6 @@
 //! [`hieratika_cairoc`] crate and the [`hieratika_compiler`] crate.
 
 #![warn(clippy::all, clippy::cargo, clippy::pedantic)]
-#![expect(clippy::module_name_repetitions)] // Allows for better API naming
 
 use std::process;
 
