@@ -242,7 +242,6 @@ mod test {
     #[test]
     fn sierra_pipeline_simple_sum() {
         let filename = Path::new("test_data/add.cairo");
-
         let compiler_config = CompilerConfig {
             replace_ids: true,
             ..Default::default()

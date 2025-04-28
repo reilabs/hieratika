@@ -21,6 +21,12 @@ pub trait Poisonable {
 
     /// Returns whether the given value is poisoned.
     fn is_poisoned(value: &Self) -> bool;
+
+    /// Returns true iff the given value is poisoned with unused.
+    fn is_unused(value: &Self) -> bool;
+
+    /// Returns true iff the given value is poisoned with unreachable.
+    fn is_unreachable(value: &Self) -> bool;
 }
 
 // Helpers for generating types that can be poisoned.
@@ -38,6 +44,14 @@ macro_rules! make_struct_poisonable {
             fn is_poisoned(value: &Self) -> bool {
                 PoisonType::is_poisoned(&value.poison)
             }
+
+            fn is_unused(value: &Self) -> bool {
+                PoisonType::is_unused(&value.poison)
+            }
+
+            fn is_unreachable(value: &Self) -> bool {
+                PoisonType::is_unreachable(&value.poison)
+            }
         }
     };
 }
@@ -52,6 +66,14 @@ macro_rules! make_enum_explicitly_poisonable {
             fn is_poisoned(value: &Self) -> bool {
                 matches!(value, Self::Poisoned(_))
             }
+
+            fn is_unused(value: &Self) -> bool {
+                matches!(value, Self::Poisoned(PoisonType::Unused))
+            }
+
+            fn is_unreachable(value: &Self) -> bool {
+                matches!(value, Self::Poisoned(PoisonType::Unreachable))
+            }
         }
     };
 }
@@ -65,6 +87,14 @@ macro_rules! make_enum_default_poisonable {
 
             fn is_poisoned(value: &Self) -> bool {
                 matches!(value, Self::Unspecified) || matches!(value, Self::Poisoned(_))
+            }
+
+            fn is_unused(value: &Self) -> bool {
+                matches!(value, Self::Poisoned(PoisonType::Unused))
+            }
+
+            fn is_unreachable(value: &Self) -> bool {
+                matches!(value, Self::Poisoned(PoisonType::Unreachable))
             }
         }
     };

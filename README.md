@@ -1,5 +1,27 @@
 # Hieratika: Compiling LLVM to CairoVM
 
+> ### Project Status: Demo
+>
+> The Hieratika project as it currently stands is a **demo**. It can currently execute small LLVM IR
+> programs—including those generated from [C code](./demo/fib.c)—that involve both immediates and
+> mutable memory. We believe it is **promising** but it definitely **needs work**. Please reach out
+> to [hi@reilabs.io](mailto:hi@reilabs.io) if you'd like to help out!
+>
+> To experiment with what Hieratika is currently capable of executing, take a look at our
+> [`Makefile`](./Makefile). This makefile provides three options.
+>
+> - The `handwritten_fib_rec` target compiles and executes a recursive implementation of the
+>   fibonacci sequence hand-written in LLVM IR
+> - The `handwritten_fib_iter` target compiles and executes an iterative implementation of the
+>   fibonacci sequence hand-written in LLVM IR. This implementation uses mutable memory for passing
+>   data.
+> - The `c_fib_rec` target compiles a recursive implementation of fibonacci in C to LLVM IR, and
+>   then compiles and executes this using Hieratika. This option is compiled to use mutable memory
+>   as well.
+>
+> You can run `make all` to run all of them at once, or `make <target>` to execute a target of
+> interest. You will need a modern `clang` available on your path.
+
 > **hieratiká /ˌhaɪ(ə)ˈɹætɪka/**, _adjective_
 >
 > Of or pertaining to the cursive writing system that developed alongside the hieroglyphic system as

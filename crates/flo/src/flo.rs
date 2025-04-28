@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     builders::BlockBuilder,
-    intern::InternTable,
+    intern::{InternTable, POISON_ENTRY},
     poison::Poisonable,
     types::{
         Block,
@@ -201,15 +201,57 @@ impl FlatLoweredObject {
         s
     }
 
+    /// Completes the FLO object, checking that it contains no unexpected
+    /// poison values.
+    ///
+    /// # Panics
+    ///
+    /// - If `self` contains any poison values that would make the generated
+    ///   object invalid.
+    pub fn finish(&self) {
+        self.panic_on_unexpected_poison();
+    }
+
     /// Walks each of the tables and ensures no poisoned elements are left in
-    /// expected places.
-    #[expect(clippy::needless_return)]
+    /// any place where they would lead to an invalid object file.
+    ///
+    /// # Panics
+    ///
+    /// - If `self` contains any poison values that would make the generated
+    ///   object invalid.
     pub(crate) fn panic_on_unexpected_poison(&self) {
+        /// Ensures that the intern table is internally consistent, panicking if
+        /// it is not.
+        ///
+        /// # Panics
+        ///
+        /// - When encountering a poisoned value that would make the generated
+        ///   object invalid.
+        fn triage<T>(table: &InternTable<usize, T>, key: &str)
+        where
+            T: Clone + Poisonable,
+        {
+            for (id, entity) in table.iter() {
+                if *id == POISON_ENTRY || *id == 0 {
+                    continue;
+                }
+
+                assert!(
+                    !Poisonable::is_poisoned(entity) || Poisonable::is_unused(entity),
+                    "{key} {id} is poisoned"
+                );
+            }
+        }
+
         if self.allow_incomplete {
             return;
         }
 
-        // TODO(ktemkin): implement!
+        triage(&self.blocks, "Block");
+        triage(&self.statements, "Statement");
+        triage(&self.enum_match_arm, "Enum Match Arm");
+        triage(&self.multi_conditional_arms, "Multi Conditional Arm");
+        triage(&self.variables, "Variable");
     }
 
     /// Creates a new `FlatLoweredObject` representation from a string

@@ -67,60 +67,60 @@ loop.exit:
 
 ; We need this assert function to actually check that things are working
 ; properly, so we have to declare it for the linker.
-declare external void @__hieratika_assert(i1 %cond, i128 %index)
+declare external void @"compiler_rt::__hieratika_assert"(i1 %cond, i128 %index)
 
 ; The main function that is called to actually run the program.
-define external void @hieratika_main() {
+define external i128 @hieratika_main() {
 start:
   ; We simply run a bunch of Fibonacci computations and check that they compute
   ; the correct result.
   %result.-1 = call i128 @fibonacci(i128 -1)
   %check.-1 = icmp eq i128 %result.-1, 0
-  call void @__hieratika_assert(i1 %check.-1, i128 -1)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.-1, i128 -1)
 
   %result.0 = call i128 @fibonacci(i128 0)
   %check.0 = icmp eq i128 %result.0, 0
-  call void @__hieratika_assert(i1 %check.0, i128 0)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.0, i128 0)
 
   %result.1 = call i128 @fibonacci(i128 1)
-  %check.1 = icmp eq i128 %result.1, 0
-  call void @__hieratika_assert(i1 %check.1, i128 1)
+  %check.1 = icmp eq i128 %result.1, 1
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.1, i128 1)
 
   %result.2 = call i128 @fibonacci(i128 2)
-  %check.2 = icmp eq i128 %result.2, 0
-  call void @__hieratika_assert(i1 %check.2, i128 2)
+  %check.2 = icmp eq i128 %result.2, 1
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.2, i128 2)
 
   %result.3 = call i128 @fibonacci(i128 3)
   %check.3 = icmp eq i128 %result.3, 2
-  call void @__hieratika_assert(i1 %check.3, i128 3)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.3, i128 3)
 
   %result.4 = call i128 @fibonacci(i128 4)
   %check.4 = icmp eq i128 %result.4, 3
-  call void @__hieratika_assert(i1 %check.4, i128 4)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.4, i128 4)
 
   %result.5 = call i128 @fibonacci(i128 5)
   %check.5 = icmp eq i128 %result.5, 5
-  call void @__hieratika_assert(i1 %check.5, i128 5)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.5, i128 5)
 
   %result.6 = call i128 @fibonacci(i128 6)
   %check.6 = icmp eq i128 %result.6, 8
-  call void @__hieratika_assert(i1 %check.6, i128 6)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.6, i128 6)
 
   %result.7 = call i128 @fibonacci(i128 7)
   %check.7 = icmp eq i128 %result.7, 13
-  call void @__hieratika_assert(i1 %check.7, i128 7)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.7, i128 7)
 
   %result.8 = call i128 @fibonacci(i128 8)
   %check.8 = icmp eq i128 %result.8, 21
-  call void @__hieratika_assert(i1 %check.8, i128 8)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.8, i128 8)
 
   %result.9 = call i128 @fibonacci(i128 9)
   %check.9 = icmp eq i128 %result.9, 34
-  call void @__hieratika_assert(i1 %check.9, i128 9)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.9, i128 9)
 
   %result.10 = call i128 @fibonacci(i128 10)
   %check.10 = icmp eq i128 %result.10, 55
-  call void @__hieratika_assert(i1 %check.10, i128 10)
+  call void @"compiler_rt::__hieratika_assert"(i1 %check.10, i128 10)
 
-  ret void
+  ret i128 0
 }
