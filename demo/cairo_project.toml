@@ -1,0 +1,6 @@
+[crate_roots]
+# compiler_rt = "../compiler-rt/src"
+demo = "src"
+
+[config.global]
+edition = "2024_07"

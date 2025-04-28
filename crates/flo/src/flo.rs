@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     builders::BlockBuilder,
-    intern::InternTable,
+    intern::{InternTable, POISON_ENTRY},
     poison::Poisonable,
     types::{
         Block,
@@ -201,13 +201,39 @@ impl FlatLoweredObject {
         s
     }
 
+    /// Completes the FLO object, checking that it contains no unexpected
+    /// poison values.
+    pub fn finish(&self) {
+        self.panic_on_unexpected_poison()
+    }
+
     /// Walks each of the tables and ensures no poisoned elements are left in
     /// expected places.
-    #[expect(clippy::needless_return)]
     pub(crate) fn panic_on_unexpected_poison(&self) {
         if self.allow_incomplete {
             return;
         }
+
+        fn triage<T>(table: &InternTable<usize, T>, key: &str)
+        where
+            T: Clone + Poisonable,
+        {
+            for (id, entity) in table.iter() {
+                if *id == POISON_ENTRY || *id == 0 {
+                    continue;
+                }
+
+                if Poisonable::is_poisoned(entity) {
+                    panic!("{key} {id} is poisoned");
+                }
+            }
+        }
+
+        triage(&self.blocks, "Block");
+        triage(&self.statements, "Statement");
+        triage(&self.enum_match_arm, "Enum Match Arm");
+        triage(&self.multi_conditional_arms, "Multi Conditional Arm");
+        triage(&self.variables, "Variable");
 
         // TODO(ktemkin): implement!
     }

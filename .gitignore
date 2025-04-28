@@ -2,6 +2,10 @@
 /target
 main
 
+# Demo File
+demo/src/lib.cairo
+demo/fib.ll
+
 # Generated LLVM IR Input Files
 crates/compiler/input/compilation/alloc.ll
 crates/compiler/input/compilation/compiler_builtins.ll

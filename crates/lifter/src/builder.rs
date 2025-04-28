@@ -929,7 +929,7 @@ impl FlatLoweredTranslator<'_> {
         cfl_const: &cfl_semantic::items::constant::ConstValue,
     ) -> Result<flo::ConstantValue> {
         // Get the raw value of the constant...
-        let value: u128 = cfl_const
+        let value: i128 = cfl_const
             .clone()
             .into_int()
             .ok_or(Error::InvalidFlatLoweredConstant)?

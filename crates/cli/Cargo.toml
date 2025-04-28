@@ -14,12 +14,18 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+smol_str = "0.3.2"
+tempfile = "3.20.0"
 anyhow.workspace = true
+cairo-lang-runner = { path = "../../cairo/crates/cairo-lang-runner" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
 clap.workspace = true
 exitcode = "1.1.2"
 hieratika-cairoc.workspace = true
 hieratika-compiler.workspace = true
+hieratika-emitter.workspace = true
 hieratika-lifter.workspace = true
+hieratika-lowerer.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
