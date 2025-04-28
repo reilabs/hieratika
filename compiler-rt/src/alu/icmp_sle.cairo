@@ -7,6 +7,7 @@ pub mod icmp_sle_i40;
 pub mod icmp_sle_i48;
 pub mod icmp_sle_i64;
 pub mod icmp_sle_i128;
+pub mod icmp_sle_ptr;
 
 use crate::alu::scmp::scmp;
 use core::num::traits::{BitSize, Bounded, OverflowingSub};
