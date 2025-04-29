@@ -28,14 +28,13 @@ authors = ["Reilabs"]
 keywords = ["compiler", "starknet", "starkware"]
 categories = ["compilers", "virtualization", "cryptography::cryptocurrencies"]
 
-edition = "2021"
-rust-version = "1.83.0"
+edition = "2024"
+rust-version = "1.86.0"
 
 # Dependencies that are used by more than one crate are specified here, allowing us to ensure that
 # we match versions in all crates.
 [workspace.dependencies]
 anyhow = "1.0.97"
-ariadne = "0.5.1"
 backtrace = "0.3.74"
 bimap = { version = "0.6.3", features = ["serde"] }
 cairo-lang-compiler = { path = "cairo/crates/cairo-lang-compiler" }

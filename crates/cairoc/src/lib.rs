@@ -106,10 +106,7 @@ fn get_flat_lowered_function(
     function_id: FunctionWithBodyId,
 ) -> Option<Arc<MultiLowering>> {
     print_compiler_diagnostics(db, function_id);
-    match db.priv_function_with_body_multi_lowering(function_id) {
-        Ok(f) => Some(f),
-        Err(_) => None,
-    }
+    db.priv_function_with_body_multi_lowering(function_id).ok()
 }
 
 /// This function returns the `FlatLowered` object of a Cairo program.
@@ -224,7 +221,7 @@ mod test {
                 let file = file.as_ref().unwrap();
                 if Path::new(file.file_name().to_str().unwrap())
                     .extension()
-                    .map_or(false, |ext| ext.eq_ignore_ascii_case("cairo"))
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("cairo"))
                 {
                     generate_flat_lowered(&file.path()).unwrap();
                 }

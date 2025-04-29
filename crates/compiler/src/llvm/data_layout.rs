@@ -169,9 +169,9 @@ impl DataLayout {
             {
                 layout.nointptr_address_spaces = npa;
             } else if part.is_empty() {
-                // We don't know if empty parts are allowed, so we just behave permissively
-                // here. It cannot introduce any bugs to be permissive in this case.
-                continue;
+                // We don't know if empty parts are allowed, so we just behave
+                // permissively here. It cannot introduce any bugs to be
+                // permissive in this case.
             } else {
                 Err(Error::InvalidDataLayoutSpecification(
                     layout_string.to_string(),
@@ -304,7 +304,7 @@ impl DataLayout {
             self.integer_layouts
                 .iter()
                 .sorted_by_key(|l| l.size)
-                .last()
+                .next_back()
                 .expect("There must be at least one integer layout for the data layout to be valid")
         }
     }
@@ -489,7 +489,7 @@ impl PointerLayout {
                                  size {size}"
                             ),
                         ))?;
-                    };
+                    }
 
                     Ok(Self {
                         address_space,

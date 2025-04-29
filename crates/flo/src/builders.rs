@@ -219,7 +219,7 @@ impl<'a> BlockBuilder<'a> {
         // instructions.
         if let BlockExit::Goto { to, .. } = self.block.exit {
             self.block.exit = BlockExit::Goto { to, from: id }
-        };
+        }
 
         // We replace the block under that id with the block that has been newly built.
         self.context.blocks.swap(id, &self.block);
