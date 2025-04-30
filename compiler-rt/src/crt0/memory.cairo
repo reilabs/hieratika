@@ -25,3 +25,4 @@ pub mod store;
 pub mod cmpxchg;
 pub mod atomicrmw;
 pub mod getelementptr;
+pub mod memcpy;
