@@ -132,6 +132,22 @@ mod test {
     }
 }
 
+pub fn __llvm_store_c_p_l_v(value: bool, address: Address, offset: i64) {
+    // As per LLVM Languge Reference:
+    //   When writing a value of a type like i20 with a size that is not an integral number of
+    //   bytes, it is unspecified what happens to the extra bits that do not belong to the type, but
+    //   they will typically be overwritten
+    //
+    // Therefore, in this implementation writing a bool will write 1 byte of data, and the
+    // remaining bits will be set to 0.
+    let value: u8 = if value {
+        1
+    } else {
+        0
+    };
+    __llvm_store_b_p_l_v(value, address, offset);
+}
+
 pub fn __llvm_store_b_p_l_v(value: u8, address: Address, offset: i64) {
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
@@ -167,8 +183,12 @@ pub fn __llvm_store_l_p_l_v(value: u64, address: Address, offset: i64) {
     store(ref allocator, value, address, offset);
 }
 
+pub fn __llvm_store_p_p_l_v(value: Address, address: Address, offset: i64) {
+    // Address is a 64-bit integer, so we can use the u64 implementation.
+    __llvm_store_l_p_l_v(value, address, offset);
+}
+
 pub fn __llvm_store_o_p_l_v(value: u128, address: Address, offset: i64) {
     let mut allocator = get_allocator().unbox();
     store(ref allocator, value, address, offset);
 }
-
