@@ -116,6 +116,21 @@ mod test {
     }
 }
 
+pub fn __llvm_load_p_l_c(address: Address, offset: i64) -> bool {
+    // As per LLVM Languge Reference:
+    //  When loading a value of a type like i20 with a size that is not an integral number of bytes,
+    //  the result is undefined if the value was not originally written using a store of the same
+    //  type
+    //
+    // Therefore, in this implementation loading a bool will load 1 byte of data and only LSB will
+    // be returned. The remaining bits will be ignored.
+    if __llvm_load_p_l_b(address, offset) & 0b1 == 0b1 {
+        return true;
+    }
+
+    return false;
+}
+
 pub fn __llvm_load_p_l_b(address: Address, offset: i64) -> u8 {
     let mut allocator = get_allocator().unbox();
     load::<u8>(ref allocator, address, offset)
@@ -149,6 +164,11 @@ pub fn __llvm_load_p_l_k(address: Address, offset: i64) -> u48 {
 pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> u64 {
     let mut allocator = get_allocator().unbox();
     load::<u64>(ref allocator, address, offset)
+}
+
+pub fn __llvm_load_p_l_p(address: Address, offset: i64) -> Address {
+    // Address is a 64-bit integer, so we can use the u64 implementation.
+    __llvm_load_p_l_l(address, offset)
 }
 
 pub fn __llvm_load_p_l_o(address: Address, offset: i64) -> u128 {
