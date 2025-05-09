@@ -57,6 +57,7 @@ hieratika-flo = { path = "crates/flo" }
 hieratika-mangler = { path = "crates/mangler" }
 hieratika-test-utils = { path = "crates/test-utils" }
 miette = { version = "7.5.0", features = ["fancy"] }
+regex = "1.11.1"
 starknet-types-core = "0.1.7"
 thiserror = "2.0.12"
 hieratika-lifter = { path = "crates/lifter" }
