@@ -17,7 +17,7 @@ use hieratika_flo::{
         VariableLinkage,
     },
 };
-use hieratika_mangler::{NameInfo, constants::INTERNAL_NAME_PREFIX, mangle};
+use hieratika_mangler::{NameInfo, constants::INTERNAL_NAME_PREFIX, mangle_cairo};
 use inkwell::module::Linkage;
 
 use crate::{
@@ -156,7 +156,7 @@ impl ObjectContext {
     /// let local_dispatch_name =
     ///     ObjectContext::local_dispatch_name_for(&function_type, module_name).unwrap();
     ///
-    /// assert_eq!(local_dispatch_name, "__f$hdisp$co$my_module");
+    /// assert_eq!(local_dispatch_name, "__f___hdisp___co___my_module");
     /// ```
     ///
     /// # Errors
@@ -176,7 +176,7 @@ impl ObjectContext {
             .collect::<Result<Vec<_>>>()?;
         let return_types = vec![Self::flo_type_of(typ.return_type.as_ref())?];
         let mangle_input = NameInfo::new(&func_name, module_name, input_types, return_types);
-        let mangled_name = mangle(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
+        let mangled_name = mangle_cairo(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
 
         Ok(mangled_name)
     }
@@ -196,7 +196,7 @@ impl ObjectContext {
     /// let function_type = LLVMFunction::new(LLVMType::f32, &[LLVMType::bool, LLVMType::i128]);
     /// let global_dispatch_name = ObjectContext::global_dispatch_name_for(&function_type).unwrap();
     ///
-    /// assert_eq!(global_dispatch_name, "__f$hdisp$co$meta");
+    /// assert_eq!(global_dispatch_name, "__f___hdisp___co___meta");
     /// ```
     ///
     /// # Errors
@@ -221,7 +221,7 @@ impl ObjectContext {
             input_types,
             return_types,
         );
-        let mangled_name = mangle(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
+        let mangled_name = mangle_cairo(mangle_input).unwrap_or_else(|_| panic_cannot_mangle(typ));
 
         Ok(mangled_name)
     }

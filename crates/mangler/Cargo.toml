@@ -16,5 +16,6 @@ rust-version.workspace = true
 [dependencies]
 hieratika-errors.workspace = true
 hieratika-flo.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
