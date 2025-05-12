@@ -5,6 +5,7 @@ pub mod sext_i1_i32;
 pub mod sext_i1_i40;
 pub mod sext_i1_i48;
 pub mod sext_i1_i64;
+pub mod sext_i1_i128;
 pub mod sext_i8_i16;
 pub mod sext_i8_i24;
 pub mod sext_i8_i32;
