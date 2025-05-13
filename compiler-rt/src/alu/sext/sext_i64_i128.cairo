@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::sext::sext;
 
-pub fn __llvm_sext_l_to_o(value: u128) -> u128 {
+pub fn __llvm_sext_l_to_o(ref state: RTState, value: u128) -> u128 {
     sext::<u64, u128>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_sext_l_to_o;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -22,7 +24,8 @@ mod tests {
     #[test]
     fn test_i64_i128() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sext_l_to_o(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_sext_l_to_o(ref state, *case.arg), *case.expected);
         }
     }
 }

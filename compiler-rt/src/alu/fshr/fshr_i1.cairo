@@ -1,4 +1,5 @@
-pub fn __llvm_fshr_c_c_c_c(a: u128, b: u128, shift: u128) -> u128 {
+use crate::rtstate::RTState;
+pub fn __llvm_fshr_c_c_c_c(ref state: RTState, a: u128, b: u128, shift: u128) -> u128 {
     if a > 1 {
         panic!("a = {:?} does not fit in i1", a)
     }
@@ -14,6 +15,7 @@ pub fn __llvm_fshr_c_c_c_c(a: u128, b: u128, shift: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_fshr_c_c_c_c;
     use crate::alu::test_case::TestCaseThreeArgs;
     #[cairofmt::skip]
@@ -36,7 +38,8 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_fshr_c_c_c_c(*case.a, *case.b, *case.c), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_fshr_c_c_c_c(ref state, *case.a, *case.b, *case.c), *case.expected);
         }
     }
 }

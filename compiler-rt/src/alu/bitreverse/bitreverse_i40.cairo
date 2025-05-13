@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::bitreverse::bitreverse;
 use crate::integer::u40::u40;
 
-pub fn __llvm_bitreverse_n_n(value: u128) -> u128 {
+pub fn __llvm_bitreverse_n_n(ref state: RTState, value: u128) -> u128 {
     bitreverse::<u40>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_bitreverse_n_n;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -47,7 +49,8 @@ mod tests {
     #[test]
     fn test_i40() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_bitreverse_n_n(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_bitreverse_n_n(ref state, *case.arg), *case.expected);
         }
     }
 }

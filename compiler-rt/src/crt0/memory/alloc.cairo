@@ -1,5 +1,5 @@
+use crate::rtstate::RTState;
 use super::super::allocator::{AllocatorState, AllocatorOps, Address};
-use super::get_allocator;
 
 /// Allocate a contiguous region of `size_bytes * count` bytes of memory, and return a pointer to
 /// the start of that memory region.
@@ -42,7 +42,6 @@ mod test {
     }
 }
 
-pub fn __llvm_alloc_l_l_p(size_bytes: i64, count: i64) -> Address {
-    let mut allocator = get_allocator().unbox();
-    alloc(ref allocator, size_bytes, count)
+pub fn __llvm_alloc_l_l_p(ref state: RTState, size_bytes: i64, count: i64) -> Address {
+    alloc(ref state.allocator, size_bytes, count)
 }

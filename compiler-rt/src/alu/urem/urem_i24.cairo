@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::urem::urem;
 use crate::integer::u24::u24;
 
-pub fn __llvm_urem_x_x_x(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_urem_x_x_x(ref state: RTState, lhs: u128, rhs: u128) -> u128 {
     urem::<u24>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_urem_x_x_x;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -261,13 +263,15 @@ mod tests {
     #[test]
     fn test_i24() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_urem_x_x_x(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_urem_x_x_x(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     #[should_panic(expected: ('Division by 0',))]
     fn test_div_by_zero() {
-        __llvm_urem_x_x_x(1, 0);
+        let mut state = RTStateOps::new();
+        __llvm_urem_x_x_x(ref state, 1, 0);
     }
 }

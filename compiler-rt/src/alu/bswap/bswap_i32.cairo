@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::bswap::bswap;
 
-pub fn __llvm_bswap_i_i(value: u128) -> u128 {
+pub fn __llvm_bswap_i_i(ref state: RTState, value: u128) -> u128 {
     bswap::<u32>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_bswap_i_i;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -528,7 +530,8 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_bswap_i_i(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_bswap_i_i(ref state, *case.arg), *case.expected);
         }
     }
 }

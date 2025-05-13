@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::zext::zext;
 
-pub fn __llvm_zext_i_to_l(value: u128) -> u128 {
+pub fn __llvm_zext_i_to_l(ref state: RTState, value: u128) -> u128 {
     zext::<u64>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_zext_i_to_l;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -18,7 +20,8 @@ mod tests {
     #[test]
     fn test_i32_i64() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_zext_i_to_l(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_zext_i_to_l(ref state, *case.arg), *case.expected);
         }
     }
 }

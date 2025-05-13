@@ -1,8 +1,8 @@
+use crate::rtstate::RTState;
 use crate::crt0::allocator::{AllocatorState, Address};
 use crate::crt0::memory::{load::load, store::store};
 use core::traits::{BitAnd, BitOr};
 use core::num::traits::{BitSize, OverflowingMul};
-use crate::crt0::memory::get_allocator;
 use crate::integer::{u24::u24, u40::u40, u48::u48};
 
 /// Atomically modify memory. Load a value from memory, perform bitwise AND with the given value and
@@ -146,42 +146,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_and_p_b_b(address: Address, value: u8) -> u8 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_z_z(address: Address, value: u16) -> u16 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_x_x(address: Address, value: u24) -> u24 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_i_i(address: Address, value: u32) -> u32 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_n_n(address: Address, value: u40) -> u40 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_k_k(address: Address, value: u48) -> u48 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_l_l(address: Address, value: u64) -> u64 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
+    atomicrmw_and(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_and_p_o_o(address: Address, value: u128) -> u128 {
-    let mut allocator = get_allocator().unbox();
-    atomicrmw_and(ref allocator, address, value)
+pub fn __llvm_atomicrmw_and_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_and(ref state.allocator, address, value)
 }

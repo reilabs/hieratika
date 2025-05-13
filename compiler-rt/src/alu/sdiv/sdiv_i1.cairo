@@ -1,6 +1,7 @@
+use crate::rtstate::RTState;
 use crate::alu::sdiv::sdiv;
 
-pub fn __llvm_sdiv_c_c_c(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_sdiv_c_c_c(ref state: RTState, lhs: u128, rhs: u128) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     if lhs > 1 {
         panic!("value = {} does not fit in i1", lhs)
@@ -16,6 +17,7 @@ pub fn __llvm_sdiv_c_c_c(lhs: u128, rhs: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_sdiv_c_c_c;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -27,13 +29,15 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sdiv_c_c_c(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_sdiv_c_c_c(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     #[should_panic(expected: ('Division by 0',))]
     fn test_div_by_zero() {
-        __llvm_sdiv_c_c_c(1, 0);
+        let mut state = RTStateOps::new();
+        __llvm_sdiv_c_c_c(ref state, 1, 0);
     }
 }

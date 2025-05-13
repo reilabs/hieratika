@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::abs::abs;
 use crate::integer::u40::u40;
 
-pub fn __llvm_abs_n_c_n(arg: u128, _is_int_min_poison: u128) -> u128 {
+pub fn __llvm_abs_n_c_n(ref state: RTState, arg: u128, _is_int_min_poison: u128) -> u128 {
     abs::<u40>(arg)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_abs_n_c_n;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -150,7 +152,8 @@ mod tests {
     fn test_i40() {
         let unused = 0;
         for case in test_cases.span() {
-            assert_eq!(__llvm_abs_n_c_n(*case.arg, unused), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_abs_n_c_n(ref state, *case.arg, unused), *case.expected);
         }
     }
 }

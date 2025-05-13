@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::ashr::ashr;
 use crate::integer::u48::u48;
 
-pub fn __llvm_ashr_k_k_k(n: u128, shift: u128) -> u128 {
+pub fn __llvm_ashr_k_k_k(ref state: RTState, n: u128, shift: u128) -> u128 {
     ashr::<u48>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ashr_k_k_k;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -73,7 +75,8 @@ mod tests {
     #[test]
     fn test_i48() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ashr_k_k_k(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_ashr_k_k_k(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
@@ -91,6 +94,7 @@ mod tests {
             rhs: 48,
             expected: 0b000000000000000000000000000000000000000000000000,
         };
-        assert_eq!(__llvm_ashr_k_k_k(case.lhs, case.rhs), case.expected);
+        let mut state = RTStateOps::new();
+        assert_eq!(__llvm_ashr_k_k_k(ref state, case.lhs, case.rhs), case.expected);
     }
 }

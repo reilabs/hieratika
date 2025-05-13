@@ -1,6 +1,7 @@
+use crate::rtstate::RTState;
 use crate::alu::or::or;
 
-pub fn __llvm_or_c_c_c(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_or_c_c_c(ref state: RTState, lhs: u128, rhs: u128) -> u128 {
     if lhs > 1 {
         panic!("lhs = {:?} does not fit in i1", lhs)
     }
@@ -16,6 +17,7 @@ pub fn __llvm_or_c_c_c(lhs: u128, rhs: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_or_c_c_c;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -30,7 +32,8 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_or_c_c_c(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_or_c_c_c(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 }

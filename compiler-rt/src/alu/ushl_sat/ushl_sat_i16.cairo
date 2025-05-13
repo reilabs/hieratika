@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::ushl_sat::ushl_sat;
 
-pub fn __llvm_ushl_sat_z_z_z(n: u128, shift: u128) -> u128 {
+pub fn __llvm_ushl_sat_z_z_z(ref state: RTState, n: u128, shift: u128) -> u128 {
     ushl_sat::<u16>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ushl_sat_z_z_z;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -141,7 +143,8 @@ mod tests {
     #[test]
     fn test_i16() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ushl_sat_z_z_z(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_ushl_sat_z_z_z(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
@@ -157,6 +160,7 @@ mod tests {
         let case = TestCaseTwoArgs {
             lhs: 0b1111111111111111, rhs: 16, expected: 0b0000000000000000,
         };
-        assert_eq!(__llvm_ushl_sat_z_z_z(case.lhs, case.rhs), case.expected);
+        let mut state = RTStateOps::new();
+        assert_eq!(__llvm_ushl_sat_z_z_z(ref state, case.lhs, case.rhs), case.expected);
     }
 }

@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::ctlz::ctlz;
 
-pub fn __llvm_ctlz_l_c_l(value: u128, _is_zero_poison: u128) -> u128 {
+pub fn __llvm_ctlz_l_c_l(ref state: RTState, value: u128, _is_zero_poison: u128) -> u128 {
     ctlz::<u64>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ctlz_l_c_l;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -1040,7 +1042,8 @@ mod tests {
     #[test]
     fn test_i64() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ctlz_l_c_l(*case.arg, 0), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_ctlz_l_c_l(ref state, *case.arg, 0), *case.expected);
         }
     }
 }

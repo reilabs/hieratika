@@ -1,3 +1,4 @@
+use crate::rtstate::RTState;
 use crate::crt0::allocator::Address;
 use core::num::traits::WrappingAdd;
 
@@ -8,7 +9,7 @@ use core::num::traits::WrappingAdd;
 /// The function returns the calculated address.
 ///
 /// The function panics if the result of the computation does not fit in the `Address` type.
-pub fn __llvm_getelementptr_p_l_p(base: Address, offset: i64) -> Address {
+pub fn __llvm_getelementptr_p_l_p(ref state: RTState, base: Address, offset: i64) -> Address {
     // Perform the addition directly in the i128 domain to handle large values.
     let base: i128 = base.into();
     let offset: i128 = offset.into();
@@ -19,12 +20,14 @@ pub fn __llvm_getelementptr_p_l_p(base: Address, offset: i64) -> Address {
 mod test {
     use super::__llvm_getelementptr_p_l_p;
     use crate::crt0::allocator::Address;
+    use crate::rtstate::RTStateOps;
 
     #[test]
     fn positive_offset() {
         let base: Address = 1000;
         let offset: i64 = 50;
-        let result = __llvm_getelementptr_p_l_p(base, offset);
+        let mut state = RTStateOps::new();
+        let result = __llvm_getelementptr_p_l_p(ref state, base, offset);
         assert_eq!(result, 1050);
     }
 
@@ -32,7 +35,8 @@ mod test {
     fn large_positive_offset() {
         let base: Address = 1000;
         let offset: i64 = 1_000_000;
-        let result = __llvm_getelementptr_p_l_p(base, offset);
+        let mut state = RTStateOps::new();
+        let result = __llvm_getelementptr_p_l_p(ref state, base, offset);
         assert_eq!(result, 1_001_000);
     }
 
@@ -40,7 +44,8 @@ mod test {
     fn negative_offset() {
         let base: Address = 1000;
         let offset: i64 = -50;
-        let result = __llvm_getelementptr_p_l_p(base, offset);
+        let mut state = RTStateOps::new();
+        let result = __llvm_getelementptr_p_l_p(ref state, base, offset);
         assert_eq!(result, 950);
     }
 
@@ -48,7 +53,8 @@ mod test {
     fn large_negative_offset() {
         let base: Address = 1_000_000;
         let offset: i64 = -999_000;
-        let result = __llvm_getelementptr_p_l_p(base, offset);
+        let mut state = RTStateOps::new();
+        let result = __llvm_getelementptr_p_l_p(ref state, base, offset);
         assert_eq!(result, 1000);
     }
 
@@ -56,7 +62,8 @@ mod test {
     fn zero_offset() {
         let base: Address = 1000;
         let offset: i64 = 0;
-        let result = __llvm_getelementptr_p_l_p(base, offset);
+        let mut state = RTStateOps::new();
+        let result = __llvm_getelementptr_p_l_p(ref state, base, offset);
         assert_eq!(result, 1000);
     }
 }

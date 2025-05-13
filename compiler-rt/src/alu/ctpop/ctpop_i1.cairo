@@ -1,4 +1,5 @@
-pub fn __llvm_ctpop_c_c(value: u128) -> u128 {
+use crate::rtstate::RTState;
+pub fn __llvm_ctpop_c_c(ref state: RTState, value: u128) -> u128 {
     if value > 1 {
         panic!("value = {:?} does not fit in i1", value)
     }
@@ -9,6 +10,7 @@ pub fn __llvm_ctpop_c_c(value: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ctpop_c_c;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -21,7 +23,8 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ctpop_c_c(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_ctpop_c_c(ref state, *case.arg), *case.expected);
         }
     }
 }
