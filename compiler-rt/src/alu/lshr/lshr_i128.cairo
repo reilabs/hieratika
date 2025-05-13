@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::lshr::lshr;
 
-pub fn __llvm_lshr_o_o_o(n: u128, shift: u128) -> u128 {
+pub fn __llvm_lshr_o_o_o(ref state: RTState, n: u128, shift: u128) -> u128 {
     lshr::<u128>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_lshr_o_o_o;
     use crate::alu::test_case::TestCaseTwoArgs;
     // Tests are split to multiple chunks due to gas limit being exceeded
@@ -339,49 +341,56 @@ mod tests {
     #[test]
     fn test_i128_shifts_ones_1() {
         for case in test_cases_shifts_ones_1.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_ones_2() {
         for case in test_cases_shifts_ones_2.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_ones_3() {
         for case in test_cases_shifts_ones_3.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_1() {
         for case in test_cases_shifts_zeros_1.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_2() {
         for case in test_cases_shifts_zeros_2.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shifts_zeros_3() {
         for case in test_cases_shifts_zeros_3.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
     #[test]
     fn test_i128_shift_mixed() {
         for case in test_cases_shift_mixed.span() {
-            assert_eq!(__llvm_lshr_o_o_o(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_o_o_o(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 }

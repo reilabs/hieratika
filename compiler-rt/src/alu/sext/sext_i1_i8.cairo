@@ -1,6 +1,7 @@
+use crate::rtstate::RTState;
 use crate::alu::sext::sext;
 
-pub fn __llvm_sext_c_to_b(value: u128) -> u128 {
+pub fn __llvm_sext_c_to_b(ref state: RTState, value: u128) -> u128 {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     if value > 1 {
         panic!("value = {} does not fit in i1", value)
@@ -16,6 +17,7 @@ pub fn __llvm_sext_c_to_b(value: u128) -> u128 {
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_sext_c_to_b;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -27,7 +29,8 @@ mod tests {
     #[test]
     fn test_i1_i16() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sext_c_to_b(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_sext_c_to_b(ref state, *case.arg), *case.expected);
         }
     }
 }

@@ -1,11 +1,15 @@
+use crate::rtstate::RTState;
 use crate::alu::smul_with_overflow::smul_with_overflow;
 
-pub fn __llvm_smul_with_overflow_o_o_Socs(lhs: u128, rhs: u128) -> (u128, bool) {
+pub fn __llvm_smul_with_overflow_o_o_Socs(
+    ref state: RTState, lhs: u128, rhs: u128,
+) -> (u128, bool) {
     smul_with_overflow::<u128>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_smul_with_overflow_o_o_Socs;
     use crate::alu::test_case::TestCaseTwoArgsTwoExpected;
     #[cairofmt::skip]
@@ -271,7 +275,10 @@ mod tests {
     #[test]
     fn test_i128() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_smul_with_overflow_o_o_Socs(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(
+                __llvm_smul_with_overflow_o_o_Socs(ref state, *case.lhs, *case.rhs), *case.expected,
+            );
         }
     }
 }

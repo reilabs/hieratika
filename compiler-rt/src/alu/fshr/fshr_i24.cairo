@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::fshr::fshr;
 use crate::integer::u24::u24;
 
-pub fn __llvm_fshr_x_x_x_x(a: u128, b: u128, shift: u128) -> u128 {
+pub fn __llvm_fshr_x_x_x_x(ref state: RTState, a: u128, b: u128, shift: u128) -> u128 {
     fshr::<u24>(a, b, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_fshr_x_x_x_x;
     use crate::alu::test_case::TestCaseThreeArgs;
     #[cairofmt::skip]
@@ -213,7 +215,8 @@ mod tests {
     #[test]
     fn test_i24() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_fshr_x_x_x_x(*case.a, *case.b, *case.c), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_fshr_x_x_x_x(ref state, *case.a, *case.b, *case.c), *case.expected);
         }
     }
 }

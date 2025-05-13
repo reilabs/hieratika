@@ -1,9 +1,11 @@
-pub fn __llvm_abs_c_c_c(arg: u128, _is_int_min_poison: u128) -> u128 {
+use crate::rtstate::RTState;
+pub fn __llvm_abs_c_c_c(ref state: RTState, arg: u128, _is_int_min_poison: u128) -> u128 {
     arg
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_abs_c_c_c;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -17,7 +19,8 @@ mod tests {
         // As per `docs/ALU Design.md`, poison values are not supported.
         let unused = 0;
         for case in test_cases.span() {
-            assert_eq!(__llvm_abs_c_c_c(*case.arg, unused), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_abs_c_c_c(ref state, *case.arg, unused), *case.expected);
         }
     }
 }

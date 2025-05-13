@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::sshl_sat::sshl_sat;
 
-pub fn __llvm_sshl_sat_c_c_c(n: u128, shift: u128) -> u128 {
+pub fn __llvm_sshl_sat_c_c_c(ref state: RTState, n: u128, shift: u128) -> u128 {
     sshl_sat::<u8>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_sshl_sat_c_c_c;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -21,7 +23,8 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sshl_sat_c_c_c(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_sshl_sat_c_c_c(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 
@@ -35,6 +38,7 @@ mod tests {
     #[should_panic(expected: "Requested shift by more bits than input word size")]
     fn test_i1_panic() {
         let case = TestCaseTwoArgs { lhs: 0b11111111, rhs: 8, expected: 0b00000000 };
-        assert_eq!(__llvm_sshl_sat_c_c_c(case.lhs, case.rhs), case.expected);
+        let mut state = RTStateOps::new();
+        assert_eq!(__llvm_sshl_sat_c_c_c(ref state, case.lhs, case.rhs), case.expected);
     }
 }

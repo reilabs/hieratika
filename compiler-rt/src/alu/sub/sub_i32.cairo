@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::sub::sub;
 
-pub fn __llvm_sub_i_i_i(lhs: u128, rhs: u128) -> u128 {
+pub fn __llvm_sub_i_i_i(ref state: RTState, lhs: u128, rhs: u128) -> u128 {
     sub::<u32>(lhs, rhs)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_sub_i_i_i;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -148,7 +150,8 @@ mod tests {
     #[test]
     fn test_i32() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_sub_i_i_i(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_sub_i_i_i(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 }

@@ -1,6 +1,9 @@
+use crate::rtstate::RTState;
 use crate::alu::ssub_with_overflow::ssub_with_overflow;
 
-pub fn __llvm_ssub_with_overflow_c_c_Sccs(lhs: u128, rhs: u128) -> (u128, bool) {
+pub fn __llvm_ssub_with_overflow_c_c_Sccs(
+    ref state: RTState, lhs: u128, rhs: u128,
+) -> (u128, bool) {
     // Make sure the value passed in the u128 arguments can fit in the concrete type.
     if lhs > 1 {
         panic!("value = {} does not fit in i1", lhs)
@@ -17,6 +20,7 @@ pub fn __llvm_ssub_with_overflow_c_c_Sccs(lhs: u128, rhs: u128) -> (u128, bool) 
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ssub_with_overflow_c_c_Sccs;
     use crate::alu::test_case::TestCaseTwoArgsTwoExpected;
     #[cairofmt::skip]
@@ -30,7 +34,10 @@ mod tests {
     #[test]
     fn test_i1() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ssub_with_overflow_c_c_Sccs(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(
+                __llvm_ssub_with_overflow_c_c_Sccs(ref state, *case.lhs, *case.rhs), *case.expected,
+            );
         }
     }
 }

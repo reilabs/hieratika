@@ -1,11 +1,13 @@
+use crate::rtstate::RTState;
 use crate::alu::lshr::lshr;
 
-pub fn __llvm_lshr_b_b_b(n: u128, shift: u128) -> u128 {
+pub fn __llvm_lshr_b_b_b(ref state: RTState, n: u128, shift: u128) -> u128 {
     lshr::<u8>(n, shift)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_lshr_b_b_b;
     use crate::alu::test_case::TestCaseTwoArgs;
     #[cairofmt::skip]
@@ -47,7 +49,8 @@ mod tests {
     #[test]
     fn test_i8() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_lshr_b_b_b(*case.lhs, *case.rhs), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_lshr_b_b_b(ref state, *case.lhs, *case.rhs), *case.expected);
         }
     }
 }

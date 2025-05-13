@@ -1,8 +1,9 @@
+use crate::rtstate::RTState;
 use crate::crt0::allocator::{AllocatorOps, AllocatorState, Address, ByteCount};
 use core::num::traits::{BitSize, OverflowingMul};
 use core::traits::BitOr;
 use crate::crt0::utils::{BITS_IN_BYTE, buffer_to_t};
-use super::get_allocator;
+
 use crate::integer::{u24::u24, u40::u40, u48::u48};
 
 /// Load a portion of data from the provided address plus the provided offset and return them as a
@@ -116,7 +117,7 @@ mod test {
     }
 }
 
-pub fn __llvm_load_p_l_c(address: Address, offset: i64) -> bool {
+pub fn __llvm_load_p_l_c(ref state: RTState, address: Address, offset: i64) -> bool {
     // As per LLVM Languge Reference:
     //  When loading a value of a type like i20 with a size that is not an integral number of bytes,
     //  the result is undefined if the value was not originally written using a store of the same
@@ -124,54 +125,46 @@ pub fn __llvm_load_p_l_c(address: Address, offset: i64) -> bool {
     //
     // Therefore, in this implementation loading a bool will load 1 byte of data and only LSB will
     // be returned. The remaining bits will be ignored.
-    if __llvm_load_p_l_b(address, offset) & 0b1 == 0b1 {
+    if __llvm_load_p_l_b(ref state, address, offset) & 0b1 == 0b1 {
         return true;
     }
 
     return false;
 }
 
-pub fn __llvm_load_p_l_b(address: Address, offset: i64) -> u8 {
-    let mut allocator = get_allocator().unbox();
-    load::<u8>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_b(ref state: RTState, address: Address, offset: i64) -> u8 {
+    load::<u8>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_z(address: Address, offset: i64) -> u16 {
-    let mut allocator = get_allocator().unbox();
-    load::<u16>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_z(ref state: RTState, address: Address, offset: i64) -> u16 {
+    load::<u16>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_x(address: Address, offset: i64) -> u24 {
-    let mut allocator = get_allocator().unbox();
-    load::<u24>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_x(ref state: RTState, address: Address, offset: i64) -> u24 {
+    load::<u24>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_i(address: Address, offset: i64) -> u32 {
-    let mut allocator = get_allocator().unbox();
-    load::<u32>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_i(ref state: RTState, address: Address, offset: i64) -> u32 {
+    load::<u32>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_n(address: Address, offset: i64) -> u40 {
-    let mut allocator = get_allocator().unbox();
-    load::<u40>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_n(ref state: RTState, address: Address, offset: i64) -> u40 {
+    load::<u40>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_k(address: Address, offset: i64) -> u48 {
-    let mut allocator = get_allocator().unbox();
-    load::<u48>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_k(ref state: RTState, address: Address, offset: i64) -> u48 {
+    load::<u48>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_l(address: Address, offset: i64) -> u64 {
-    let mut allocator = get_allocator().unbox();
-    load::<u64>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_l(ref state: RTState, address: Address, offset: i64) -> u64 {
+    load::<u64>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_p(address: Address, offset: i64) -> Address {
+pub fn __llvm_load_p_l_p(ref state: RTState, address: Address, offset: i64) -> Address {
     // Address is a 64-bit integer, so we can use the u64 implementation.
-    __llvm_load_p_l_l(address, offset)
+    __llvm_load_p_l_l(ref state, address, offset)
 }
 
-pub fn __llvm_load_p_l_o(address: Address, offset: i64) -> u128 {
-    let mut allocator = get_allocator().unbox();
-    load::<u128>(ref allocator, address, offset)
+pub fn __llvm_load_p_l_o(ref state: RTState, address: Address, offset: i64) -> u128 {
+    load::<u128>(ref state.allocator, address, offset)
 }

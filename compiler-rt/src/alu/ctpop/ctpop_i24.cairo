@@ -1,12 +1,14 @@
+use crate::rtstate::RTState;
 use crate::alu::ctpop::ctpop;
 use crate::integer::u24::u24;
 
-pub fn __llvm_ctpop_x_x(value: u128) -> u128 {
+pub fn __llvm_ctpop_x_x(ref state: RTState, value: u128) -> u128 {
     ctpop::<u24>(value)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rtstate::RTStateOps;
     use super::__llvm_ctpop_x_x;
     use crate::alu::test_case::TestCaseOneArg;
     #[cairofmt::skip]
@@ -77,7 +79,8 @@ mod tests {
     #[test]
     fn test_i24() {
         for case in test_cases.span() {
-            assert_eq!(__llvm_ctpop_x_x(*case.arg), *case.expected);
+            let mut state = RTStateOps::new();
+            assert_eq!(__llvm_ctpop_x_x(ref state, *case.arg), *case.expected);
         }
     }
 }

@@ -1,8 +1,9 @@
+use crate::rtstate::RTState;
 use crate::crt0::allocator::{AllocatorOps, AllocatorState, Address};
 use core::num::traits::BitSize;
 use core::traits::BitAnd;
 use crate::crt0::utils::t_to_buffer;
-use super::get_allocator;
+
 use crate::integer::{u24::u24, u40::u40, u48::u48};
 
 /// Store a portion of data at the provided address plus the provided offset. The number of stored
@@ -132,7 +133,7 @@ mod test {
     }
 }
 
-pub fn __llvm_store_c_p_l_v(value: bool, address: Address, offset: i64) {
+pub fn __llvm_store_c_p_l_v(ref state: RTState, value: bool, address: Address, offset: i64) {
     // As per LLVM Languge Reference:
     //   When writing a value of a type like i20 with a size that is not an integral number of
     //   bytes, it is unspecified what happens to the extra bits that do not belong to the type, but
@@ -145,50 +146,42 @@ pub fn __llvm_store_c_p_l_v(value: bool, address: Address, offset: i64) {
     } else {
         0
     };
-    __llvm_store_b_p_l_v(value, address, offset);
+    __llvm_store_b_p_l_v(ref state, value, address, offset);
 }
 
-pub fn __llvm_store_b_p_l_v(value: u8, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_b_p_l_v(ref state: RTState, value: u8, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_z_p_l_v(value: u16, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_z_p_l_v(ref state: RTState, value: u16, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_x_p_l_v(value: u24, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_x_p_l_v(ref state: RTState, value: u24, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_i_p_l_v(value: u32, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_i_p_l_v(ref state: RTState, value: u32, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_n_p_l_v(value: u40, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_n_p_l_v(ref state: RTState, value: u40, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_k_p_l_v(value: u48, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_k_p_l_v(ref state: RTState, value: u48, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_l_p_l_v(value: u64, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_l_p_l_v(ref state: RTState, value: u64, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_p_p_l_v(value: Address, address: Address, offset: i64) {
+pub fn __llvm_store_p_p_l_v(ref state: RTState, value: Address, address: Address, offset: i64) {
     // Address is a 64-bit integer, so we can use the u64 implementation.
-    __llvm_store_l_p_l_v(value, address, offset);
+    __llvm_store_l_p_l_v(ref state, value, address, offset);
 }
 
-pub fn __llvm_store_o_p_l_v(value: u128, address: Address, offset: i64) {
-    let mut allocator = get_allocator().unbox();
-    store(ref allocator, value, address, offset);
+pub fn __llvm_store_o_p_l_v(ref state: RTState, value: u128, address: Address, offset: i64) {
+    store(ref state.allocator, value, address, offset);
 }
