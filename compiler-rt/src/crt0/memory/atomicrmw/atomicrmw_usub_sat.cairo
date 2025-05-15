@@ -38,15 +38,15 @@ pub fn atomicrmw_usub_sat<
     +PartialOrd<T>,
     +WrappingSub<T>,
 >(
-    ref allocator: AllocatorState, address: Address, value: T,
-) -> T {
-    let old_value: T = load(ref allocator, address, 0);
+    ref allocator: AllocatorState, address: Address, value: u128,
+) -> u128 {
+    let old_value = load::<T>(ref allocator, address, 0);
     let new_value = if old_value >= value {
         old_value.wrapping_sub(value)
     } else {
-        0_u8.into()
+        0
     };
-    store(ref allocator, new_value, address, 0);
+    store::<T>(ref allocator, new_value, address, 0);
     old_value
 }
 
@@ -54,7 +54,6 @@ pub fn atomicrmw_usub_sat<
 mod test {
     use super::*;
     use crate::crt0::allocator::{Allocator, AllocatorOps};
-    use crate::integer::IntegerOps;
     use core::fmt::Debug;
 
     /// Prepare allocator for the test suite.
@@ -99,7 +98,7 @@ mod test {
         +PartialOrd<T>,
         +WrappingSub<T>,
     >(
-        value: T,
+        value: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = get_allocator().unbox();
@@ -116,7 +115,7 @@ mod test {
         if old_value >= value {
             assert_eq!(new_value, old_value.wrapping_sub(value));
         } else {
-            assert_eq!(new_value, 0_u8.into());
+            assert_eq!(new_value, 0);
         }
     }
 
@@ -137,8 +136,8 @@ mod test {
     #[test]
     /// Test the `atomicrmw usub_sat` operation with u24 values.
     fn atomicrmw_usub_sat_u24() {
-        test_atomicrmw_usub_sat::<u24>(IntegerOps::new(0x000000));
-        test_atomicrmw_usub_sat::<u24>(IntegerOps::new(0xffffff));
+        test_atomicrmw_usub_sat::<u24>(0x000000);
+        test_atomicrmw_usub_sat::<u24>(0xffffff);
     }
 
     #[test]
@@ -151,15 +150,15 @@ mod test {
     #[test]
     /// Test the `atomicrmw usub_sat` operation with u40 values.
     fn atomicrmw_usub_sat_u40() {
-        test_atomicrmw_usub_sat::<u40>(IntegerOps::new(0x0000000000));
-        test_atomicrmw_usub_sat::<u40>(IntegerOps::new(0xffffffffff));
+        test_atomicrmw_usub_sat::<u40>(0x0000000000);
+        test_atomicrmw_usub_sat::<u40>(0xffffffffff);
     }
 
     #[test]
     /// Test the `atomicrmw usub_sat` operation with u48 values.
     fn atomicrmw_usub_sat_u48() {
-        test_atomicrmw_usub_sat::<u48>(IntegerOps::new(0x000000000000));
-        test_atomicrmw_usub_sat::<u48>(IntegerOps::new(0xffffffffffff));
+        test_atomicrmw_usub_sat::<u48>(0x000000000000);
+        test_atomicrmw_usub_sat::<u48>(0xffffffffffff);
     }
 
     #[test]
@@ -177,34 +176,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_b_b(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u8>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_z_z(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u16>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_x_x(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u24>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_i_i(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u32>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_n_n(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u40>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_k_k(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u48>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_usub_sat_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_usub_sat_p_l_l(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_usub_sat::<u64>(ref state.allocator, address, value)
 }
 
 pub fn __llvm_atomicrmw_usub_sat_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
-    atomicrmw_usub_sat(ref state.allocator, address, value)
+    atomicrmw_usub_sat::<u128>(ref state.allocator, address, value)
 }

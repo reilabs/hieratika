@@ -18,13 +18,15 @@ use crate::integer::{u24::u24, u40::u40, u48::u48};
 ///
 /// This is a generic implementation for every data type. Its specialized versions
 /// are defined in this file.
-pub fn load<T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +BitOr<T>, +PanicDestruct<T>>(
-    ref allocator: AllocatorState, address: Address, offset: i64,
-) -> T {
+pub fn load<
+    T, +BitSize<T>, +OverflowingMul<T>, +Into<u8, T>, +Into<T, u128>, +BitOr<T>, +PanicDestruct<T>,
+>(
+    ref allocator: AllocatorState, address: Address, offset: u128,
+) -> u128 {
     let load_address: Address = address + offset.try_into().expect('offset does not fit in u64');
     let load_size: ByteCount = (BitSize::<T>::bits() / BITS_IN_BYTE).into();
     let data = allocator.load(load_address, load_size);
-    buffer_to_t::<T>(@data)
+    buffer_to_t::<T>(@data).into()
 }
 
 #[cfg(test)]
@@ -32,7 +34,6 @@ mod test {
     use super::load;
     use crate::crt0::allocator::{Allocator, AllocatorOps, AllocatorState};
     use crate::integer::{u24::u24, u40::u40, u48::u48};
-    use crate::integer::IntegerOps;
 
     /// Prepare allocator for the test suite.
     ///
@@ -72,7 +73,7 @@ mod test {
     fn load_u24() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u24>(ref allocator, 0, 0);
-        assert_eq!(data1, IntegerOps::new(0x020100));
+        assert_eq!(data1, 0x020100);
     }
 
 
@@ -89,7 +90,7 @@ mod test {
     fn load_u40() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u40>(ref allocator, 0, 0);
-        assert_eq!(data1, IntegerOps::new(0x0403020100));
+        assert_eq!(data1, 0x0403020100);
     }
 
     #[test]
@@ -97,7 +98,7 @@ mod test {
     fn load_u48() {
         let mut allocator = get_allocator().unbox();
         let data1 = load::<u48>(ref allocator, 0, 0);
-        assert_eq!(data1, IntegerOps::new(0x050403020100));
+        assert_eq!(data1, 0x050403020100);
     }
 
     #[test]
@@ -117,7 +118,7 @@ mod test {
     }
 }
 
-pub fn __llvm_load_p_l_c(ref state: RTState, address: Address, offset: i64) -> bool {
+pub fn __llvm_load_p_l_c(ref state: RTState, address: Address, offset: u128) -> u128 {
     // As per LLVM Languge Reference:
     //  When loading a value of a type like i20 with a size that is not an integral number of bytes,
     //  the result is undefined if the value was not originally written using a store of the same
@@ -126,45 +127,46 @@ pub fn __llvm_load_p_l_c(ref state: RTState, address: Address, offset: i64) -> b
     // Therefore, in this implementation loading a bool will load 1 byte of data and only LSB will
     // be returned. The remaining bits will be ignored.
     if __llvm_load_p_l_b(ref state, address, offset) & 0b1 == 0b1 {
-        return true;
+        return 1;
     }
 
-    return false;
+    return 0;
 }
 
-pub fn __llvm_load_p_l_b(ref state: RTState, address: Address, offset: i64) -> u8 {
+pub fn __llvm_load_p_l_b(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u8>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_z(ref state: RTState, address: Address, offset: i64) -> u16 {
+pub fn __llvm_load_p_l_z(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u16>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_x(ref state: RTState, address: Address, offset: i64) -> u24 {
+pub fn __llvm_load_p_l_x(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u24>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_i(ref state: RTState, address: Address, offset: i64) -> u32 {
+pub fn __llvm_load_p_l_i(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u32>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_n(ref state: RTState, address: Address, offset: i64) -> u40 {
+pub fn __llvm_load_p_l_n(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u40>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_k(ref state: RTState, address: Address, offset: i64) -> u48 {
+pub fn __llvm_load_p_l_k(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u48>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_l(ref state: RTState, address: Address, offset: i64) -> u64 {
+pub fn __llvm_load_p_l_l(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u64>(ref state.allocator, address, offset)
 }
 
-pub fn __llvm_load_p_l_p(ref state: RTState, address: Address, offset: i64) -> Address {
-    // Address is a 64-bit integer, so we can use the u64 implementation.
-    __llvm_load_p_l_l(ref state, address, offset)
+pub fn __llvm_load_p_l_p(ref state: RTState, address: Address, offset: u128) -> Address {
+    load::<Address>(ref state.allocator, address, offset)
+        .try_into()
+        .expect('address does not fit in u64')
 }
 
-pub fn __llvm_load_p_l_o(ref state: RTState, address: Address, offset: i64) -> u128 {
+pub fn __llvm_load_p_l_o(ref state: RTState, address: Address, offset: u128) -> u128 {
     load::<u128>(ref state.allocator, address, offset)
 }

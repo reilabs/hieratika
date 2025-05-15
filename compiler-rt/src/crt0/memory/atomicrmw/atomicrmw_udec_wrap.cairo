@@ -39,15 +39,15 @@ pub fn atomicrmw_udec_wrap<
     +PartialOrd<T>,
     +WrappingSub<T>,
 >(
-    ref allocator: AllocatorState, address: Address, value: T,
-) -> T {
-    let old_value: T = load(ref allocator, address, 0);
-    let new_value = if old_value == 0_u8.into() || old_value > value {
+    ref allocator: AllocatorState, address: Address, value: u128,
+) -> u128 {
+    let old_value = load::<T>(ref allocator, address, 0);
+    let new_value = if old_value == 0 || old_value > value {
         value
     } else {
-        old_value.wrapping_sub(1_u8.into())
+        old_value.wrapping_sub(1)
     };
-    store(ref allocator, new_value, address, 0);
+    store::<T>(ref allocator, new_value, address, 0);
     old_value
 }
 
@@ -55,7 +55,6 @@ pub fn atomicrmw_udec_wrap<
 mod test {
     use super::*;
     use crate::crt0::allocator::{Allocator, AllocatorOps};
-    use crate::integer::IntegerOps;
     use core::fmt::Debug;
 
     /// Prepare allocator for the test suite.
@@ -100,7 +99,7 @@ mod test {
         +PartialOrd<T>,
         +WrappingSub<T>,
     >(
-        value: T,
+        value: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = get_allocator().unbox();
@@ -114,10 +113,10 @@ mod test {
 
         // Load the value from the same part of the memory and see if it was updated correctly.
         let new_value = load::<T>(ref allocator, address, offset);
-        if old_value == 0_u8.into() || old_value > value {
+        if old_value == 0 || old_value > value {
             assert_eq!(new_value, value);
         } else {
-            assert_eq!(new_value, old_value.wrapping_sub(1_u8.into()));
+            assert_eq!(new_value, old_value.wrapping_sub(1));
         }
     }
 
@@ -138,8 +137,8 @@ mod test {
     #[test]
     /// Test the `atomicrmw udec_wrap` operation with u24 values.
     fn atomicrmw_udec_wrap_u24() {
-        test_atomicrmw_udec_wrap::<u24>(IntegerOps::new(0x000000));
-        test_atomicrmw_udec_wrap::<u24>(IntegerOps::new(0xffffff));
+        test_atomicrmw_udec_wrap::<u24>(0x000000);
+        test_atomicrmw_udec_wrap::<u24>(0xffffff);
     }
 
     #[test]
@@ -152,15 +151,15 @@ mod test {
     #[test]
     /// Test the `atomicrmw udec_wrap` operation with u40 values.
     fn atomicrmw_udec_wrap_u40() {
-        test_atomicrmw_udec_wrap::<u40>(IntegerOps::new(0x0000000000));
-        test_atomicrmw_udec_wrap::<u40>(IntegerOps::new(0xffffffffff));
+        test_atomicrmw_udec_wrap::<u40>(0x0000000000);
+        test_atomicrmw_udec_wrap::<u40>(0xffffffffff);
     }
 
     #[test]
     /// Test the `atomicrmw udec_wrap` operation with u48 values.
     fn atomicrmw_udec_wrap_u48() {
-        test_atomicrmw_udec_wrap::<u48>(IntegerOps::new(0x000000000000));
-        test_atomicrmw_udec_wrap::<u48>(IntegerOps::new(0xffffffffffff));
+        test_atomicrmw_udec_wrap::<u48>(0x000000000000);
+        test_atomicrmw_udec_wrap::<u48>(0xffffffffffff);
     }
 
     #[test]
@@ -178,34 +177,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_b_b(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u8>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_z_z(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u16>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_x_x(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u24>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_i_i(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u32>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_n_n(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u40>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_k_k(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u48>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_udec_wrap_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_udec_wrap_p_l_l(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_udec_wrap::<u64>(ref state.allocator, address, value)
 }
 
 pub fn __llvm_atomicrmw_udec_wrap_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
-    atomicrmw_udec_wrap(ref state.allocator, address, value)
+    atomicrmw_udec_wrap::<u128>(ref state.allocator, address, value)
 }

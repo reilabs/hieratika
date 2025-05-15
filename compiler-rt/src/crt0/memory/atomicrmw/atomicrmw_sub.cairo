@@ -27,15 +27,18 @@ pub fn atomicrmw_sub<
     +Div<T>,
     +Drop<T>,
     +Into<u8, T>,
+    +Into<T, u128>,
     +TryInto<T, u8>,
+    +TryInto<u128, T>,
     +OverflowingMul<T>,
     +WrappingSub<T>,
 >(
-    ref allocator: AllocatorState, address: Address, value: T,
-) -> T {
-    let old_value = load(ref allocator, address, 0);
-    let new_value = old_value.wrapping_sub(value);
-    store(ref allocator, new_value, address, 0);
+    ref allocator: AllocatorState, address: Address, value: u128,
+) -> u128 {
+    let old_value = load::<T>(ref allocator, address, 0);
+    let old_value_t: T = old_value.try_into().expect('value does not fit in T');
+    let value_t: T = value.try_into().expect('value does not fit in T');
+    store::<T>(ref allocator, (old_value_t).wrapping_sub(value_t).into(), address, 0);
     old_value
 }
 
@@ -43,7 +46,6 @@ pub fn atomicrmw_sub<
 mod test {
     use super::*;
     use crate::crt0::allocator::{Allocator, AllocatorOps};
-    use crate::integer::IntegerOps;
     use core::fmt::Debug;
 
     /// Prepare allocator for the test suite.
@@ -78,12 +80,14 @@ mod test {
         +Div<T>,
         +Drop<T>,
         +Into<u8, T>,
+        +Into<T, u128>,
         +TryInto<T, u8>,
+        +TryInto<u128, T>,
         +OverflowingMul<T>,
         +PartialEq<T>,
         +WrappingSub<T>,
     >(
-        value_to_subtract: T,
+        value_to_subtract: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = get_allocator().unbox();
@@ -93,11 +97,15 @@ mod test {
         let offset = 0;
 
         // Do the operation.
-        let old_value = atomicrmw_sub::<T>(ref allocator, address, value_to_subtract);
+        let old_value: T = atomicrmw_sub::<T>(ref allocator, address, value_to_subtract)
+            .try_into()
+            .expect('value does not fit in T');
 
         // Load the value from the same part of the memory and see if it was updated correctly.
-        let new_value = load(ref allocator, address, offset);
-        assert_eq!(new_value, old_value.wrapping_sub(value_to_subtract));
+        let value: T = value_to_subtract.try_into().expect('value does not fit in T');
+        let expected_value: u128 = old_value.wrapping_sub(value).into();
+        let new_value = load::<T>(ref allocator, address, offset);
+        assert_eq!(new_value, expected_value);
     }
 
     #[test]
@@ -115,7 +123,7 @@ mod test {
     #[test]
     /// Test the `atomicrmw sub` operation with u24 values.
     fn atomicrmw_sub_u24() {
-        test_atomicrmw_sub::<u24>(IntegerOps::new(0x123456));
+        test_atomicrmw_sub::<u24>(0x123456);
     }
 
     #[test]
@@ -127,13 +135,13 @@ mod test {
     #[test]
     /// Test the `atomicrmw sub` operation with u40 values.
     fn atomicrmw_sub_u40() {
-        test_atomicrmw_sub::<u40>(IntegerOps::new(0x123456789a));
+        test_atomicrmw_sub::<u40>(0x123456789a);
     }
 
     #[test]
     /// Test the `atomicrmw sub` operation with u48 values.
     fn atomicrmw_sub_u48() {
-        test_atomicrmw_sub::<u48>(IntegerOps::new(0x123456789abc));
+        test_atomicrmw_sub::<u48>(0x123456789abc);
     }
 
     #[test]
@@ -149,34 +157,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_sub_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_b_b(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u8>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_z_z(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u16>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_x_x(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u24>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_i_i(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u32>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_n_n(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u40>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_k_k(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u48>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_sub_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
-    atomicrmw_sub(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_sub_p_l_l(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_sub::<u64>(ref state.allocator, address, value)
 }
 
 pub fn __llvm_atomicrmw_sub_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
-    atomicrmw_sub(ref state.allocator, address, value)
+    atomicrmw_sub::<u128>(ref state.allocator, address, value)
 }
