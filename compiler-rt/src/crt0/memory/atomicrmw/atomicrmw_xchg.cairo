@@ -27,13 +27,15 @@ pub fn atomicrmw_xchg<
     +Div<T>,
     +Drop<T>,
     +Into<u8, T>,
+    +Into<T, u128>,
     +TryInto<T, u8>,
+    +TryInto<u128, T>,
     +OverflowingMul<T>,
 >(
-    ref allocator: AllocatorState, address: Address, value: T,
-) -> T {
-    let old_value = load(ref allocator, address, 0);
-    store(ref allocator, value, address, 0);
+    ref allocator: AllocatorState, address: Address, value: u128,
+) -> u128 {
+    let old_value = load::<T>(ref allocator, address, 0);
+    store::<T>(ref allocator, value, address, 0);
     old_value
 }
 
@@ -41,7 +43,6 @@ pub fn atomicrmw_xchg<
 mod test {
     use super::*;
     use crate::crt0::allocator::{Allocator, AllocatorOps};
-    use crate::integer::IntegerOps;
     use core::fmt::Debug;
 
     /// Prepare allocator for the test suite.
@@ -77,11 +78,13 @@ mod test {
         +Div<T>,
         +Drop<T>,
         +Into<u8, T>,
+        +Into<T, u128>,
         +TryInto<T, u8>,
+        +TryInto<u128, T>,
         +OverflowingMul<T>,
         +PartialEq<T>,
     >(
-        value_to_be_written: T, expected_memory_contents: T,
+        value_to_be_written: u128, expected_memory_contents: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = get_allocator().unbox();
@@ -114,7 +117,7 @@ mod test {
     #[test]
     /// Test the `atomicrmw xchg` operation with u24 values.
     fn atomicrmw_xchg_u24() {
-        test_atomicrmw_xchg::<u24>(IntegerOps::new(0x123456), IntegerOps::new(0x0201ff));
+        test_atomicrmw_xchg::<u24>(0x123456, 0x0201ff);
     }
 
     #[test]
@@ -126,15 +129,13 @@ mod test {
     #[test]
     /// Test the `atomicrmw xchg` operation with u40 values.
     fn atomicrmw_xchg_u40() {
-        test_atomicrmw_xchg::<u40>(IntegerOps::new(0x123456789a), IntegerOps::new(0x04030201ff));
+        test_atomicrmw_xchg::<u40>(0x123456789a, 0x04030201ff);
     }
 
     #[test]
     /// Test the `atomicrmw xchg` operation with u48 values.
     fn atomicrmw_xchg_u48() {
-        test_atomicrmw_xchg::<
-            u48,
-        >(IntegerOps::new(0x123456789abc), IntegerOps::new(0x0504030201ff));
+        test_atomicrmw_xchg::<u48>(0x123456789abc, 0x0504030201ff);
     }
 
     #[test]
@@ -152,34 +153,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_xchg_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_b_b(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u8>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_z_z(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u16>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_x_x(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u24>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_i_i(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u32>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_n_n(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u40>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_k_k(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u48>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_xchg_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_xchg_p_l_l(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_xchg::<u64>(ref state.allocator, address, value)
 }
 
 pub fn __llvm_atomicrmw_xchg_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
-    atomicrmw_xchg(ref state.allocator, address, value)
+    atomicrmw_xchg::<u128>(ref state.allocator, address, value)
 }

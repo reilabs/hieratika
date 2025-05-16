@@ -1,7 +1,5 @@
 use crate::rtstate::RTState;
-use crate::crt0::allocator::{AllocatorOps, AllocatorState, Address};
-use crate::integer::{u24::u24, u40::u40, u48::u48};
-
+use crate::crt0::allocator::{AllocatorOps, AllocatorState, Address, ByteCount};
 
 /// Copy a block of memory from the source location to the destination location.
 ///
@@ -26,7 +24,7 @@ pub fn memcpy(ref allocator: AllocatorState, dest: Address, src: Address, len: u
 
     // The underlying memory allocator operates on 64-bit addresses, therefore lengths larger than
     // u64::max are not supported.
-    let len: u64 = len.try_into().expect('memcpy: length exceeds 64-bit');
+    let len: ByteCount = len.try_into().expect('memcpy: length exceeds 64-bit');
 
     // As per LLVM Language Reference:
     //  The ‘llvm.memcpy.*’ intrinsics copy a block of memory from the source location to the
@@ -170,55 +168,55 @@ mod test {
 
 
 pub fn __llvm_memcpy_p0_p0_p_p_c_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u8, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_b_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u8, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_z_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u16, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_x_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u24, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_i_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u32, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_n_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u40, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_k_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u48, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_l_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u64, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
-    memcpy(ref state.allocator, dest, src, len.into());
+    memcpy(ref state.allocator, dest, src, len);
 }
 
 pub fn __llvm_memcpy_p0_p0_p_p_o_c_v(
-    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: bool,
+    ref state: RTState, dest: Address, src: Address, len: u128, _is_volatile: u128,
 ) {
     memcpy(ref state.allocator, dest, src, len);
 }

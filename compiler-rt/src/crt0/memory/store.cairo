@@ -18,12 +18,20 @@ use crate::integer::{u24::u24, u40::u40, u48::u48};
 /// This is a generic implementation for every data type. Its specialized versions are defined in
 /// this file.
 pub fn store<
-    T, +BitAnd<T>, +BitSize<T>, +Copy<T>, +Div<T>, +Drop<T>, +Into<u8, T>, +TryInto<T, u8>,
+    T,
+    +BitAnd<T>,
+    +BitSize<T>,
+    +Copy<T>,
+    +Div<T>,
+    +Drop<T>,
+    +Into<u8, T>,
+    +TryInto<T, u8>,
+    +TryInto<u128, T>,
 >(
-    ref allocator: AllocatorState, value: T, address: Address, offset: i64,
+    ref allocator: AllocatorState, value: u128, address: Address, offset: u128,
 ) {
     let store_address: Address = address + offset.try_into().expect('offset does not fit in u64');
-    let buffer = t_to_buffer::<T>(value);
+    let buffer = t_to_buffer::<T>(value.try_into().expect('value does not fit in T'));
     allocator.store(store_address, @buffer);
 }
 
@@ -36,7 +44,6 @@ mod test {
     use core::traits::{BitOr, BitAnd};
     use core::fmt::Debug;
     use crate::integer::{u24::u24, u40::u40, u48::u48};
-    use crate::integer::IntegerOps;
 
     /// Make sure the input array of bytes can be serialized to a single variable of type T.
     fn assert_bytes<
@@ -65,8 +72,9 @@ mod test {
         +Drop<T>,
         +Into<u8, T>,
         +TryInto<T, u8>,
+        +TryInto<u128, T>,
     >(
-        data: T,
+        data: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = Allocator::new();
@@ -99,7 +107,7 @@ mod test {
     #[test]
     /// Store a single u24 variable with the first 3 bytes of memory.
     fn store_u24() {
-        test_store_t::<u24>(IntegerOps::new(0x020100));
+        test_store_t::<u24>(0x020100);
     }
 
     #[test]
@@ -111,13 +119,13 @@ mod test {
     #[test]
     /// Store a single u40 variable with the first 5 bytes of memory.
     fn store_u40() {
-        test_store_t::<u40>(IntegerOps::new(0x0403020100));
+        test_store_t::<u40>(0x0403020100);
     }
 
     #[test]
     /// Store a single u48 variable with the first 5 bytes of memory.
     fn store_u48() {
-        test_store_t::<u48>(IntegerOps::new(0x050403020100));
+        test_store_t::<u48>(0x050403020100);
     }
 
     #[test]
@@ -133,7 +141,7 @@ mod test {
     }
 }
 
-pub fn __llvm_store_c_p_l_v(ref state: RTState, value: bool, address: Address, offset: i64) {
+pub fn __llvm_store_c_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
     // As per LLVM Languge Reference:
     //   When writing a value of a type like i20 with a size that is not an integral number of
     //   bytes, it is unspecified what happens to the extra bits that do not belong to the type, but
@@ -141,7 +149,7 @@ pub fn __llvm_store_c_p_l_v(ref state: RTState, value: bool, address: Address, o
     //
     // Therefore, in this implementation writing a bool will write 1 byte of data, and the
     // remaining bits will be set to 0.
-    let value: u8 = if value {
+    let value: u128 = if value > 0 {
         1
     } else {
         0
@@ -149,39 +157,38 @@ pub fn __llvm_store_c_p_l_v(ref state: RTState, value: bool, address: Address, o
     __llvm_store_b_p_l_v(ref state, value, address, offset);
 }
 
-pub fn __llvm_store_b_p_l_v(ref state: RTState, value: u8, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_b_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u8>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_z_p_l_v(ref state: RTState, value: u16, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_z_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u16>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_x_p_l_v(ref state: RTState, value: u24, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_x_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u24>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_i_p_l_v(ref state: RTState, value: u32, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_i_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u32>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_n_p_l_v(ref state: RTState, value: u40, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_n_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u40>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_k_p_l_v(ref state: RTState, value: u48, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_k_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u48>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_l_p_l_v(ref state: RTState, value: u64, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_l_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u64>(ref state.allocator, value, address, offset);
 }
 
-pub fn __llvm_store_p_p_l_v(ref state: RTState, value: Address, address: Address, offset: i64) {
-    // Address is a 64-bit integer, so we can use the u64 implementation.
-    __llvm_store_l_p_l_v(ref state, value, address, offset);
+pub fn __llvm_store_p_p_l_v(ref state: RTState, value: Address, address: Address, offset: u128) {
+    store::<Address>(ref state.allocator, value.into(), address, offset);
 }
 
-pub fn __llvm_store_o_p_l_v(ref state: RTState, value: u128, address: Address, offset: i64) {
-    store(ref state.allocator, value, address, offset);
+pub fn __llvm_store_o_p_l_v(ref state: RTState, value: u128, address: Address, offset: u128) {
+    store::<u128>(ref state.allocator, value, address, offset);
 }

@@ -28,15 +28,21 @@ fn cmpxchg<
     +Div<T>,
     +Drop<T>,
     +Into<u8, T>,
+    +Into<T, u128>,
     +OverflowingMul<T>,
     +PartialEq<T>,
     +TryInto<T, u8>,
+    +TryInto<u128, T>,
 >(
-    ref allocator: AllocatorState, address: Address, offset: i64, expected_value: T, new_value: T,
-) -> (T, bool) {
-    let existing_value = load(ref allocator, address, offset);
+    ref allocator: AllocatorState,
+    address: Address,
+    offset: u128,
+    expected_value: u128,
+    new_value: u128,
+) -> (u128, bool) {
+    let existing_value = load::<T>(ref allocator, address, offset);
     let did_exchange_happen = if existing_value == expected_value {
-        store(ref allocator, new_value, address, offset);
+        store::<T>(ref allocator, new_value, address, offset);
         true
     } else {
         false
@@ -90,9 +96,11 @@ mod test {
         +Div<T>,
         +Drop<T>,
         +Into<u8, T>,
+        +Into<T, u128>,
         +OverflowingMul<T>,
         +PartialEq<T>,
         +TryInto<T, u8>,
+        +TryInto<u128, T>,
     >(
         does_exchange_happen: bool,
     ) {
@@ -104,24 +112,24 @@ mod test {
         let offset = 0;
 
         // Load the existing value from the memory for later use and comparison.
-        let existing_value = load(ref allocator, address, offset);
+        let existing_value = load::<T>(ref allocator, address, offset);
 
         // If we want the exchange to happen, we set the expected value to the existing value.
         // Otherwise, we set it to some other value.
         let expected_value = if does_exchange_happen {
             existing_value
         } else {
-            0x21_u8.into()
+            0x21
         };
 
         // The new value to set if the exchange happens. 0x37 is an arbitrary value, that is known
         // not to be in the memory.
-        let new_value: T = 0x37_u8.into();
+        let new_value = 0x37_u128;
 
         // Perform the cmpxchg operation.
-        let (returned_value, changed) = cmpxchg(
-            ref allocator, address, offset, expected_value, new_value,
-        );
+        let (returned_value, changed) = cmpxchg::<
+            T,
+        >(ref allocator, address, offset, expected_value, new_value);
 
         // Check if the exchange happened (or not) as expected.
         assert_eq!(changed, does_exchange_happen);
@@ -129,7 +137,7 @@ mod test {
 
         // If the exchange happened, the value in memory should be updated to the new value.
         if does_exchange_happen {
-            let stored_value = load(ref allocator, address, offset);
+            let stored_value = load::<T>(ref allocator, address, offset);
             assert_eq!(stored_value, new_value);
         }
     }
@@ -192,49 +200,49 @@ mod test {
 }
 
 pub fn __llvm_cmpxchg_p_b_b_Sbcs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u8, new_value: u8,
-) -> (u8, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u8>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_z_z_Szcs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u16, new_value: u16,
-) -> (u16, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u16>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_x_x_Sxcs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u24, new_value: u24,
-) -> (u24, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u24>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_i_i_Sics(
-    ref state: RTState, address: Address, offset: i64, expected_value: u32, new_value: u32,
-) -> (u32, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u32>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_n_n_Sncs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u40, new_value: u40,
-) -> (u40, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u40>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_k_k_Skcs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u48, new_value: u48,
-) -> (u48, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u48>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_l_l_Slcs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u64, new_value: u64,
-) -> (u64, bool) {
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
+) -> (u128, bool) {
     cmpxchg::<u64>(ref state.allocator, address, offset, expected_value, new_value)
 }
 
 pub fn __llvm_cmpxchg_p_o_o_Socs(
-    ref state: RTState, address: Address, offset: i64, expected_value: u128, new_value: u128,
+    ref state: RTState, address: Address, offset: u128, expected_value: u128, new_value: u128,
 ) -> (u128, bool) {
     cmpxchg::<u128>(ref state.allocator, address, offset, expected_value, new_value)
 }

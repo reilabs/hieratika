@@ -36,16 +36,11 @@ pub fn atomicrmw_min<
     +OverflowingMul<T>,
     +OverflowingSub<T>,
 >(
-    ref allocator: AllocatorState, address: Address, value: T,
-) -> T {
-    let old_value: T = load(ref allocator, address, 0);
-    // smin returns the lower one of the input values. Since ALU polyfills operate exclusively on
-    // u128, the input values must be casted into u128 first. Then, the result must be casted back
-    // to T. Since T->u128 casting is safe, u128->T must be safe as well.
-    let lower_value: T = smin::<T>(old_value.into(), value.into())
-        .try_into()
-        .expect('u128 from T, can\'t cast back');
-    store(ref allocator, lower_value, address, 0);
+    ref allocator: AllocatorState, address: Address, value: u128,
+) -> u128 {
+    let old_value = load::<T>(ref allocator, address, 0);
+    let lower_value = smin::<T>(old_value, value);
+    store::<T>(ref allocator, lower_value, address, 0);
     old_value
 }
 
@@ -53,7 +48,6 @@ pub fn atomicrmw_min<
 mod test {
     use super::*;
     use crate::crt0::allocator::{Allocator, AllocatorOps};
-    use crate::integer::IntegerOps;
     use core::fmt::Debug;
 
     /// Prepare allocator for the test suite.
@@ -97,7 +91,7 @@ mod test {
         +OverflowingSub<T>,
         +PartialEq<T>,
     >(
-        value_lower_than_stored: T,
+        value_lower_than_stored: u128,
     ) {
         // Instantiate the allocator.
         let mut allocator = get_allocator().unbox();
@@ -110,7 +104,7 @@ mod test {
         let _old_value = atomicrmw_min::<T>(ref allocator, address, value_lower_than_stored);
 
         // Load the value from the same part of the memory and see if it was updated correctly.
-        let new_value = load(ref allocator, address, offset);
+        let new_value = load::<T>(ref allocator, address, offset);
         assert_eq!(new_value, value_lower_than_stored);
     }
 
@@ -129,7 +123,7 @@ mod test {
     #[test]
     /// Test the `atomicrmw min` operation with u24 values.
     fn atomicrmw_min_u24() {
-        test_atomicrmw_min::<u24>(IntegerOps::new(0x030200));
+        test_atomicrmw_min::<u24>(0x030200);
     }
 
     #[test]
@@ -141,13 +135,13 @@ mod test {
     #[test]
     /// Test the `atomicrmw min` operation with u40 values.
     fn atomicrmw_min_u40() {
-        test_atomicrmw_min::<u40>(IntegerOps::new(0x0504030200));
+        test_atomicrmw_min::<u40>(0x0504030200);
     }
 
     #[test]
     /// Test the `atomicrmw min` operation with u48 values.
     fn atomicrmw_min_u48() {
-        test_atomicrmw_min::<u48>(IntegerOps::new(0x060504030200));
+        test_atomicrmw_min::<u48>(0x060504030200);
     }
 
     #[test]
@@ -163,34 +157,34 @@ mod test {
     }
 }
 
-pub fn __llvm_atomicrmw_min_p_b_b(ref state: RTState, address: Address, value: u8) -> u8 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_b_b(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u8>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_z_z(ref state: RTState, address: Address, value: u16) -> u16 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_z_z(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u16>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_x_x(ref state: RTState, address: Address, value: u24) -> u24 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_x_x(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u24>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_i_i(ref state: RTState, address: Address, value: u32) -> u32 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_i_i(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u32>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_n_n(ref state: RTState, address: Address, value: u40) -> u40 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_n_n(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u40>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_k_k(ref state: RTState, address: Address, value: u48) -> u48 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_k_k(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u48>(ref state.allocator, address, value)
 }
 
-pub fn __llvm_atomicrmw_min_p_l_l(ref state: RTState, address: Address, value: u64) -> u64 {
-    atomicrmw_min(ref state.allocator, address, value)
+pub fn __llvm_atomicrmw_min_p_l_l(ref state: RTState, address: Address, value: u128) -> u128 {
+    atomicrmw_min::<u64>(ref state.allocator, address, value)
 }
 
 pub fn __llvm_atomicrmw_min_p_o_o(ref state: RTState, address: Address, value: u128) -> u128 {
-    atomicrmw_min(ref state.allocator, address, value)
+    atomicrmw_min::<u128>(ref state.allocator, address, value)
 }
