@@ -1,0 +1,23 @@
+[package]
+name = "hieratika-lowerer"
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+authors.workspace = true
+description = "A tool to take a FLO object and generate Cairo source from it."
+keywords.workspace = true
+categories.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+cairo-lang-compiler.workspace = true
+cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
+cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
+hieratika-compiler.workspace = true
+hieratika-errors.workspace = true
+hieratika-flo.workspace = true
+itertools.workspace = true

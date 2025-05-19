@@ -13,7 +13,7 @@ pub(crate) type InternIdentifier = usize;
 
 /// The special table value that always contains a poisoned element.
 #[expect(clippy::unreadable_literal)]
-const POISON_ENTRY: usize = 0xdecea5ed;
+pub(crate) const POISON_ENTRY: usize = 0xdecea5ed;
 
 /// A type for generic tables of interned objects.
 ///
@@ -195,6 +195,14 @@ mod tests {
 
         fn is_poisoned(value: &Self) -> bool {
             (*value) == vec![0xabad_cafe]
+        }
+
+        fn is_unused(_value: &Self) -> bool {
+            false
+        }
+
+        fn is_unreachable(_value: &Self) -> bool {
+            false
         }
     }
 

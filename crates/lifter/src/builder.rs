@@ -825,7 +825,7 @@ impl FlatLoweredTranslator<'_> {
     fn equivalent_flo_coupon(&self, _coupon: cfl_semantic::FunctionId) -> Result<flo::Type> {
         // FIXME(ktemkin): implement this once we agree on adding a Coupon-passthrough
         // type to FLO.
-        todo!();
+        todo!("FLO coupon passthrough");
     }
 
     /// Special case type handling.
@@ -929,7 +929,7 @@ impl FlatLoweredTranslator<'_> {
         cfl_const: &cfl_semantic::items::constant::ConstValue,
     ) -> Result<flo::ConstantValue> {
         // Get the raw value of the constant...
-        let value: u128 = cfl_const
+        let value: i128 = cfl_const
             .clone()
             .into_int()
             .ok_or(Error::InvalidFlatLoweredConstant)?

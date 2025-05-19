@@ -1,5 +1,6 @@
-use core::num::traits::{BitSize, WrappingAdd, Zero, One};
-use core::traits::{Copy, PartialEq, BitAnd, BitNot, BitOr, Sub};
+use core::num::traits::{Bounded, BitSize, WrappingAdd, Zero, One};
+use core::traits::{Copy, Neg, PartialEq, BitAnd, BitNot, BitOr, Sub};
+use crate::rtstate::RTState;
 
 /// Indicated the direction of overflow in polyfills implementing arithmetic operations that can
 /// overflow.
@@ -86,8 +87,120 @@ pub fn extend_sign<
 /// It takes an `index` to better identify where the panic arose as we do not
 /// have an easy method of passing strings between Cairo and LLVM IR at the
 /// current time.
-pub fn __hieratika_assert(condition: bool, index: u128) {
+pub fn __hieratika_assert(ref state: RTState, condition: bool, index: i128) {
     if !condition {
-        panic!("{index}")
+        panic!("Assert with index {index} failed")
+    }
+}
+
+/// Prints a boolean value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i1(ref state: RTState, value: bool, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Prints an i8 value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i8(ref state: RTState, value: i8, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Prints an i16 value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i16(ref state: RTState, value: i16, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Prints an i32 value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i32(ref state: RTState, value: i32, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Prints an i64 value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i64(ref state: RTState, value: i64, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Prints an i128 value to stdout.
+///
+/// This utilizes the underlying Cairo printing functionality to do the printing
+/// but exposes it in a way that can be called easily from LLVM IR.
+pub fn __print_i128(ref state: RTState, value: i128, key: i128) {
+    println!("value {key} = {value}");
+}
+
+/// Converts the input value into a 2's complement representation in a u128.
+pub fn __bool_into_twos(n: bool) -> u128 {
+    if n {
+        1
+    } else {
+        0
+    }
+}
+
+/// Converts the input value into a boolean, assuming a 2's complement
+/// representation.
+pub fn __bool_from_twos(n: u128) -> bool {
+    if n == 0 {
+        false
+    } else {
+        true
+    }
+}
+
+/// Converts the input value into a 2's complement representation in a u128.
+pub fn __signed_into_twos<
+    T,
+    +Bounded<T>,
+    +Copy<T>,
+    +Destruct<T>,
+    +Drop<T>,
+    +Neg<T>,
+    +PartialOrd<T>,
+    +Sub<T>,
+    +TryInto<T, u128>,
+    +Zero<T>,
+>(
+    n: T,
+) -> u128 {
+    if n < Zero::<T>::zero() {
+        // Safe to unwrap as our types are always signed. This conversion will
+        // always succeed.
+        let max: u128 = Bounded::<u128>::MAX.try_into().unwrap();
+        let abs: u128 = (-n).try_into().unwrap();
+        max - abs + 1
+    } else {
+        n.try_into().unwrap()
+    }
+}
+
+/// Converts the input value into an arbitrary signed numeric T, assuming a 2's
+/// complement representation.
+///
+/// The input contains a 2's complement number in the u128, which must contain
+/// the correct number of bits to fit into T, otherwise this will panic.
+pub fn __signed_from_twos<
+    T, +Bounded<T>, +Destruct<T>, +Drop<T>, +Mul<T>, +Neg<T>, +One<T>, +Sub<T>, +TryInto<u128, T>,
+>(
+    n: u128,
+) -> T {
+    if (n & 0x80000000000000000000000000000000) != 0 {
+        // Safe to unwrap here as our types are always signed in this branch.
+        let max = Bounded::<u128>::MAX;
+        (-One::<T>::one()) * (max - n + 1).try_into().unwrap()
+    } else {
+        n.try_into().unwrap()
     }
 }

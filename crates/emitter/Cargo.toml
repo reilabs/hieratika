@@ -1,12 +1,12 @@
 [package]
-name = "hieratika-cli"
+name = "hieratika-emitter"
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
 authors.workspace = true
-description = "Hieratika CLI allows users to interact with the Hieratika compilation process."
+description = "A tool to emit sierra from a Hieratika FLO."
 keywords.workspace = true
 categories.workspace = true
 
@@ -14,22 +14,13 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-anyhow.workspace = true
+cairo-lang-compiler.workspace = true
+cairo-lang-filesystem = { path = "../../cairo/crates/cairo-lang-filesystem" }
 cairo-lang-runner = { path = "../../cairo/crates/cairo-lang-runner" }
+cairo-lang-sierra = { path = "../../cairo/crates/cairo-lang-sierra" }
 cairo-lang-utils = { path = "../../cairo/crates/cairo-lang-utils" }
-clap.workspace = true
-exitcode = "1.1.2"
 hieratika-cairoc.workspace = true
 hieratika-compiler.workspace = true
-hieratika-emitter.workspace = true
-hieratika-lifter.workspace = true
+hieratika-errors.workspace = true
+hieratika-flo.workspace = true
 hieratika-lowerer.workspace = true
-tempfile = "3.20.0"
-
-[dev-dependencies]
-assert_cmd = "2.0.16"
-indoc = "2.0.6"
-
-[[bin]]
-name = "hieratika"
-path = "src/main.rs"

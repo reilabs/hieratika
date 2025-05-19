@@ -7,12 +7,15 @@ members = [
   "crates/cli",
   "crates/compiler",
   "crates/driver",
+  "crates/emitter",
   "crates/error",
   "crates/flo",
   "crates/lifter",
+  "crates/lowerer",
   "crates/mangler",
   "crates/test-utils",
 ]
+default-members = ["crates/cli"]
 
 # Cairo is excluded because it is imported as git submodule that has its own Cargo workspace.
 exclude = ["cairo", "tests"]
@@ -52,8 +55,10 @@ inkwell = { git = "https://github.com/stevefan1999-personal/inkwell", rev = "0c1
 itertools = "0.14.0"
 hieratika-cairoc = { path = "crates/cairoc" }
 hieratika-compiler = { path = "crates/compiler" }
+hieratika-emitter = { path = "crates/emitter" }
 hieratika-errors = { path = "crates/error" }
 hieratika-flo = { path = "crates/flo" }
+hieratika-lowerer = { path = "crates/lowerer" }
 hieratika-mangler = { path = "crates/mangler" }
 hieratika-test-utils = { path = "crates/test-utils" }
 miette = { version = "7.5.0", features = ["fancy"] }
@@ -69,6 +74,6 @@ lto = "thin"           # Thin LTO performs cheaper cross-crate LTO.
 
 # Running the compiler tests in a reasonable time means we need to optimize,
 # but we also want to retain debug assertions and debug information.
-[profile.test]
+[profile.dev]
 opt-level = 1
 debug = "full"

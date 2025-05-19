@@ -185,10 +185,15 @@ impl ObjectGenerator {
     ///
     /// - [`Error`], if the code generation process fails for any reason.
     pub fn run(&self) -> Result<FlatLoweredObject> {
+        // We start by building our compilation context and running compilation
+        // on it.
         let mut cg_data = ObjectContext::new(&self.name);
-
         self.context()
             .analyze_module(|m| self.generate_module(m, &mut cg_data))?;
+
+        // We then complete the generation of the FLO to perform the necessary
+        // consistency checking.
+        cg_data.flo.finish();
 
         Ok(cg_data.into())
     }
@@ -232,8 +237,9 @@ impl ObjectGenerator {
         self.generate_function_pointer_vars(data)?;
 
         // As part of handling function pointers, we ALSO need dispatch functions for
-        // each function type in the current module.
-        self.generate_local_dispatch_functions(data)?;
+        // each function type in the current module. We currently do not do this to
+        // simplify getting things executing.
+        // self.generate_local_dispatch_functions(data)?;
 
         // With that done, we have to actually generate the code for the functions that
         // are defined locally.
@@ -340,7 +346,17 @@ impl ObjectGenerator {
                 // We start by iterating over all the basic blocks in the function, and creating
                 // an empty stub for each. These are inserted as needed into the object map.
                 for (ix, block) in function.get_basic_blocks().iter().enumerate() {
-                    let block_name = block.get_name().to_str()?;
+                    // Due to the way our state performs lookups, we need to be able to look up
+                    // blocks by name. Here, we assign names to unnamed blocks to ensure that they
+                    // can be looked up properly in the compilation context.
+                    let mut block_name = block.get_name().to_str()?.to_string();
+                    if block_name.is_empty() {
+                        let name = self.allocate_name();
+                        block.set_name(&name);
+                        block_name = name;
+                    }
+
+                    // We then generate a block that is empty (and currently invalid as a result).
                     let block_id = data.flo.new_empty_block();
 
                     // We first register the block into the blocks mapping.
@@ -850,7 +866,7 @@ impl ObjectGenerator {
                 // We then need variables describing the size of the allocation to create, and
                 // how many of these allocations.
                 let alloc_size = bb.simple_assign_new_const(ConstantValue {
-                    value: pointer_target_type.alloc_size_of_bytes(self.get_data_layout()) as u128,
+                    value: pointer_target_type.alloc_size_of_bytes(self.get_data_layout()) as i128,
                     typ:   Type::Unsigned64,
                 });
                 let alloc_count = bb.simple_assign_new_const(ConstantValue {
@@ -1303,14 +1319,14 @@ impl ObjectGenerator {
 
                 // In this case, it is a constant that we can compute at compile time.
                 bb.simple_assign_new_const(ConstantValue {
-                    value: u128::from_le_bytes(i128::from(offset_bytes).to_le_bytes()),
+                    value: i128::from(offset_bytes),
                     typ:   Type::Signed64,
                 })
             } else {
                 // In this case it is non-constant, so we have to defer the offset computation
                 // to runtime.
                 let type_size_felts_const = bb.simple_assign_new_const(ConstantValue {
-                    value: typ.alloc_size_of_bytes(data_layout) as u128,
+                    value: typ.alloc_size_of_bytes(data_layout) as i128,
                     typ:   Type::Signed64,
                 });
 
@@ -1440,7 +1456,7 @@ impl ObjectGenerator {
                         let bits_before_index = struct_type
                             .offset_of_element_at(gep_index_value, self.get_data_layout());
                         let const_offset = bb.simple_assign_new_const(ConstantValue {
-                            value: u128::from_le_bytes(bits_before_index.to_le_bytes()),
+                            value: bits_before_index,
                             typ:   Type::Signed64,
                         });
 
@@ -1631,7 +1647,7 @@ impl ObjectGenerator {
         // constant for that offset. As this constant is purely used once, we never add
         // it to the function context.
         let offset = bb.simple_assign_new_const(ConstantValue {
-            value: u128::from_le_bytes(initial_offset.to_le_bytes()),
+            value: initial_offset,
             typ:   Type::Signed64,
         });
 
@@ -1872,7 +1888,7 @@ impl ObjectGenerator {
         // constant for that offset. As this constant is purely used once, we never add
         // it to the function context.
         let offset = bb.simple_assign_new_const(ConstantValue {
-            value: u128::from_le_bytes(initial_offset.to_le_bytes()),
+            value: initial_offset,
             typ:   Type::Signed64,
         });
 
@@ -2975,7 +2991,7 @@ impl ObjectGenerator {
 
         // We also need arguments and returns with their types.
         let alloc_size = bb.simple_assign_new_const(ConstantValue {
-            value: type_size as u128,
+            value: type_size as i128,
             typ:   Type::Unsigned64,
         });
         let return_val = util::get_opcode_output(&instruction, func_ctx)?;
@@ -3106,7 +3122,7 @@ impl ObjectGenerator {
             .iter()
             .map(|id| {
                 let constant_val = ConstantValue {
-                    value: *id as u128,
+                    value: *id as i128,
                     typ:   Type::Pointer,
                 };
                 let constant_variable = bb.assign_new_const(
@@ -3449,11 +3465,17 @@ impl ObjectGenerator {
         let generate_conditional_br =
             |bb: &mut BlockBuilder, func_ctx: &mut FunctionContext| -> Result<()> {
                 // In this case we have to generate the CONDITIONAL branch.
+                //
+                // It must be noted that in LLVM IR, the iteration order of operands to a
+                // conditional branch instruction places the "else" branch before the "then"
+                // branch, and so we have to index them in that order. This is done for an
+                // analogy with the switch instruction, as that has its "else" case first too.
                 let condition = util::extract_value_operand(operands[0], InstructionOpcode::Br)?;
-                let true_block = util::extract_block_operand(operands[1], InstructionOpcode::Br)?;
-                let false_block = util::extract_block_operand(operands[2], InstructionOpcode::Br)?;
+                let true_block = util::extract_block_operand(operands[2], InstructionOpcode::Br)?;
+                let false_block = util::extract_block_operand(operands[1], InstructionOpcode::Br)?;
 
-                // The condition must be an already-extant variable.
+                // The condition must be an already-extant variable, otherwise the IR is
+                // malformed.
                 let cond_id = self.get_var_or_const(&condition, bb, func_ctx)?;
                 let cond_typ = bb.context.variables.get(cond_id).typ;
                 if !matches!(&cond_typ, Type::Bool) {
@@ -3637,8 +3659,8 @@ impl ObjectGenerator {
             // In this case, it can still, unfortunately, be many
             // possible constant values, and it is tricky for us to
             // figure out which.
-            if let Some(constant) = value.get_zero_extended_constant() {
-                u128::from(constant)
+            if let Some(constant) = value.get_sign_extended_constant() {
+                i128::from(constant)
             } else {
                 // Unfortunately LLVM-SYS (and hence Inkwell) only report constant values to 64
                 // bits of precision. We need to be able to work with constant values of the
@@ -3653,7 +3675,7 @@ impl ObjectGenerator {
                         ))
                     })?;
 
-                u128::from_le_bytes(parsed_result.value.to_le_bytes())
+                parsed_result.value
             }
         } else {
             // In this case, we have an expression that is constant but not a bare constant
@@ -3741,7 +3763,7 @@ impl ObjectGenerator {
                 "Floating-point value already known to be a constant had no constant value",
             );
 
-            u128::from(u64::from_le_bytes(const_float.to_le_bytes()))
+            i128::from(u64::from_le_bytes(const_float.to_le_bytes()))
         };
         let flo_const = ConstantValue {
             value: const_value,
@@ -3932,7 +3954,7 @@ impl ObjectGenerator {
             ConstantExpression::Integer(integer) => {
                 // An integer constant can be trivially turned into a constant value in FLO.
                 let flo_const = ConstantValue {
-                    value: u128::from_le_bytes(integer.value.to_le_bytes()),
+                    value: integer.value,
                     typ:   ObjectContext::flo_type_of(&integer.underlying_type)?,
                 };
                 bb.simple_assign_const(variable, flo_const);
@@ -4072,7 +4094,7 @@ impl ObjectGenerator {
                 // don't know how that pointer is going to be used, or its value, so we have to
                 // calculate the offset at runtime using the gep polyfill.
                 let accumulated_offset_id = bb.simple_assign_new_const(ConstantValue {
-                    value: u128::from_le_bytes(accumulated_offset.to_le_bytes()),
+                    value: accumulated_offset,
                     typ:   Type::Signed64,
                 });
 
